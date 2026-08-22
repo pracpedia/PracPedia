@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // NOTE: Do NOT set `output: "standalone"` — that's for Docker/VPS self-hosting.
+  // Vercel has its own build system and handles output automatically.
 
   // Enable React Strict Mode to surface latent bugs (double-render in dev only).
   reactStrictMode: true,

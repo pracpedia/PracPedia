@@ -24,12 +24,14 @@ Keep responses under 600 words.`;
     let aiResponse: string;
     try {
       const ZAI = await import('z-ai-web-dev-sdk');
-      // BYOK: prefer the user's Gemini API key from the x-gemini-api-key header.
-      // Fall back to the GEMINI_API_KEY env var if the user hasn't set one.
+      // The z-AI SDK reads the API key from process.env.GEMINI_API_KEY automatically.
+      // BYOK: if the user sends their own key via x-gemini-api-key header, we set
+      // it as the env var before calling create() (workaround for SDK not accepting args).
       const userApiKey = request.headers.get('x-gemini-api-key');
-      const zai = userApiKey
-        ? await ZAI.default.create({ apiKey: userApiKey })
-        : await ZAI.default.create();
+      if (userApiKey) {
+        process.env.GEMINI_API_KEY = userApiKey;
+      }
+      const zai = await ZAI.default.create();
       const completion = await zai.chat.completions.create({
         messages: [
           { role: 'system', content: sysPrompt },

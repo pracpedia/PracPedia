@@ -36,11 +36,10 @@ Keep the tone academic, encouraging, and clear. Use proper Markdown formatting.`
     let aiResponse: string;
     try {
       const ZAI = await import('z-ai-web-dev-sdk');
-      const zai = await ZAI.default.create(
-        request.headers.get('x-gemini-api-key')
-          ? { apiKey: request.headers.get('x-gemini-api-key') as string }
-          : undefined
-      );
+      // BYOK: set user's API key as env var if provided via header
+      const userApiKey = request.headers.get('x-gemini-api-key');
+      if (userApiKey) process.env.GEMINI_API_KEY = userApiKey;
+      const zai = await ZAI.default.create();
       const completion = await zai.chat.completions.create({
         messages: [
           { role: 'system', content: sysPrompt },
