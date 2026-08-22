@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
   Layers,
@@ -25,7 +25,15 @@ import {
   Image as ImageIcon,
   BarChart3,
   Key,
-  Crown
+  Crown,
+  Activity,
+  LogIn,
+  LogOut,
+  MessageSquare,
+  ShoppingBag,
+  UserPlus,
+  Filter,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CredentialsView } from '@/components/features/pages/CredentialsView';
@@ -100,6 +108,254 @@ interface AdminCmsPageProps {
   onNavigateToCreds?: () => void;
 }
 
+/* ========================================================================== */
+/*  ACTIVITY LOG TAB — real-time feed of user actions                          */
+/* ========================================================================== */
+
+interface ActivityEntry {
+  id: string;
+  userId: string | null;
+  userName: string;
+  userRole: string;
+  action: string;
+  category: string;
+  detail: string;
+  metadataJson?: string;
+  metadata?: Record<string, any>;
+  ipAddress?: string | null;
+  createdAt: string;
+}
+
+interface ActivityLogTabProps {
+  apiFetch: (url: string, opts?: RequestInit) => Promise<Response>;
+}
+
+const CATEGORY_META: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
+  auth:        { label: 'Auth',        color: 'text-emerald-300', bg: 'bg-emerald-500/10',  border: 'border-emerald-500/25',  icon: LogIn },
+  user:        { label: 'User',        color: 'text-sky-300',     bg: 'bg-sky-500/10',      border: 'border-sky-500/25',      icon: Users },
+  content:     { label: 'Content',     color: 'text-indigo-300',  bg: 'bg-indigo-500/10',   border: 'border-indigo-500/25',   icon: BookOpen },
+  marketplace: { label: 'Marketplace', color: 'text-amber-300',   bg: 'bg-amber-500/10',    border: 'border-amber-500/25',    icon: ShoppingBag },
+  chat:        { label: 'Chat',        color: 'text-cyan-300',    bg: 'bg-cyan-500/10',     border: 'border-cyan-500/25',     icon: MessageSquare },
+  system:      { label: 'System',      color: 'text-fuchsia-300', bg: 'bg-fuchsia-500/10',  border: 'border-fuchsia-500/25',  icon: Activity },
+};
+
+const ACTION_ICONS: Record<string, React.ElementType> = {
+  login: LogIn,
+  logout: LogOut,
+  register: UserPlus,
+  booking_created: ShoppingBag,
+  message_sent: MessageSquare,
+  profile_updated: Users,
+  default: Activity,
+};
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+const ActivityLogTab: React.FC<ActivityLogTabProps> = ({ apiFetch }) => {
+  const [entries, setEntries] = useState<ActivityEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchEntries = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await apiFetch('/api/activity-log?limit=100');
+      if (!res.ok) throw new Error('Failed to load');
+      const data = await res.json();
+      setEntries(data.entries || []);
+      setLastRefresh(new Date());
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load activity log');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  // Initial fetch + long-poll loop (5s interval — light on the server)
+  useEffect(() => {
+    fetchEntries();
+    let cancelled = false;
+
+    const pollLoop = async () => {
+      while (!cancelled && autoRefresh) {
+        await new Promise((r) => setTimeout(r, 5000));
+        if (cancelled || !autoRefresh) break;
+        await fetchEntries(true);
+      }
+    };
+    pollLoop();
+
+    return () => { cancelled = true; if (pollRef.current) clearTimeout(pollRef.current); };
+  }, [autoRefresh]);
+
+  // Filter entries by category + search
+  const filtered = entries.filter((e) => {
+    if (filter !== 'all' && e.category !== filter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        e.userName.toLowerCase().includes(q) ||
+        e.action.toLowerCase().includes(q) ||
+        e.detail.toLowerCase().includes(q) ||
+        (e.ipAddress || '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-300">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-950/80 border border-white/10">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shrink-0">
+            <Activity className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              Real-Time Activity Log
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {filtered.length} entries{lastRefresh ? ` · updated ${timeAgo(lastRefresh.toISOString())}` : ''}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setAutoRefresh((v) => !v)}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer min-h-[32px] ${
+              autoRefresh
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                : 'bg-slate-900 text-slate-400 border-white/10 hover:text-slate-200'
+            }`}
+          >
+            <RefreshCw className={`w-3 h-3 inline mr-1 ${autoRefresh ? 'animate-spin' : ''}`} />
+            {autoRefresh ? 'Live' : 'Paused'}
+          </button>
+          <button
+            onClick={() => fetchEntries()}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-900 text-slate-400 border border-white/10 hover:text-white hover:bg-slate-800 transition-all cursor-pointer min-h-[32px]"
+          >
+            <RefreshCw className="w-3 h-3 inline mr-1" />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Filters + search */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          {['all', 'auth', 'user', 'content', 'marketplace', 'chat', 'system'].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilter(cat)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer min-h-[28px] ${
+                filter === cat
+                  ? 'bg-cyan-500 text-slate-950'
+                  : 'bg-slate-950/80 text-slate-400 border border-white/5 hover:text-slate-200'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1 min-w-0">
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by user, action, IP…"
+            className="w-full h-8 pl-8 pr-2 rounded-lg bg-slate-950/80 border border-white/10 text-slate-200 placeholder:text-slate-500 text-xs focus:outline-none focus:border-cyan-500/40"
+          />
+        </div>
+      </div>
+
+      {/* Entries */}
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-16 rounded-xl bg-slate-950/80 border border-white/5 animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="p-6 rounded-xl bg-rose-950/30 border border-rose-500/30 text-rose-300 text-sm text-center">
+          {error}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="p-8 rounded-xl bg-slate-950/80 border border-white/5 text-center text-slate-500 text-sm">
+          No activity entries found.
+        </div>
+      ) : (
+        <div className="space-y-1.5 max-h-[60vh] overflow-y-auto pr-1">
+          {filtered.map((entry) => {
+            const meta = CATEGORY_META[entry.category] || CATEGORY_META.system;
+            const Icon = ACTION_ICONS[entry.action] || ACTION_ICONS.default;
+            return (
+              <div
+                key={entry.id}
+                className="flex items-start gap-3 p-3 rounded-xl bg-slate-950/60 border border-white/5 hover:border-white/10 hover:bg-slate-950/80 transition-all"
+              >
+                {/* Icon */}
+                <div className={`p-2 rounded-lg ${meta.bg} ${meta.border} border shrink-0`}>
+                  <Icon className={`w-3.5 h-3.5 ${meta.color}`} />
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-white truncate">{entry.userName}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${meta.bg} ${meta.color} ${meta.border}`}>
+                      {entry.action}
+                    </span>
+                    {entry.userRole && entry.userRole !== 'user' && (
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+                        entry.userRole === 'super_admin' ? 'bg-fuchsia-500/15 text-fuchsia-300' :
+                        entry.userRole === 'admin' ? 'bg-amber-500/15 text-amber-300' :
+                        entry.userRole === 'artist' ? 'bg-pink-500/15 text-pink-300' :
+                        'bg-sky-500/15 text-sky-300'
+                      }`}>
+                        {entry.userRole}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-slate-500 ml-auto shrink-0">{timeAgo(entry.createdAt)}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5 break-words">{entry.detail}</p>
+                  {entry.ipAddress && (
+                    <p className="text-[9px] text-slate-600 font-mono mt-0.5">IP: {entry.ipAddress}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   user,
   subjects,
@@ -112,7 +368,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
 }) => {
   const { apiFetch } = useAuth();
   // Navigation tabs: 'overview' | 'content' | 'assets' | 'users' | 'commissions' | 'announcements'
-  const [activeTab, setActiveTab] = useState<'overview' | 'content' | 'assets' | 'users' | 'commissions' | 'announcements'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'content' | 'assets' | 'users' | 'commissions' | 'announcements' | 'activity'>('overview');
 
   // Notification Banner States
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -942,6 +1198,22 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
           <span>Notice Broadcasts</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/80 font-mono">
             {announcements.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('activity')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer min-h-[44px] ${
+            activeTab === 'activity'
+              ? 'bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+              : 'bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-white/5'
+          }`}
+        >
+          <Activity className="w-4 h-4" />
+          <span>Activity Log</span>
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
         </button>
       </div>
@@ -2347,6 +2619,13 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* =========================================================================
+          TAB 7: ACTIVITY LOG (REAL-TIME FEED)
+          ========================================================================= */}
+      {activeTab === 'activity' && (
+        <ActivityLogTab apiFetch={apiFetch} />
       )}
 
       {/* =========================================================================

@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { signToken, getUserFromRequest } from '@/lib/auth';
 import { serializeUser } from '@/lib/user-serializer';
 import { registerLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
+import { logActivity } from '@/lib/activity-log';
 
 // Basic email format check
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,6 +68,17 @@ export async function POST(request: NextRequest) {
 
     // Successful registration — reset this IP's bucket
     registerLimiter.reset(ip);
+
+    // Log to activity feed
+    await logActivity({
+      userId: newUser.id,
+      userName: newUser.name,
+      userRole: newUser.role,
+      action: 'register',
+      category: 'auth',
+      detail: `New ${newUser.role} registered: ${newUser.email}`,
+      request,
+    });
 
     const token = await signToken({
       userId: newUser.id,

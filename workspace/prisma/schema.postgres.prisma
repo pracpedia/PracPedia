@@ -166,3 +166,24 @@ model PortfolioItem {
   @@index([artistId])
   @@map("portfolio_items")
 }
+
+/// Activity log entry — tracks user actions for the admin real-time feed.
+/// Each row is one event: login, register, booking created, message posted, etc.
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?  // null for anonymous/public events
+  userName  String   @default("Anonymous")
+  userRole  String   @default("user")
+  action    String   // e.g. "login", "register", "booking_created", "message_sent"
+  category  String   @default("user") // "auth" | "user" | "content" | "marketplace" | "chat" | "system"
+  detail    String   @default("")    // human-readable description
+  metadataJson String @default("{}") // JSON object with extra context (e.g. bookingId, subjectId)
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])     // newest first — main query pattern
+  @@index([userId])         // filter by user
+  @@index([category])       // filter by category
+  @@index([action])         // filter by action type
+  @@map("activity_logs")
+}

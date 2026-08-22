@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { signToken } from '@/lib/auth';
 import { serializeUser } from '@/lib/user-serializer';
 import { loginLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
+import { logActivity } from '@/lib/activity-log';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,6 +38,17 @@ export async function POST(request: NextRequest) {
 
     // Successful login — reset this IP's bucket so they aren't penalized
     loginLimiter.reset(ip);
+
+    // Log to activity feed
+    await logActivity({
+      userId: u.id,
+      userName: u.name,
+      userRole: u.role,
+      action: 'login',
+      category: 'auth',
+      detail: `${u.name} (${u.email}) logged in`,
+      request,
+    });
 
     const token = await signToken({ userId: u.id, email: u.email, role: u.role });
     return NextResponse.json({ token, user: serializeUser(u) });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { logActivity } from '@/lib/activity-log';
 
 export async function GET(request: NextRequest) {
   try {
@@ -77,6 +78,18 @@ export async function POST(request: NextRequest) {
         subjectId: subjectId || null,
       },
     });
+    // Log to activity feed
+    await logActivity({
+      userId: u.id,
+      userName: u.name,
+      userRole: u.role,
+      action: 'message_sent',
+      category: 'chat',
+      detail: `${u.name} posted a message${subjectId ? ' in a subject channel' : ' in global chat'}`,
+      metadata: { messageId: created.id, subjectId: subjectId || null },
+      request,
+    });
+
     return NextResponse.json({ ...created, id: created.id });
   } catch (err: any) {
     console.error('POST /api/chat error:', err);

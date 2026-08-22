@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { logActivity } from '@/lib/activity-log';
 
 export async function GET(request: NextRequest) {
   try {
@@ -87,6 +88,18 @@ export async function POST(request: NextRequest) {
         status: 'pending',
         paymentStatus: 'unpaid',
       },
+    });
+
+    // Log to activity feed
+    await logActivity({
+      userId: payload.userId,
+      userName: payload.email,
+      userRole: payload.role,
+      action: 'booking_created',
+      category: 'marketplace',
+      detail: `New commission: ${serviceType} for ${subject} (BDT ${price})`,
+      metadata: { bookingId: booking.id, artistId, serviceType, price },
+      request,
     });
 
     return NextResponse.json({
