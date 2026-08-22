@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { uploadDataUrl } from '@/lib/blob-storage';
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,13 +46,19 @@ export async function POST(request: NextRequest) {
     if (!imageUrl || !title) {
       return NextResponse.json({ error: 'imageUrl and title are required.' }, { status: 400 });
     }
+
+    // Upload to blob storage if it's a data URL
+    const finalImageUrl = imageUrl.startsWith('data:')
+      ? await uploadDataUrl(String(imageUrl), 'portfolio')
+      : String(imageUrl);
+
     const tagArr = Array.isArray(tags)
       ? tags
       : (tags ? String(tags).split(',').map((s: string) => s.trim()).filter(Boolean) : []);
     const created = await db.portfolioItem.create({
       data: {
         artistId: u.id,
-        imageUrl: String(imageUrl),
+        imageUrl: finalImageUrl,
         title: String(title),
         description: description ? String(description) : '',
         tagsJson: JSON.stringify(tagArr),

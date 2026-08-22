@@ -55,6 +55,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
   const { user, apiFetch } = useAuth();
   const { language, t } = useLanguage();
   const [messages, setMessages] = useState<MessageType[]>([]);
+  const messagesRef = useRef<MessageType[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<string>('general');
   const [typedMessage, setTypedMessage] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -65,6 +66,12 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
   const [mobileView, setMobileView] = useState<'channels' | 'chat'>('chat');
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Keep messagesRef in sync with messages state so the long-poll loop can
+  // read the latest message timestamp without being a dependency of the effect.
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Real-time active users
   const [activeUsers, setActiveUsers] = useState<any[]>((window as any).__activeUsers || []);
@@ -77,20 +84,25 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
     t('quickChip4'),
   ];
 
-  // Fetch messages of specified subject channel
-  const fetchChannelMessages = async (subjId: string, silent: boolean = false) => {
+  // Fetch messages of specified subject channel.
+  // If `since` is provided, uses long-polling (server holds up to 20s waiting
+  // for new messages). Otherwise, fetches the latest 200 messages immediately.
+  const fetchChannelMessages = async (subjId: string, silent: boolean = false, since?: string) => {
     if (!silent) {
       setLoading(true);
       setErrorMessage(null);
     }
     try {
-      // Next.js backend exposes /api/chat (general) and /api/chat/[subjectId] (subject-specific)
-      const endpoint = subjId === 'general' ? '/api/chat' : `/api/chat/${subjId}`;
+      // Always use /api/chat/[subjectId] — 'general' maps to global (null subjectId)
+      const endpoint = `/api/chat/${subjId}` + (since ? `?since=${encodeURIComponent(since)}` : '');
       const res = await apiFetch(endpoint);
       if (res.ok) {
         const raw = await res.json();
+        // Response shape: { messages: [...], polledAt: '...' }
+        // Handle both old (array) and new ({messages}) shapes for resilience
+        const rawMessages = Array.isArray(raw) ? raw : (raw.messages || []);
         // Normalize API fields (text -> content, userAvatar -> userProfilePic) to match local MessageType shape
-        const data: MessageType[] = (Array.isArray(raw) ? raw : []).map((m: any) => ({
+        const data: MessageType[] = rawMessages.map((m: any) => ({
           id: m.id,
           _id: m._id,
           userId: m.userId,
@@ -102,13 +114,15 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
           userProfilePic: m.userProfilePic ?? m.userAvatar,
         }));
         setMessages((prev) => {
-          // Compare previous message IDs to prevent redundant state re-renders which mess up the layout
-          const prevIds = prev.map(m => m.id || m._id).join(',');
-          const newIds = data.map((m) => m.id || m._id).join(',');
-          if (prevIds !== newIds || prev.length !== data.length) {
-            return data;
+          if (since) {
+            // Long-poll mode — merge new messages into existing
+            if (data.length === 0) return prev;
+            const existingIds = new Set(prev.map(m => m.id || m._id));
+            const newOnes = data.filter(m => !existingIds.has(m.id || m._id));
+            return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
           }
-          return prev;
+          // Initial fetch — replace all
+          return data;
         });
       } else if (!silent) {
         const errData = await res.json();
@@ -213,15 +227,45 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
     }
   };
 
-  // Fetch initial posts and configure automatic polling every 1 second to make it act like a live Messenger
+  // Initial fetch + long-polling loop for near-real-time chat.
+  //
+  // How it works:
+  //   1. On mount/channel change, fetch the latest 200 messages (initial load)
+  //   2. Then start a long-poll loop: send a request with ?since=<last message time>
+  //   3. Server holds the request open up to 20s, returns when new messages arrive
+  //   4. Client merges new messages, then immediately sends the next long-poll
+  //
+  // This gives ~1s latency (same as the old 1s polling) but with 20× fewer
+  // requests — dramatically lower server load and battery usage.
   useEffect(() => {
-    fetchChannelMessages(activeChannelId, false);
+    let cancelled = false;
 
-    const intervalId = setInterval(() => {
-      fetchChannelMessages(activeChannelId, true);
-    }, 1000);
+    const startLongPollLoop = async (subjId: string) => {
+      // Initial fetch (no `since` param)
+      await fetchChannelMessages(subjId, false);
 
-    return () => clearInterval(intervalId);
+      if (cancelled) return;
+
+      // Long-poll loop
+      while (!cancelled) {
+        // Get the latest message timestamp to use as the `since` cursor
+        const latestMsg = messagesRef.current[messagesRef.current.length - 1];
+        const since = latestMsg?.createdAt || new Date(0).toISOString();
+
+        // Wait for new messages (server holds up to 20s)
+        await fetchChannelMessages(subjId, true, since);
+
+        // Small delay between long-poll cycles to prevent tight loops on errors
+        if (cancelled) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    };
+
+    startLongPollLoop(activeChannelId);
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeChannelId]);
 
   // Listen to WebSocket-triggered immediate reload event for instantaneous responsiveness

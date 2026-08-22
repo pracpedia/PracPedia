@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -33,18 +34,11 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: [
-          // MIME sniffing protection
           { key: "X-Content-Type-Options", value: "nosniff" },
-          // Clickjacking protection — allow same-origin only
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
-          // HSTS — force HTTPS for 1 year (only honored over HTTPS)
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
-          // Disable referrer leak to cross-origin destinations
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          // Restrict powerful browser features
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          // CSP — locked down to self + a few trusted inline sources
-          // (loose enough for shadcn/ui + Tailwind, strict enough to block exfil)
           {
             key: "Content-Security-Policy",
             value: [
@@ -65,5 +59,16 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Sentry wrapper — only active when SENTRY_DSN is set
+// ─────────────────────────────────────────────────────────────────────────────
+export default withSentryConfig(nextConfig, {
+  // Only activate Sentry when the auth token is present (avoids build errors
+  // when SENTRY_AUTH_TOKEN is not set — e.g. local dev or non-Sentry deploys)
+  silent: true,
+  // Disable source map upload when no auth token (avoids build failure)
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  // Tree-shake Sentry in production to reduce bundle size
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+});

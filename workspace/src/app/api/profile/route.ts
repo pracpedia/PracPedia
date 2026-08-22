@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest, signToken } from '@/lib/auth';
 import { serializeUser } from '@/lib/user-serializer';
+import { uploadDataUrl } from '@/lib/blob-storage';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -23,7 +24,12 @@ export async function PUT(request: NextRequest) {
     if (name !== undefined) updateData.name = String(name);
     if (phoneNumber !== undefined) updateData.phoneNumber = String(phoneNumber);
     if (bio !== undefined) updateData.bio = String(bio);
-    if (profilePic !== undefined) updateData.profilePic = String(profilePic);
+    if (profilePic !== undefined) {
+      // Upload avatar to blob storage if it's a data URL
+      updateData.profilePic = profilePic.startsWith('data:')
+        ? await uploadDataUrl(String(profilePic), 'avatars')
+        : String(profilePic);
+    }
     if (isArtist) {
       if (rateDrawingOnly !== undefined) updateData.rateDrawingOnly = Number(rateDrawingOnly) || 0;
       if (rateDrawingWriting !== undefined) updateData.rateDrawingWriting = Number(rateDrawingWriting) || 0;
