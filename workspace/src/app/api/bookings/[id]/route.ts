@@ -1,0 +1,158 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { getUserFromRequest } from '@/lib/auth';
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const payload = await getUserFromRequest(request);
+    if (!payload) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { id } = await params;
+    const booking = await db.booking.findUnique({
+      where: { id },
+      include: {
+        client: { select: { id: true, name: true, email: true, profilePic: true } },
+        artist: { select: { id: true, name: true, email: true, profilePic: true, rating: true, completedOrders: true } },
+      },
+    });
+    if (!booking) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+    // Only client, artist, or admins can view
+    if (
+      booking.clientId !== payload.userId &&
+      booking.artistId !== payload.userId &&
+      payload.role !== 'admin' &&
+      payload.role !== 'super_admin'
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    return NextResponse.json({
+      ...booking,
+      id: booking.id,
+      referenceImages: JSON.parse(booking.referenceImagesJson || '[]'),
+    });
+  } catch {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const payload = await getUserFromRequest(request);
+    if (!payload) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { id } = await params;
+    const booking = await db.booking.findUnique({ where: { id } });
+    if (!booking) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const { status, paymentStatus, artistNotes, clientNotes } = body;
+
+    // Authorization rules
+    const isClient = booking.clientId === payload.userId;
+    const isArtist = booking.artistId === payload.userId;
+    const isSuperAdmin = payload.role === 'super_admin';
+    const isAdmin = payload.role === 'admin';
+
+    // Status transition validation
+    const validStatuses = ['pending', 'in_progress', 'completed', 'cancelled'];
+    const newStatus = status !== undefined ? String(status) : undefined;
+    if (newStatus && !validStatuses.includes(newStatus)) {
+      return NextResponse.json({ error: 'Invalid status.' }, { status: 400 });
+    }
+
+    // Client can only cancel (not change to other statuses) or update clientNotes
+    if (!isArtist && !isSuperAdmin && !isAdmin) {
+      if (isClient) {
+        if (newStatus && newStatus !== 'cancelled') {
+          return NextResponse.json({ error: 'Clients can only cancel bookings.' }, { status: 403 });
+        }
+      } else {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
+    // Cannot modify a cancelled or completed booking
+    if (booking.status === 'cancelled' || booking.status === 'completed') {
+      return NextResponse.json({ error: `Booking already ${booking.status}.` }, { status: 400 });
+    }
+
+    const updateData: any = {};
+    if (newStatus) updateData.status = newStatus;
+    if (paymentStatus !== undefined) updateData.paymentStatus = String(paymentStatus);
+    if (artistNotes !== undefined && isArtist) updateData.artistNotes = String(artistNotes);
+    if (clientNotes !== undefined && isClient) updateData.clientNotes = String(clientNotes);
+
+    const updated = await db.booking.update({ where: { id }, data: updateData });
+
+    // If status changed to 'completed', increment artist's completedOrders
+    if (newStatus === 'completed' && booking.status !== 'completed') {
+      await db.user.update({
+        where: { id: booking.artistId },
+        data: { completedOrders: { increment: 1 } },
+      });
+    }
+    // If rolling back from completed (rare), decrement
+    if (booking.status === 'completed' && newStatus && newStatus !== 'completed') {
+      await db.user.update({
+        where: { id: booking.artistId },
+        data: { completedOrders: { decrement: 1 } },
+      });
+    }
+
+    return NextResponse.json({
+      ...updated,
+      id: updated.id,
+      referenceImages: JSON.parse(updated.referenceImagesJson || '[]'),
+    });
+  } catch (err: any) {
+    console.error('PUT /api/bookings/[id] error:', err);
+    return NextResponse.json({ error: 'Could not update booking.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const payload = await getUserFromRequest(request);
+    if (!payload) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const { id } = await params;
+    const booking = await db.booking.findUnique({ where: { id } });
+    if (!booking) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+    // Client, artist, or admin/super_admin can cancel (sets status=cancelled)
+    if (
+      booking.clientId !== payload.userId &&
+      booking.artistId !== payload.userId &&
+      payload.role !== 'admin' &&
+      payload.role !== 'super_admin'
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (booking.status === 'cancelled') {
+      return NextResponse.json({ error: 'Booking already cancelled.' }, { status: 400 });
+    }
+    if (booking.status === 'completed') {
+      return NextResponse.json({ error: 'Cannot cancel a completed booking.' }, { status: 400 });
+    }
+    const updated = await db.booking.update({
+      where: { id },
+      data: { status: 'cancelled' },
+    });
+    return NextResponse.json({
+      ...updated,
+      id: updated.id,
+      referenceImages: JSON.parse(updated.referenceImagesJson || '[]'),
+    });
+  } catch (err: any) {
+    console.error('DELETE /api/bookings/[id] error:', err);
+    return NextResponse.json({ error: 'Could not cancel booking.' }, { status: 500 });
+  }
+}

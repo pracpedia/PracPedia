@@ -1,0 +1,150 @@
+// Prisma schema for PracPedia (Practical Notebook Gallery)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  passwordHash  String
+  role          String   @default("user") // "user" | "admin" | "super_admin" | "artist"
+  studyTime     Int      @default(0)
+  profilePic    String?
+  phoneNumber   String?
+  bio           String?
+  isAdminStudent Boolean @default(false)
+  isPremium     Boolean  @default(false)
+  aiCredits     Int      @default(0)
+  scareTriggered Boolean @default(false)
+  catTriggered  Boolean  @default(false)
+
+  // Artist marketplace fields
+  rateDrawingOnly  Int      @default(150)   // BDT price for "Drawing Only" service
+  rateDrawingWriting Int    @default(300)   // BDT price for "Drawing + Writing" service
+  specialtiesJson String   @default("[]")   // JSON array of strings
+  isAvailable     Boolean  @default(true)   // accepting new commissions?
+  rating          Float    @default(5.0)    // average rating (0-5)
+  completedOrders Int      @default(0)      // total completed commissions
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bookingsAsClient  Booking[]    @relation("BookingClient")
+  bookingsAsArtist  Booking[]    @relation("BookingArtist")
+  portfolio         PortfolioItem[]
+
+  @@map("users")
+}
+
+model Subject {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  folders     Folder[]
+  chatMessages ChatMessage[]
+
+  @@map("subjects")
+}
+
+model Folder {
+  id          String   @id @default(cuid())
+  subjectId   String
+  title       String
+  description String
+  imagesJson  String   @default("[]") // JSON array of {url, title}
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@map("folders")
+}
+
+model Announcement {
+  id           String   @id @default(cuid())
+  title        String
+  content      String
+  deadline     String?
+  createdById  String
+  createdByName String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("announcements")
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  subjectId  String?
+  userId     String
+  userName   String
+  userRole   String   @default("user")
+  userAvatar String?
+  text       String
+  createdAt  DateTime @default(now())
+
+  subject    Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model HireRequest {
+  id         String   @id @default(cuid())
+  fullName   String
+  email      String
+  phone      String
+  subject    String
+  message    String
+  status     String   @default("pending") // pending | approved | rejected
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("hire_requests")
+}
+
+model Booking {
+  id            String   @id @default(cuid())
+  clientId      String
+  artistId      String
+  serviceType   String   @default("drawing_only") // "drawing_only" | "drawing_writing"
+  subject       String
+  description   String
+  referenceImagesJson String @default("[]") // JSON array of {url, title}
+  price         Int      @default(0)        // BDT
+  status        String   @default("pending") // pending | in_progress | completed | cancelled
+  paymentStatus String   @default("unpaid")  // unpaid | paid | refunded
+  clientNotes   String?
+  artistNotes   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  client        User     @relation("BookingClient", fields: [clientId], references: [id], onDelete: Cascade)
+  artist        User     @relation("BookingArtist", fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@map("bookings")
+}
+
+model PortfolioItem {
+  id          String   @id @default(cuid())
+  artistId    String
+  imageUrl    String
+  title       String
+  description String   @default("")
+  tagsJson    String   @default("[]") // JSON array of subject tags
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  artist      User     @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@map("portfolio_items")
+}
