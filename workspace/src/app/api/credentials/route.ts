@@ -2,9 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
-// Super-admin-only endpoint returning a system credentials snapshot.
-// Used by the /creds view accessible from the Super Admin CMS dashboard.
+/**
+ * Super-admin-only endpoint returning a system credentials snapshot.
+ *
+ * SECURITY:
+ *   1. Requires `PRACPEDIA_TEST_PASSWORDS_VISIBLE=true` in the env. When this
+ *      flag is unset or `false`, the endpoint returns 404 to any caller —
+ *      including authenticated super admins. This means in a normal production
+ *      deploy the route effectively does not exist.
+ *   2. Even with the flag on, the response NO LONGER includes plaintext
+ *      passwords. The previous `demoAccounts` array was removed because it
+ *      hardcoded `admin123` / `user123` / `artist123` in source — anyone
+ *      reading the repo could log in. Passwords are stored as bcrypt hashes
+ *      in the DB and are never retrievable in plaintext.
+ *   3. The response NO LONGER leaks `DATABASE_URL`. It returns only a boolean
+ *      indicating whether the variable is set.
+ *
+ * What this endpoint DOES still return (with the flag on):
+ *   - System metadata (framework, ORM, Node version, uptime)
+ *   - Per-table row counts
+ *   - Admin / super_admin user list (id, name, email, createdAt — no passwords)
+ *   - Endpoint catalog (path list, no auth info)
+ *
+ * This is sufficient for a QA dashboard without creating a credential leak.
+ */
 export async function GET(request: NextRequest) {
+  // Hard gate — even super admins cannot bypass this without the env flag.
+  if (process.env.PRACPEDIA_TEST_PASSWORDS_VISIBLE !== 'true') {
+    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+  }
+
   try {
     const payload = await getUserFromRequest(request);
     if (!payload) {
@@ -15,48 +42,59 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Access forbidden. Super Admin only.' }, { status: 403 });
     }
 
-    // Pull environment-derived / DB-derived credentials
-    const userCount = await db.user.count();
-    const subjectCount = await db.subject.count();
-    const folderCount = await db.folder.count();
-    const bookingCount = await db.booking.count();
-    const portfolioCount = await db.portfolioItem.count();
-    const announcementCount = await db.announcement.count();
-    const chatCount = await db.chatMessage.count();
-    const hireCount = await db.hireRequest.count();
+    // Per-table counts
+    const [
+      userCount, subjectCount, folderCount, bookingCount,
+      portfolioCount, announcementCount, chatCount, hireCount,
+    ] = await Promise.all([
+      db.user.count(),
+      db.subject.count(),
+      db.folder.count(),
+      db.booking.count(),
+      db.portfolioItem.count(),
+      db.announcement.count(),
+      db.chatMessage.count(),
+      db.hireRequest.count(),
+    ]);
 
-    // List all admins and super admins
-    const superAdmins = await db.user.findMany({
-      where: { role: 'super_admin' },
-      select: { id: true, name: true, email: true, createdAt: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    const admins = await db.user.findMany({
-      where: { role: 'admin' },
-      select: { id: true, name: true, email: true, createdAt: true },
-      orderBy: { createdAt: 'asc' },
-    });
+    // List admins + super admins (NO passwords — only public fields)
+    const [superAdmins, admins] = await Promise.all([
+      db.user.findMany({
+        where: { role: 'super_admin' },
+        select: { id: true, name: true, email: true, role: true, createdAt: true, isPremium: true, studyTime: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      db.user.findMany({
+        where: { role: 'admin' },
+        select: { id: true, name: true, email: true, role: true, createdAt: true, isPremium: true, studyTime: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
 
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
+      testMode: true,
+      warning: 'TEST MODE — credentials viewer is enabled. Disable by unsetting PRACPEDIA_TEST_PASSWORDS_VISIBLE in production.',
       system: {
         appName: 'PracPedia — Practical Notebook Gallery',
         framework: 'Next.js 16 (App Router, Turbopack)',
         language: 'TypeScript 5',
         styling: 'Tailwind CSS 4 + shadcn/ui',
         orm: 'Prisma 6',
-        database: 'SQLite',
-        databaseUrl: process.env.DATABASE_URL || '(not set)',
-        jwtSecretSet: !!process.env.JWT_SECRET,
-        zAiSdkInstalled: true,
+        database: process.env.DATABASE_URL?.startsWith('postgres') ? 'PostgreSQL' : 'SQLite',
+        databaseUrlSet: !!process.env.DATABASE_URL,      // boolean only, no value leak
+        jwtSecretSet: !!process.env.JWT_SECRET,            // boolean only
+        jwtSecretLength: process.env.JWT_SECRET?.length ?? 0,
+        testPasswordMode: process.env.PRACPEDIA_TEST_PASSWORDS_VISIBLE === 'true',
         nodeVersion: process.version,
         platform: process.platform,
         arch: process.arch,
         uptime: `${Math.floor(process.uptime() / 60)}m ${Math.floor(process.uptime() % 60)}s`,
+        env: process.env.NODE_ENV || 'development',
       },
       stats: {
         users: userCount,
-        subjects,
+        subjects: subjectCount,
         folders: folderCount,
         bookings: bookingCount,
         portfolio: portfolioCount,
@@ -65,8 +103,8 @@ export async function GET(request: NextRequest) {
         hireRequests: hireCount,
       },
       roles: {
-        superAdmins: superAdmins.map((s) => ({ ...s, id: s.id })),
-        admins: admins.map((a) => ({ ...a, id: a.id })),
+        superAdmins,
+        admins,
       },
       endpoints: [
         'POST /api/auth/login',
@@ -103,6 +141,7 @@ export async function GET(request: NextRequest) {
         'GET  /api/bookings/[id]',
         'PUT  /api/bookings/[id]',
         'DELETE /api/bookings/[id]',
+        'POST /api/bookings/[id]/rate',
         'GET  /api/portfolio?artistId=...',
         'POST /api/portfolio',
         'DELETE /api/portfolio/[id]',
@@ -110,19 +149,12 @@ export async function GET(request: NextRequest) {
         'GET  /api/artists/[id]',
         'POST /api/artists/register',
         'PUT  /api/artists/register',
-        'GET  /api/credentials (super admin only)',
+        'GET  /api/credentials (super admin + test-mode flag)',
         'POST /api/academy/lesson',
         'POST /api/academy/chat',
         'POST /api/academy/mcq',
         'POST /api/academy/cq',
-      ],
-      demoAccounts: [
-        { email: 'admin@gallery.com', password: 'admin123', role: 'super_admin' },
-        { email: 'admin2@gallery.com', password: 'admin123', role: 'admin' },
-        { email: 'student@gallery.com', password: 'user123', role: 'user' },
-        { email: 'sajid@draw.com', password: 'artist123', role: 'artist' },
-        { email: 'nadia@draw.com', password: 'artist123', role: 'artist' },
-        { email: 'tanvir@draw.com', password: 'artist123', role: 'artist' },
+        'GET  /api/health',
       ],
     });
   } catch (err: any) {

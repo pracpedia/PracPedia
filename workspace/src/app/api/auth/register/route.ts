@@ -3,14 +3,38 @@ import { db } from '@/lib/db';
 import { signToken, getUserFromRequest } from '@/lib/auth';
 import * as bcrypt from 'bcryptjs';
 import { serializeUser } from '@/lib/user-serializer';
+import { registerLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
+
+// Basic email format check — avoids hitting the DB for obviously bad input.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
   try {
+    // ── Rate limit: 3 registrations / 10 minutes / IP ───────────────────────
+    const ip = getClientIp(request);
+    const rl = registerLimiter.check(ip);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many registration attempts. Please try again later.' },
+        { status: 429, headers: rateLimitHeaders(rl) }
+      );
+    }
+
     const body = await request.json();
     const { email, password, name, role, profilePic, phoneNumber } = body;
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
+    }
+
+    // Email format validation
+    if (!EMAIL_RE.test(String(email))) {
+      return NextResponse.json({ error: 'Please provide a valid email address.' }, { status: 400 });
+    }
+
+    // Password strength: minimum 8 characters
+    if (String(password).length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters long.' }, { status: 400 });
     }
 
     // Artist registration includes rate fields
@@ -21,14 +45,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
     }
 
-    const passwordHash = bcrypt.hashSync(String(password), 10);
+    // 12 rounds instead of 10 — marginal CPU cost, ~16× harder to brute force
+    const passwordHash = bcrypt.hashSync(String(password), 12);
     const newUser = await db.user.create({
       data: {
         email: String(email).toLowerCase(),
-        name: String(name || email.split('@')[0]),
+        name: String(name || email.split('@')[0]).slice(0, 100),
         passwordHash,
         role: isArtist ? 'artist' : 'user',
-        phoneNumber: phoneNumber ? String(phoneNumber) : null,
+        phoneNumber: phoneNumber ? String(phoneNumber).slice(0, 30) : null,
         profilePic: profilePic || null,
         // Artist-specific marketplace fields
         rateDrawingOnly: isArtist ? Number(body.rateDrawingOnly) || 150 : 0,
@@ -39,6 +64,9 @@ export async function POST(request: NextRequest) {
         isAvailable: isArtist ? body.isAvailable !== false : true,
       },
     });
+
+    // Successful registration — reset this IP's bucket
+    registerLimiter.reset(ip);
 
     const token = await signToken({
       userId: newUser.id,

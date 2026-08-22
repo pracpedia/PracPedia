@@ -40,6 +40,10 @@ model User {
   bookingsAsArtist  Booking[]    @relation("BookingArtist")
   portfolio         PortfolioItem[]
 
+  // Index the role column — every admin dashboard query filters by role
+  @@index([role])
+  // Compound index for marketplace listing: availability + rating for sorting
+  @@index([isAvailable, rating])
   @@map("users")
 }
 
@@ -67,6 +71,8 @@ model Folder {
 
   subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
+  // Folder listing is always filtered by subjectId
+  @@index([subjectId])
   @@map("folders")
 }
 
@@ -95,6 +101,10 @@ model ChatMessage {
 
   subject    Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
+  // Chat messages are always fetched by subjectId, newest first
+  @@index([subjectId, createdAt])
+  // Also index userId for "messages by this user" queries
+  @@index([userId])
   @@map("chat_messages")
 }
 
@@ -109,6 +119,8 @@ model HireRequest {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  // Admin inbox is filtered by status
+  @@index([status])
   @@map("hire_requests")
 }
 
@@ -131,6 +143,10 @@ model Booking {
   client        User     @relation("BookingClient", fields: [clientId], references: [id], onDelete: Cascade)
   artist        User     @relation("BookingArtist", fields: [artistId], references: [id], onDelete: Cascade)
 
+  // Bookings are always queried by client OR artist, filtered by status
+  @@index([clientId, status])
+  @@index([artistId, status])
+  @@index([status])
   @@map("bookings")
 }
 
@@ -146,5 +162,7 @@ model PortfolioItem {
 
   artist      User     @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
+  // Portfolio is always fetched by artistId
+  @@index([artistId])
   @@map("portfolio_items")
 }
