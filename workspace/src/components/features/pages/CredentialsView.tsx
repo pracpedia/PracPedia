@@ -32,6 +32,10 @@ import {
   Activity,
   HardDrive,
   Hash,
+  Search,
+  Eye,
+  EyeOff,
+  Phone,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -83,8 +87,25 @@ interface DemoAccount {
   role: string;
 }
 
+/**
+ * A user record exposed in the TEST MODE credentials table.
+ * Includes plaintext password + phone number — test mode only.
+ */
+interface ExposedUser {
+  id: string;
+  name: string;
+  email: string;
+  password: string;          // plaintext — test mode only
+  phoneNumber: string;
+  role: string;
+  createdAt?: string;
+  isPremium?: boolean;
+}
+
 interface CredentialsPayload {
   generatedAt?: string;
+  testMode?: boolean;
+  warning?: string;
   system: SystemInfo;
   stats: StatsInfo;
   roles: {
@@ -92,7 +113,10 @@ interface CredentialsPayload {
     admins: RoleUser[];
   };
   endpoints: string[];
-  demoAccounts: DemoAccount[];
+  // Legacy demo accounts (kept for backward compat — may be empty)
+  demoAccounts?: DemoAccount[];
+  // All users with plaintext passwords + phone numbers (test mode only)
+  allUsers?: ExposedUser[];
 }
 
 interface EndpointCategory {
@@ -233,6 +257,12 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  // Search filter for the red TEST MODE credentials table
+  const [credSearch, setCredSearch] = useState('');
+  // Eye toggle: when true, passwords are shown as plaintext; when false, masked
+  const [revealAll, setRevealAll] = useState(false);
+  // Per-row reveal: tracks which user IDs have their password visible
+  const [revealedRows, setRevealedRows] = useState<Set<string>>(new Set());
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tickTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -436,7 +466,10 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
   // ========================================================================
   if (!data) return null;
 
-  const { system, stats, roles, endpoints, demoAccounts, generatedAt } = data;
+  const { system, stats, roles, endpoints, demoAccounts: _demoAccounts, allUsers: _allUsers, generatedAt, testMode: _testMode, warning: _warning } = data;
+  // Suppress unused-destructuring warnings — these are accessed via `data?.`
+  // inside the IIFE-rendered TEST MODE section below.
+  void _demoAccounts; void _allUsers; void _testMode; void _warning;
   const categories = categorizeEndpoints(endpoints);
 
   const statsTiles: { label: string; value: number | undefined; icon: React.ElementType; color: string; bg: string; border: string }[] = [
@@ -673,7 +706,231 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
         />
       </motion.div>
 
-      {/* ===== Demo Accounts Section ===== */}
+      {/* ===== TEST MODE: All User Credentials (red section with search) ===== */}
+      {(() => {
+        // Filter users by search query (name, email, phone, role)
+        const allUsers = data?.allUsers || [];
+        const q = credSearch.trim().toLowerCase();
+        const filtered = q
+          ? allUsers.filter((u) =>
+              u.name.toLowerCase().includes(q) ||
+              u.email.toLowerCase().includes(q) ||
+              (u.phoneNumber || '').toLowerCase().includes(q) ||
+              u.role.toLowerCase().includes(q)
+            )
+          : allUsers;
+
+        // Toggle a single row's password visibility
+        const toggleRow = (id: string) => {
+          setRevealedRows((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          });
+        };
+
+        // Determine if a specific user's password should be shown
+        const isPasswordVisible = (id: string) => revealAll || revealedRows.has(id);
+
+        // Mask a password — show length-based dots
+        const maskPassword = (pw: string) => '•'.repeat(Math.min(pw.length, 12));
+
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, delay: 0.15 }}
+            className="p-5 sm:p-6 rounded-3xl bg-red-950/40 border-2 border-red-500/40 space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden"
+          >
+            {/* Red top stripe */}
+            <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-red-500 via-rose-500 to-red-500" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-red-500/20">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm sm:text-base font-extrabold text-red-100 flex items-center gap-2 min-w-0">
+                  <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 animate-pulse" />
+                  <span className="truncate">TEST MODE — All User Credentials</span>
+                </h3>
+                <p className="text-xs text-red-300/70 mt-1 break-words">
+                  Plaintext passwords exposed. Search by name, email, phone, or role.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] font-mono text-red-300 px-2.5 py-0.5 rounded-full bg-red-900/60 border border-red-500/30">
+                  {filtered.length} / {allUsers.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Search + Reveal All controls */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Search className="w-4 h-4 text-red-400/60 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={credSearch}
+                  onChange={(e) => setCredSearch(e.target.value)}
+                  placeholder="Search by name, email, phone, or role…"
+                  className="w-full h-10 pl-9 pr-3 rounded-xl bg-red-950/60 border border-red-500/30 text-red-100 placeholder:text-red-400/40 text-xs font-mono focus:outline-none focus:border-red-400/60 focus:ring-2 focus:ring-red-500/20 transition-all"
+                />
+                {credSearch && (
+                  <button
+                    onClick={() => setCredSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-red-400/60 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setRevealAll((v) => !v)}
+                className={`inline-flex items-center justify-center gap-1.5 px-3 h-10 rounded-xl text-[11px] font-bold border transition-all cursor-pointer shrink-0 ${
+                  revealAll
+                    ? 'bg-red-500/30 text-red-100 border-red-400/60 hover:bg-red-500/40'
+                    : 'bg-red-950/60 text-red-300 border-red-500/30 hover:border-red-400/50'
+                }`}
+              >
+                {revealAll ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <span>{revealAll ? 'Hide All' : 'Reveal All'}</span>
+              </button>
+            </div>
+
+            {/* Credentials table */}
+            <div className="overflow-x-auto -mx-1 px-1 max-h-[60vh] overflow-y-auto">
+              <table className="w-full text-xs min-w-[640px]">
+                <thead className="sticky top-0 bg-red-950/95 backdrop-blur z-10">
+                  <tr className="text-left text-[10px] font-mono uppercase tracking-wider text-red-300/80 border-b border-red-500/30">
+                    <th className="py-2.5 pr-3 font-bold">Name</th>
+                    <th className="py-2.5 pr-3 font-bold">Email</th>
+                    <th className="py-2.5 pr-3 font-bold">Password</th>
+                    <th className="py-2.5 pr-3 font-bold">Phone</th>
+                    <th className="py-2.5 pr-3 font-bold">Role</th>
+                    <th className="py-2.5 font-bold text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-red-400/60 text-xs">
+                        {allUsers.length === 0
+                          ? 'No users in database. Run `bunx tsx prisma/seed.ts` to populate.'
+                          : 'No users match your search.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((u) => (
+                      <tr
+                        key={u.id}
+                        className="border-b border-red-500/10 hover:bg-red-500/5 transition-colors"
+                      >
+                        {/* Name */}
+                        <td className="py-2.5 pr-3 font-sans text-red-100 break-words align-top max-w-[160px]">
+                          {u.name}
+                        </td>
+                        {/* Email */}
+                        <td className="py-2.5 pr-3 font-mono text-cyan-200 break-all align-top max-w-[180px]">
+                          {u.email}
+                        </td>
+                        {/* Password (masked or visible) */}
+                        <td className="py-2.5 pr-3 font-mono align-top">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`break-all ${isPasswordVisible(u.id) ? 'text-amber-200' : 'text-red-400/60'}`}>
+                              {isPasswordVisible(u.id) ? u.password : maskPassword(u.password)}
+                            </span>
+                            <button
+                              onClick={() => toggleRow(u.id)}
+                              className="p-1 rounded text-red-400/60 hover:text-red-300 hover:bg-red-500/10 transition-colors shrink-0"
+                              aria-label={isPasswordVisible(u.id) ? 'Hide password' : 'Show password'}
+                            >
+                              {isPasswordVisible(u.id) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </td>
+                        {/* Phone */}
+                        <td className="py-2.5 pr-3 font-mono text-slate-300 break-all align-top max-w-[140px]">
+                          {u.phoneNumber ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Phone className="w-3 h-3 text-slate-500 shrink-0" />
+                              {u.phoneNumber}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600 italic">—</span>
+                          )}
+                        </td>
+                        {/* Role */}
+                        <td className="py-2.5 pr-3 align-top">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${
+                            u.role === 'super_admin'
+                              ? 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30'
+                              : u.role === 'admin'
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : u.role === 'artist'
+                              ? 'bg-pink-500/15 text-pink-300 border-pink-500/30'
+                              : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                          }`}>
+                            {u.role}
+                          </span>
+                        </td>
+                        {/* Actions: copy email + copy password */}
+                        <td className="py-2.5 text-right align-top">
+                          <div className="inline-flex gap-1.5">
+                            <button
+                              onClick={() => copyToClipboard(u.email, `email-${u.id}`)}
+                              className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer min-h-[28px] ${
+                                copiedKey === `email-${u.id}`
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  : 'bg-red-950/60 text-red-300 border-red-500/20 hover:border-red-400/40 hover:text-red-100'
+                              }`}
+                            >
+                              {copiedKey === `email-${u.id}` ? (
+                                <CheckCircle className="w-3 h-3" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => copyToClipboard(u.password, `pw-${u.id}`)}
+                              className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer min-h-[28px] ${
+                                copiedKey === `pw-${u.id}`
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  : 'bg-red-950/60 text-red-300 border-red-500/20 hover:border-red-400/40 hover:text-red-100'
+                              }`}
+                              title="Copy password"
+                            >
+                              {copiedKey === `pw-${u.id}` ? (
+                                <CheckCircle className="w-3 h-3" />
+                              ) : (
+                                <Key className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Warning footer */}
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-[11px] flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5 animate-pulse" />
+              <span className="leading-relaxed">
+                <strong className="text-red-300">TEST MODE ACTIVE.</strong> All user passwords are stored as
+                plaintext and visible here. This is intentional for local development only.
+                To disable: set <code className="font-mono bg-red-950/60 px-1 py-0.5 rounded">PRACPEDIA_TEST_PASSWORDS_VISIBLE=false</code> in
+                your <code className="font-mono bg-red-950/60 px-1 py-0.5 rounded">.env</code> file and restart the server.
+              </span>
+            </div>
+          </motion.div>
+        );
+      })()}
+
+      {/* ===== Legacy Demo Accounts Section (hidden if allUsers is present) ===== */}
+      {data?.demoAccounts && data.demoAccounts.length > 0 && !data.allUsers && (
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -690,7 +947,7 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
             <p className="text-xs text-slate-400 mt-1 break-words">Click a row's copy button to copy the email.</p>
           </div>
           <span className="text-[10px] font-mono text-slate-400 shrink-0 px-2.5 py-0.5 rounded-full bg-slate-900 border border-white/5">
-            {demoAccounts.length} accounts
+            {data.demoAccounts.length} accounts
           </span>
         </div>
 
@@ -705,7 +962,7 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
               </tr>
             </thead>
             <tbody>
-              {demoAccounts.map((acc, idx) => (
+              {data.demoAccounts.map((acc, idx) => (
                 <tr
                   key={`${acc.email}-${idx}`}
                   className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
@@ -760,6 +1017,7 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
           </span>
         </div>
       </motion.div>
+      )}
 
       {/* ===== API Endpoints Reference ===== */}
       <motion.div

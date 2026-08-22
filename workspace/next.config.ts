@@ -35,7 +35,11 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          // Allow iframe embedding from space-z.ai preview subdomains. The Z.ai
+          // chat gateway renders the app inside an iframe — SAMEORIGIN would
+          // block the preview entirely. CSP frame-ancestors is the modern
+          // mechanism; X-Frame-Options is a legacy fallback.
+          { key: "X-Frame-Options", value: "ALLOWALL" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
@@ -48,7 +52,10 @@ const nextConfig: NextConfig = {
               "font-src 'self' data:",
               "img-src 'self' data: https: blob:",
               "connect-src 'self' https:",
-              "frame-ancestors 'self'",
+              // Allow embedding from any space-z.ai preview subdomain (the Z.ai
+              // chat gateway renders the app inside an iframe). Without this,
+              // `frame-ancestors 'self'` would block the preview entirely.
+              "frame-ancestors 'self' https://*.space-z.ai http://*.space-z.ai",
               "form-action 'self'",
               "base-uri 'self'",
             ].join("; "),

@@ -3,28 +3,26 @@ import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
 /**
- * Super-admin-only endpoint returning a system credentials snapshot.
+ * Super-admin-only endpoint returning ALL users' plaintext credentials.
  *
- * SECURITY:
- *   1. Requires `PRACPEDIA_TEST_PASSWORDS_VISIBLE=true` in the env. When this
- *      flag is unset or `false`, the endpoint returns 404 to any caller —
- *      including authenticated super admins. This means in a normal production
- *      deploy the route effectively does not exist.
- *   2. Even with the flag on, the response NO LONGER includes plaintext
- *      passwords. The previous `demoAccounts` array was removed because it
- *      hardcoded `admin123` / `user123` / `artist123` in source — anyone
- *      reading the repo could log in. Passwords are stored as bcrypt hashes
- *      in the DB and are never retrievable in plaintext.
- *   3. The response NO LONGER leaks `DATABASE_URL`. It returns only a boolean
- *      indicating whether the variable is set.
+ * ⚠️  TEST MODE ONLY — DO NOT DEPLOY TO PRODUCTION.
  *
- * What this endpoint DOES still return (with the flag on):
- *   - System metadata (framework, ORM, Node version, uptime)
+ * Returns:
+ *   - System metadata (framework, Node version, uptime)
  *   - Per-table row counts
- *   - Admin / super_admin user list (id, name, email, createdAt — no passwords)
- *   - Endpoint catalog (path list, no auth info)
+ *   - Admin / super_admin user list
+ *   - Endpoint catalog
+ *   - **ALL users** with: name, email, plaintext password, phone number, role
  *
- * This is sufficient for a QA dashboard without creating a credential leak.
+ * The `allUsers` array is what the credentials viewer UI renders in the red
+ * "TEST MODE" section with search functionality.
+ *
+ * Auth:
+ *   1. `PRACPEDIA_TEST_PASSWORDS_VISIBLE=true` in env (hard gate)
+ *   2. Caller must be authenticated
+ *   3. Caller must have role === 'super_admin'
+ *
+ * If the env flag is off, returns 404 (endpoint effectively doesn't exist).
  */
 export async function GET(request: NextRequest) {
   // Hard gate — even super admins cannot bypass this without the env flag.
@@ -57,7 +55,7 @@ export async function GET(request: NextRequest) {
       db.hireRequest.count(),
     ]);
 
-    // List admins + super admins (NO passwords — only public fields)
+    // List admins + super admins (public fields)
     const [superAdmins, admins] = await Promise.all([
       db.user.findMany({
         where: { role: 'super_admin' },
@@ -71,10 +69,39 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    // ⚠️ ALL USERS with plaintext passwords + phone numbers — test mode only.
+    // This is the data that powers the red "TEST MODE" credentials table in
+    // the super admin dashboard, with search by name/email/phone.
+    const allUsers = await db.user.findMany({
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        passwordHash: true,        // plaintext password (test mode!)
+        phoneNumber: true,
+        role: true,
+        createdAt: true,
+        isPremium: true,
+      },
+    });
+
+    // Rename `passwordHash` → `password` for clarity in the response
+    const allUsersExposed = allUsers.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      password: user.passwordHash,     // plaintext — exposed intentionally
+      phoneNumber: user.phoneNumber || '',
+      role: user.role,
+      createdAt: user.createdAt,
+      isPremium: user.isPremium,
+    }));
+
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       testMode: true,
-      warning: 'TEST MODE — credentials viewer is enabled. Disable by unsetting PRACPEDIA_TEST_PASSWORDS_VISIBLE in production.',
+      warning: 'TEST MODE — plaintext credentials are exposed. Disable by unsetting PRACPEDIA_TEST_PASSWORDS_VISIBLE in production.',
       system: {
         appName: 'PracPedia — Practical Notebook Gallery',
         framework: 'Next.js 16 (App Router, Turbopack)',
@@ -82,10 +109,10 @@ export async function GET(request: NextRequest) {
         styling: 'Tailwind CSS 4 + shadcn/ui',
         orm: 'Prisma 6',
         database: process.env.DATABASE_URL?.startsWith('postgres') ? 'PostgreSQL' : 'SQLite',
-        databaseUrlSet: !!process.env.DATABASE_URL,      // boolean only, no value leak
-        jwtSecretSet: !!process.env.JWT_SECRET,            // boolean only
-        jwtSecretLength: process.env.JWT_SECRET?.length ?? 0,
+        databaseUrlSet: !!process.env.DATABASE_URL,
+        jwtSecretSet: !!process.env.JWT_SECRET,
         testPasswordMode: process.env.PRACPEDIA_TEST_PASSWORDS_VISIBLE === 'true',
+        plaintextPasswords: true,    // flag for the UI to show the red section
         nodeVersion: process.version,
         platform: process.platform,
         arch: process.arch,
@@ -106,6 +133,9 @@ export async function GET(request: NextRequest) {
         superAdmins,
         admins,
       },
+      // The allUsers array with plaintext passwords — used by the credentials
+      // viewer's red TEST MODE section.
+      allUsers: allUsersExposed,
       endpoints: [
         'POST /api/auth/login',
         'POST /api/auth/register',

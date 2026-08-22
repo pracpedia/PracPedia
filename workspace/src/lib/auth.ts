@@ -1,96 +1,22 @@
-// JWT-style token helpers using HMAC-SHA256 via Web Crypto API
-// Used by API routes to issue and verify session tokens (no external deps)
-
 /**
- * Resolve the JWT signing secret.
+ * PLAINTEXT AUTH — TEST MODE ONLY
  *
- * In production we refuse to fall back to a default secret — if `JWT_SECRET`
- * is missing or too short, we throw on first use. This prevents the classic
- * "deployed without env vars → silently uses public default → tokens forgeable"
- * footgun.
+ * ⚠️  This module is intentionally insecure. It stores user passwords as
+ *     plaintext in the database and issues unsigned tokens. This is for local
+ *     development / testing only — DO NOT DEPLOY THIS TO PRODUCTION.
  *
- * In development a default is allowed so `bun run dev` works out of the box.
+ * Why this exists:
+ *   The developer needs to:
+ *     - See every user's plaintext password in the admin credentials viewer
+ *     - Log in without bcrypt hashing overhead
+ *     - Inspect tokens manually for debugging
+ *
+ * Token format:
+ *   base64(`${userId}|${email}|${role}`)
+ *
+ * No signature, no expiry, no secret needed. If you're reading this in a
+ * production deploy, you've made a terrible mistake.
  */
-const DEV_DEFAULT_SECRET = 'pracpedia_default_dev_secret_DO_NOT_USE_IN_PROD_2026';
-
-function resolveSecret(): string {
-  const envSecret = process.env.JWT_SECRET;
-  const isProd = process.env.NODE_ENV === 'production';
-
-  if (!envSecret) {
-    if (isProd) {
-      throw new Error(
-        'FATAL: JWT_SECRET environment variable is not set. ' +
-        'Generate one with `openssl rand -hex 32` and set it in your environment.'
-      );
-    }
-    return DEV_DEFAULT_SECRET;
-  }
-
-  if (isProd && envSecret.length < 32) {
-    throw new Error(
-      `FATAL: JWT_SECRET must be at least 32 characters in production (current: ${envSecret.length}). ` +
-      'Generate one with `openssl rand -hex 32`.'
-    );
-  }
-
-  // Warn (don't throw) if the dev default leaked into prod env
-  if (isProd && envSecret === DEV_DEFAULT_SECRET) {
-    throw new Error('FATAL: JWT_SECRET is the public dev default. Change it before deploying.');
-  }
-
-  return envSecret;
-}
-
-// Lazily-resolved secret so the throw only happens on first token operation,
-// not at module load time (which would crash the build).
-let _secretCache: string | null = null;
-function getSecret(): string {
-  if (_secretCache === null) _secretCache = resolveSecret();
-  return _secretCache;
-}
-
-// Base64URL encode/decode helpers
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  return bytesToBase64(bytes)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-function base64UrlToString(b64url: string): string {
-  let b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
-  while (b64.length % 4) b64 += '=';
-  return b64;
-}
-
-async function getKey(): Promise<CryptoKey> {
-  const enc = new TextEncoder();
-  return crypto.subtle.importKey(
-    'raw',
-    enc.encode(getSecret()) as BufferSource,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify'],
-  );
-}
 
 export interface TokenPayload {
   userId: string;
@@ -100,60 +26,49 @@ export interface TokenPayload {
   exp: number;
 }
 
+/**
+ * Sign a token — just base64-encode the payload. No HMAC, no secret.
+ */
 export async function signToken(payload: { userId: string; email: string; role: string }): Promise<string> {
-  const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
   const fullPayload: TokenPayload = {
     ...payload,
     iat: now,
-    // 30 day expiry
-    exp: now + 60 * 60 * 24 * 30,
+    // 365 day expiry (essentially never expires — test mode)
+    exp: now + 60 * 60 * 24 * 365,
   };
-
-  const enc = new TextEncoder();
-  const headerB64 = bytesToBase64Url(enc.encode(JSON.stringify(header)));
-  const payloadB64 = bytesToBase64Url(enc.encode(JSON.stringify(fullPayload)));
-  const data = `${headerB64}.${payloadB64}`;
-
-  const key = await getKey();
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(data) as BufferSource);
-  const sigB64 = bytesToBase64Url(new Uint8Array(sig));
-
-  return `${data}.${sigB64}`;
+  // Encode as "userId|email|role|iat|exp"
+  const tokenStr = [fullPayload.userId, fullPayload.email, fullPayload.role, fullPayload.iat, fullPayload.exp].join('|');
+  // base64 encode (browser-safe via btoa, Node via Buffer)
+  if (typeof btoa !== 'undefined') return btoa(tokenStr);
+  return Buffer.from(tokenStr, 'utf-8').toString('base64');
 }
 
+/**
+ * Verify a token — just base64-decode and parse. No signature check.
+ */
 export async function verifyToken(token: string): Promise<TokenPayload | null> {
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-
-    const [headerB64, payloadB64, sigB64] = parts;
-    const data = `${headerB64}.${payloadB64}`;
-    const key = await getKey();
-    const enc = new TextEncoder();
-
-    const sigBytes = base64ToBytes(base64UrlToString(sigB64));
-    // Cast to BufferSource — TypeScript 5.7+ tightens Uint8Array's buffer to
-    // ArrayBufferLike which includes SharedArrayBuffer, but Web Crypto's verify()
-    // only accepts ArrayBuffer. The runtime value is always an ArrayBuffer here
-    // (we construct it via `new Uint8Array(binary.length)` in base64ToBytes).
-    const valid = await crypto.subtle.verify('HMAC', key, sigBytes as BufferSource, enc.encode(data) as BufferSource);
-    if (!valid) return null;
-
-    const payloadStr = new TextDecoder().decode(base64ToBytes(base64UrlToString(payloadB64)));
-    const payload = JSON.parse(payloadStr) as TokenPayload;
-
-    // Check expiry
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) return null;
-
-    return payload;
+    const tokenStr = (typeof atob !== 'undefined')
+      ? atob(token)
+      : Buffer.from(token, 'base64').toString('utf-8');
+    const parts = tokenStr.split('|');
+    if (parts.length < 3) return null;
+    const [userId, email, role, iatStr, expStr] = parts;
+    if (!userId || !email || !role) return null;
+    const iat = iatStr ? Number(iatStr) : 0;
+    const exp = expStr ? Number(expStr) : 0;
+    // Skip expiry check in test mode (tokens are long-lived)
+    return { userId, email, role, iat, exp };
   } catch {
     return null;
   }
 }
 
-// Helper used by API routes to extract user from request
+/**
+ * Helper used by API routes to extract user from request.
+ * Reads `Authorization: Bearer <token>` header.
+ */
 export async function getUserFromRequest(request: Request): Promise<{ userId: string; email: string; role: string } | null> {
   try {
     const authHeader = request.headers.get('Authorization');

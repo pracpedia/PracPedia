@@ -1,10 +1,13 @@
 // Seed script — populates the PracPedia database with demo data
+//
+// ⚠️  TEST MODE: passwords are stored as PLAINTEXT (no bcrypt). This is for
+//     local development only — the super admin credentials viewer needs to
+//     display plaintext passwords. Do not deploy this seed to production.
 import { db } from '../src/lib/db';
-import * as bcrypt from 'bcryptjs';
 
+// Plaintext password storage — no hashing in test mode.
 async function hashPassword(password: string): Promise<string> {
-  const bcrypt = await import('bcryptjs');
-  return bcrypt.hashSync(password, 10);
+  return password;
 }
 
 async function main() {
@@ -33,6 +36,7 @@ async function main() {
       passwordHash: adminPassword,
       role: 'super_admin',
       studyTime: 2400,
+      phoneNumber: '+8801711111111',
       bio: 'Lead faculty super administrator for the Practical Notebook Gallery. Oversees all platform operations, marketplace integrity, and curriculum standards.',
       isPremium: true,
       aiCredits: 9999,
@@ -47,6 +51,7 @@ async function main() {
       passwordHash: adminPassword,
       role: 'admin',
       studyTime: 1800,
+      phoneNumber: '+8801722222222',
       bio: 'Faculty administrator responsible for chemistry and biology curriculum oversight.',
       isPremium: true,
       aiCredits: 5000,
@@ -61,6 +66,7 @@ async function main() {
       passwordHash: userPassword,
       role: 'user',
       studyTime: 420,
+      phoneNumber: '+8801733333333',
       bio: 'Science student exploring practical notebooks and commissioning professional drawings.',
     },
   });
@@ -73,6 +79,7 @@ async function main() {
       name: 'Sajid Ahmed',
       passwordHash: artistPassword,
       role: 'artist',
+      phoneNumber: '+8801744444444',
       bio: 'Professional STEM illustrator with 8+ years creating board-standard lab diagrams for Physics, Chemistry, Biology. Specialized in precision apparatus drawings and organic chemistry structural formulas.',
       profilePic: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sajid&backgroundColor=b6e3f4',
       rateDrawingOnly: 250,
@@ -92,6 +99,7 @@ async function main() {
       name: 'Nadia Rahman',
       passwordHash: artistPassword,
       role: 'artist',
+      phoneNumber: '+8801755555555',
       bio: 'Award-winning scientific illustrator focused on biology dissection guides and microscopic observation plates. Anatomy and cytology specialist with publication-grade accuracy.',
       profilePic: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Nadia&backgroundColor=ffdfbf',
       rateDrawingOnly: 200,
@@ -110,6 +118,7 @@ async function main() {
       name: 'Tanvir Islam',
       passwordHash: artistPassword,
       role: 'artist',
+      phoneNumber: '+8801766666666',
       bio: 'ICT and Higher Math specialist. Creates clean logic gate schematics, circuit diagrams, and coordinate geometry plots with precision typography.',
       profilePic: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Tanvir&backgroundColor=c0aede',
       rateDrawingOnly: 180,

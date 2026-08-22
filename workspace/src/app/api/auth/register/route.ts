@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { signToken, getUserFromRequest } from '@/lib/auth';
-import * as bcrypt from 'bcryptjs';
 import { serializeUser } from '@/lib/user-serializer';
 import { registerLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 
-// Basic email format check — avoids hitting the DB for obviously bad input.
+// Basic email format check
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
@@ -32,9 +31,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please provide a valid email address.' }, { status: 400 });
     }
 
-    // Password strength: minimum 8 characters
-    if (String(password).length < 8) {
-      return NextResponse.json({ error: 'Password must be at least 8 characters long.' }, { status: 400 });
+    // Password strength: minimum 4 characters (test mode — relaxed for convenience)
+    if (String(password).length < 4) {
+      return NextResponse.json({ error: 'Password must be at least 4 characters long.' }, { status: 400 });
     }
 
     // Artist registration includes rate fields
@@ -45,8 +44,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
     }
 
-    // 12 rounds instead of 10 — marginal CPU cost, ~16× harder to brute force
-    const passwordHash = bcrypt.hashSync(String(password), 12);
+    // ⚠️ PLAINTEXT password storage — test mode only.
+    // No bcrypt. Password is stored as-is in the passwordHash column.
+    const passwordHash = String(password);
     const newUser = await db.user.create({
       data: {
         email: String(email).toLowerCase(),

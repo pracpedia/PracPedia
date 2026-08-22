@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { signToken } from '@/lib/auth';
-import * as bcrypt from 'bcryptjs';
 import { serializeUser } from '@/lib/user-serializer';
 import { loginLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 
@@ -24,15 +23,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
     }
 
-    // Constant-time-ish compare: do the DB lookup + bcrypt regardless of which
-    // field is wrong, so timing doesn't reveal whether the email exists.
     const u = await db.user.findUnique({ where: { email: String(email).toLowerCase() } });
-    // Always run a bcrypt compare even if user is null — prevents email enumeration via timing
-    const dummyHash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'; // hash of "x"
-    const valid = u ? bcrypt.compareSync(String(password), u.passwordHash)
-                    : bcrypt.compareSync(String(password), dummyHash);
+    if (!u) {
+      return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
+    }
 
-    if (!u || !valid) {
+    // ⚠️ PLAINTEXT password comparison — test mode only.
+    // Passwords are stored as plaintext in the database (see /api/auth/register
+    // and prisma/seed.ts). No bcrypt hashing.
+    if (u.passwordHash !== String(password)) {
       return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
     }
 
