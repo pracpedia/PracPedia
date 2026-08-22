@@ -16,14 +16,23 @@ const nextConfig: NextConfig = {
   // Without this, Next.js blocks _next/static/chunks/* from preview-*.space-z.ai
   // and the page hangs forever on the loading screen.
   //
-  // Note: Next.js only accepts string entries here (no regex). We add the specific
-  // preview host pattern as a wildcard-ish string. If you have multiple preview
-  // subdomains, add them explicitly.
+  // IMPORTANT: Next.js 16 matches against the bare hostname (no protocol).
+  // The preview host changes per chat session (chat_id is in the subdomain),
+  // so we need both the exact host AND wildcard patterns.
+  // We include multiple formats for maximum compatibility:
+  //   - Bare hostnames (what Next.js 16 error messages suggest)
+  //   - With protocol (some Next.js versions expect this)
+  //   - Wildcard patterns (for future chat sessions with different IDs)
   allowedDevOrigins: [
-    "http://127.0.0.1:3000",
-    "http://localhost:3000",
-    "http://21.0.21.87:3000",
+    "127.0.0.1:3000",
+    "localhost:3000",
+    "21.0.21.87:3000",
+    // Bare hostname (no protocol) — Next.js 16's preferred format
+    "preview-chat-3648604d-0a50-4309-90f7-091d34201496.space-z.ai",
+    "*.space-z.ai",
+    // With protocol — for older Next.js versions / edge cases
     "https://preview-chat-3648604d-0a50-4309-90f7-091d34201496.space-z.ai",
+    "http://preview-chat-3648604d-0a50-4309-90f7-091d34201496.space-z.ai",
     "https://*.space-z.ai",
     "http://*.space-z.ai",
   ],
