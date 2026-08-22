@@ -949,6 +949,21 @@ export const AiAcademyRoom: React.FC = () => {
 
   // Perform AI trigger action — maps to Next.js academy endpoints (lesson/mcq/cq/chat)
   const handleTriggerAction = async (chosenMode: 'concept' | 'mcq' | 'creative_question' | 'ask_ai') => {
+    // ── BYOK gate — block AI features until the user connects a Gemini API key ──
+    // This runs on every AI button click (Concept Desk, NCTB CQ, Ask Scholar,
+    // Interactive Mocks). If no key is set, we open the key modal and bail out.
+    if (!googleApiKey || !googleApiKey.trim()) {
+      setIsKeyModalOpen(true);
+      setErrorMessage(
+        language === 'bn'
+          ? 'এই ফিচারটি ব্যবহার করতে Gemini API কী সংযুক্ত করুন। আপনার নিজস্ব API কী দিন (BYOK) অথবা https://aistudio.google.com/app/apikey থেকে বিনামূল্যে একটি তৈরি করুন।'
+          : 'Connect your Gemini API key to use this feature. Bring Your Own Key (BYOK) — get a free one at https://aistudio.google.com/app/apikey'
+      );
+      // Clear the error after 6 seconds so it doesn't linger
+      setTimeout(() => setErrorMessage(null), 6000);
+      return;
+    }
+
     const finalTopic = customTopic.trim() || selectedTopic || SYLLABUS_BLUEPRINTS[selectedSubject]?.[selectedPaper]?.[curriculum]?.[0]?.topics[0] || 'Core Concepts';
     setMode(chosenMode);
     setIsLoading(true);
@@ -1004,7 +1019,14 @@ export const AiAcademyRoom: React.FC = () => {
 
       const res = await apiFetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // Forward the user's Gemini API key (BYOK) to the server so it can
+          // call the Gemini API on their behalf. Without this header, the
+          // server falls back to its own GEMINI_API_KEY env var (if set) or
+          // returns a fallback template response.
+          'x-gemini-api-key': googleApiKey,
+        },
         body: JSON.stringify(body)
       });
 
@@ -1080,7 +1102,10 @@ export const AiAcademyRoom: React.FC = () => {
       //   POST /api/academy/chat { prompt, subject, language } -> { content }
       const res = await apiFetch('/api/academy/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-gemini-api-key': googleApiKey,
+        },
         body: JSON.stringify({
           prompt: textToSend,
           subject: selectedSubject,

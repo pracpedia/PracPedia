@@ -44,6 +44,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Wand2,
+  Phone,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -87,6 +88,7 @@ interface Artist {
   isAvailable: boolean;
   rating: number;
   completedOrders: number;
+  phoneNumber?: string;   // shown to students for contact
 }
 
 interface PortfolioItem {
@@ -347,6 +349,18 @@ const ArtistCard: React.FC<ArtistCardProps> = ({
       <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 min-h-[2.4em]">
         {artist.bio || 'No bio provided.'}
       </p>
+
+      {/* Contact phone — visible to students for direct commission inquiries */}
+      {artist.phoneNumber && (
+        <a
+          href={`tel:${artist.phoneNumber}`}
+          className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-400/40 transition-all text-[11px] font-bold cursor-pointer min-h-[28px]"
+          title={`Call ${artist.name}`}
+        >
+          <Phone className="w-3 h-3 shrink-0" />
+          <span className="font-mono">{artist.phoneNumber}</span>
+        </a>
+      )}
 
       {/* Specialties */}
       {artist.specialties.length > 0 && (
@@ -757,6 +771,15 @@ const ArtistDetailModal: React.FC<ArtistDetailModalProps> = ({
                   <Mail className="w-3 h-3" />
                   {artist.email}
                 </span>
+                {artist.phoneNumber && (
+                  <a
+                    href={`tel:${artist.phoneNumber}`}
+                    className="text-xs text-emerald-300 font-mono inline-flex items-center gap-1 hover:text-emerald-200 transition-colors mt-1"
+                  >
+                    <Phone className="w-3 h-3" />
+                    {artist.phoneNumber}
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -1606,7 +1629,7 @@ export const ArtistsPage: React.FC<ArtistsPageProps> = ({ activeTheme }) => {
   /* ---------------------------------------------------------------------- */
 
   return (
-    <div className="min-h-[60vh] text-slate-100 pb-6 select-none relative overflow-hidden bg-[#04060b]">
+    <div className="text-slate-100 pb-6 select-none relative overflow-hidden bg-[#04060b]">
       {/* Ambient glows */}
       <div className="absolute top-[3%] left-[10%] w-[45%] h-[28%] rounded-full bg-gradient-to-br from-amber-500/10 to-transparent blur-[140px] pointer-events-none" />
       <div className="absolute bottom-[8%] right-[12%] w-[40%] h-[30%] rounded-full bg-gradient-to-tr from-indigo-500/10 to-transparent blur-[140px] pointer-events-none" />
