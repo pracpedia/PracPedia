@@ -77,15 +77,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (data.user) {
             setUser(data.user);
           } else {
+            // Token is invalid — clear it so the user sees the login page
             safeLocalStorage.removeItem('png_token');
             setToken(null);
           }
         } else {
+          // Server returned 401 — token is invalid, clear it
           safeLocalStorage.removeItem('png_token');
           setToken(null);
         }
       } catch (err) {
         console.error('Failed to authenticate session token on startup:', err);
+        // Network error or DB connection dropped — clear the stale token
+        // so the user sees the login page instead of a broken state
+        safeLocalStorage.removeItem('png_token');
+        setToken(null);
       } finally {
         setIsLoading(false);
       }
