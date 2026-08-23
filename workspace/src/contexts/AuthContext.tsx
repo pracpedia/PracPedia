@@ -152,15 +152,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         if (res.ok) {
           const data = await res.json();
-          if (typeof data.studyTime === 'number' && user) {
-            setUser({ ...user, studyTime: data.studyTime });
+          if (typeof data.studyTime === 'number') {
+            // Functional updater — avoids stale `user` closure that would
+            // overwrite freshly-saved profilePic / name / bio with old values.
+            setUser((prev) => prev ? { ...prev, studyTime: data.studyTime } : prev);
           }
         }
       } catch (err) {
         console.error('Could not register study session details:', err);
       }
     },
-    [apiFetch, user],
+    [apiFetch],
   );
 
   const setLanguage = useCallback((lang: 'en' | 'bn') => {

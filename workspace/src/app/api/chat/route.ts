@@ -64,9 +64,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     const body = await request.json();
-    const { text, subjectId } = body;
-    if (!text || !text.trim()) {
-      return NextResponse.json({ error: 'Message required.' }, { status: 400 });
+    const { text, subjectId, imageUrl } = body;
+    if ((!text || !text.trim()) && !imageUrl) {
+      return NextResponse.json({ error: 'Message text or image required.' }, { status: 400 });
     }
     const created = await db.chatMessage.create({
       data: {
@@ -74,7 +74,8 @@ export async function POST(request: NextRequest) {
         userName: u.name,
         userRole: u.role,
         userAvatar: u.profilePic || null,
-        text: String(text).slice(0, 4000),
+        text: String(text || '').slice(0, 4000),
+        imageUrl: imageUrl ? String(imageUrl).slice(0, 500000) : null,  // base64 can be large
         subjectId: subjectId || null,
       },
     });

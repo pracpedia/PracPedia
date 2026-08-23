@@ -25,7 +25,10 @@ import {
   BookmarkCheck,
   Phone,
   Video,
-  Info
+  Info,
+  Paperclip,
+  X,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -58,6 +61,8 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
   const messagesRef = useRef<MessageType[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<string>('general');
   const [typedMessage, setTypedMessage] = useState<string>('');
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -139,21 +144,43 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
     }
   };
 
-  // Perform post of typed message content
+  // Image picker — converts to base64 data URL for inline upload
+  const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (imageInputRef.current) imageInputRef.current.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Please choose an image file.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMessage('Max 2 MB for chat images.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setPendingImage(String(reader.result || ''));
+    reader.onerror = () => setErrorMessage('Could not read image file.');
+    reader.readAsDataURL(file);
+  };
+
+  // Perform post of typed message content + optional image
   const handleSendMessage = async (incomingContent?: string) => {
     const targetContent = incomingContent || typedMessage;
-    if (!targetContent.trim() || submitting) return;
+    // Need either text or an image to send
+    if ((!targetContent.trim() && !pendingImage) || submitting) return;
 
     setSubmitting(true);
     setErrorMessage(null);
 
     const messageContent = targetContent;
+    const imageToSend = pendingImage;
     if (!incomingContent) {
       setTypedMessage('');
     }
+    setPendingImage(null);
 
     try {
-      // Next.js /api/chat expects { text, subjectId } — pass null for general lounge
+      // Next.js /api/chat expects { text, subjectId, imageUrl } — pass null for general lounge
       const subjectPayload = activeChannelId === 'general' ? null : activeChannelId;
       const res = await apiFetch('/api/chat', {
         method: 'POST',
@@ -161,8 +188,9 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text: messageContent,
-          subjectId: subjectPayload
+          text: messageContent || '(image)',
+          subjectId: subjectPayload,
+          imageUrl: imageToSend || undefined,
         })
       });
 
@@ -725,22 +753,71 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
             )}
 
             <input
-              type="text"
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImagePick}
+              className="hidden"
+            />
+
+            {/* Paperclip image upload button */}
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={submitting}
+              className="shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-900/90 border border-white/[0.05] hover:border-cyan-500/40 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 flex items-center justify-center transition-all cursor-pointer disabled:opacity-40"
+              title="Attach image"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+
+            {/* Pending image preview */}
+            {pendingImage && (
+              <div className="absolute -top-20 left-14 z-10 flex items-end gap-2">
+                <div className="relative">
+                  <img
+                    src={pendingImage}
+                    alt="Pending upload"
+                    className="w-16 h-16 object-cover rounded-lg border border-white/10 shadow-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPendingImage(null)}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center hover:bg-rose-400 transition-colors"
+                    title="Remove image"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <textarea
               required
               value={typedMessage}
               onChange={(e) => setTypedMessage(e.target.value)}
-              maxLength={600}
+              onKeyDown={(e) => {
+                // Enter to send, Shift+Enter for newline
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              rows={1}
+              maxLength={4000}
               placeholder={
-                activeChannelId === 'general'
+                pendingImage
+                  ? 'Add a caption (optional)…'
+                  : activeChannelId === 'general'
                   ? t('placeholderGeneral')
                   : `${t('placeholderChannel')} #${activeChannelObj?.title}...`
               }
-              className="flex-1 min-w-0 min-h-[44px] bg-slate-900/90 border border-white/[0.05] focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/5 px-4 sm:px-5 h-11 rounded-full text-xs sm:text-[13px] text-slate-100 placeholder:text-slate-500 focus:outline-none transition-all font-sans font-medium"
+              className="flex-1 min-w-0 min-h-[44px] max-h-32 resize-none bg-slate-900/90 border border-white/[0.05] focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/5 px-4 sm:px-5 py-3 h-11 rounded-2xl text-xs sm:text-[13px] text-slate-100 placeholder:text-slate-500 focus:outline-none transition-all font-sans font-medium overflow-y-auto"
             />
 
             <button
               type="submit"
-              disabled={!typedMessage.trim() || submitting}
+              disabled={(!typedMessage.trim() && !pendingImage) || submitting}
               className="px-4 sm:px-5 min-h-[44px] min-w-[44px] rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-600 hover:from-cyan-405 hover:to-indigo-550 text-white font-bold h-11 flex items-center justify-center shrink-0 border border-white/5 active:scale-95 disabled:opacity-20 disabled:scale-100 transition-all cursor-pointer shadow-lg shadow-indigo-600/10"
               title={t('liveClassChat')}
             >

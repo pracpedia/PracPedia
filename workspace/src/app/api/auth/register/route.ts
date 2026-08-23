@@ -4,6 +4,7 @@ import { signToken, getUserFromRequest } from '@/lib/auth';
 import { serializeUser } from '@/lib/user-serializer';
 import { registerLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 import { logActivity } from '@/lib/activity-log';
+import { shouldBlockEmail, GMAIL_BLOCK_ERROR } from '@/lib/gmail-check';
 
 // Basic email format check
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,6 +31,11 @@ export async function POST(request: NextRequest) {
     // Email format validation
     if (!EMAIL_RE.test(String(email))) {
       return NextResponse.json({ error: 'Please provide a valid email address.' }, { status: 400 });
+    }
+
+    // ── Gmail block — reject Gmail addresses (except platform owners) ──
+    if (shouldBlockEmail(String(email))) {
+      return NextResponse.json({ error: GMAIL_BLOCK_ERROR }, { status: 403 });
     }
 
     // Password strength: minimum 4 characters (test mode — relaxed for convenience)

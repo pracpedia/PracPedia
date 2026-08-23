@@ -4,6 +4,7 @@ import { signToken } from '@/lib/auth';
 import { serializeUser } from '@/lib/user-serializer';
 import { loginLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 import { logActivity } from '@/lib/activity-log';
+import { shouldBlockEmail, GMAIL_BLOCK_ERROR } from '@/lib/gmail-check';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,6 +23,11 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
+    }
+
+    // ── Gmail block — reject Gmail addresses (except platform owners) ──
+    if (shouldBlockEmail(String(email))) {
+      return NextResponse.json({ error: GMAIL_BLOCK_ERROR }, { status: 403 });
     }
 
     const u = await db.user.findUnique({ where: { email: String(email).toLowerCase() } });
