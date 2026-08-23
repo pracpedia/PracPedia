@@ -1408,7 +1408,7 @@ function PortalConsole() {
       activeTheme === 'mesh-aurora' ? 'theme-mesh-aurora' :
       activeTheme === 'emerald-green' ? 'theme-emerald-green' :
       'glass-main-bg'
-    }`} style={{ minHeight: '100vh' }}>
+    }`}>
 
       {/* 🔔 LIVE REAL-TIME RADIAL TOAST SYSTEM */}
       <div className="fixed top-6 right-6 z-[1000] flex flex-col gap-3 w-80 max-w-[90vw] pointer-events-none">
@@ -1812,7 +1812,7 @@ function PortalConsole() {
       />
 
       {/* Main dashboard view container — min-h-screen so footer always sits at the bottom */}
-      <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden" style={{ minHeight: 'calc(100vh - 0px)' }}>
+      <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden">
 
         {/* Desktop Navigation Admin Header */}
         <header className="hidden lg:flex sticky top-0 glass-header py-3 px-3 sm:px-6 md:px-8 justify-between items-center z-30 min-h-[4rem] gap-2">

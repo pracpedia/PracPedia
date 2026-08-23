@@ -129,20 +129,10 @@
   html,
   body {
     @apply bg-background text-foreground;
-    /* Ensure the root element fills the viewport on curved-edge phones
-       so no white background leaks through at the edges. */
     min-height: 100vh;
     min-height: 100dvh;
     width: 100%;
     overflow-x: hidden;
-    /* Extend into the curved/notched edges */
-    overscroll-behavior: none;
-  }
-  /* Dark backdrop behind everything — covers safe-area insets on notched/curved phones */
-  #root,
-  body > div {
-    min-height: 100vh;
-    min-height: 100dvh;
   }
   /* Safe-area insets for curved/notched phones — padding so content
      isn't clipped by the screen curve or notch. */
