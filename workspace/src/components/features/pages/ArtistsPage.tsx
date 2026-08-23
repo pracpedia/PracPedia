@@ -995,35 +995,35 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const notebookExtra = notebookProvider === 'artist' ? (artist.notebookCost || 0) : 0;
   const price = basePrice + notebookExtra;
 
-  // 4 service tier options: 2 service types × 2 notebook providers
-  const serviceOptions: { value: ServiceType; notebook: NotebookProvider; label: string; subLabel: string; price: number }[] = [
+  // 2 service options (Step 1)
+  const serviceOptions: { value: ServiceType; label: string; desc: string; price: number }[] = [
     {
       value: 'drawing_only',
-      notebook: 'client',
-      label: 'Drawing Only · I provide notebook',
-      subLabel: 'You supply the notebook, artist draws only',
+      label: 'Drawing Only',
+      desc: 'Diagram only — you handle the write-up.',
       price: artist.rateDrawingOnly,
     },
     {
-      value: 'drawing_only',
-      notebook: 'artist',
-      label: 'Drawing Only · Artist provides notebook',
-      subLabel: `Artist supplies notebook (+${artist.notebookCost} BDT)`,
-      price: artist.rateDrawingOnly + artist.notebookCost,
-    },
-    {
       value: 'drawing_writing',
-      notebook: 'client',
-      label: 'Drawing + Writing · I provide notebook',
-      subLabel: 'You supply the notebook, artist draws + writes',
+      label: 'Drawing + Writing',
+      desc: 'Diagram + full written practical content.',
       price: artist.rateDrawingWriting,
     },
+  ];
+
+  // 2 notebook provider options (Step 2 — mandatory)
+  const notebookOptions: { value: NotebookProvider; label: string; desc: string; extra: number }[] = [
     {
-      value: 'drawing_writing',
-      notebook: 'artist',
-      label: 'Drawing + Writing · Artist provides notebook',
-      subLabel: `Artist supplies notebook (+${artist.notebookCost} BDT)`,
-      price: artist.rateDrawingWriting + artist.notebookCost,
+      value: 'client',
+      label: 'I will provide notebook',
+      desc: 'You supply the notebook, no extra charge.',
+      extra: 0,
+    },
+    {
+      value: 'artist',
+      label: 'Artist will provide notebook',
+      desc: `Artist supplies the notebook (+${artist.notebookCost} BDT extra).`,
+      extra: artist.notebookCost,
     },
   ];
 
@@ -1141,27 +1141,21 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
         {/* Body — step-by-step form */}
         <div className="p-5 sm:p-6 space-y-5">
-          {/* Step 1 — Service type + notebook provider (4 tiers) */}
+          {/* Step 1 — Service type (2 options) */}
           <section>
-            <StepHeader index={1} title="Choose a service tier" />
+            <StepHeader index={1} title="Choose a service" />
             <RadioGroup
-              value={`${serviceType}|${notebookProvider}`}
-              onValueChange={(v) => {
-                const [svc, np] = v.split('|');
-                setServiceType(svc as ServiceType);
-                setNotebookProvider(np as NotebookProvider);
-              }}
+              value={serviceType}
+              onValueChange={(v) => setServiceType(v as ServiceType)}
               className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3"
             >
               {serviceOptions.map((opt) => {
-                const optValue = `${opt.value}|${opt.notebook}`;
-                const active = serviceType === opt.value && notebookProvider === opt.notebook;
+                const active = serviceType === opt.value;
                 const isDrawingOnly = opt.value === 'drawing_only';
-                const isArtistNotebook = opt.notebook === 'artist';
                 return (
                   <label
-                    key={optValue}
-                    htmlFor={`svc-${optValue}`}
+                    key={opt.value}
+                    htmlFor={`svc-${opt.value}`}
                     className={`relative flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${
                       active
                         ? isDrawingOnly
@@ -1171,13 +1165,13 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     }`}
                   >
                     <RadioGroupItem
-                      value={optValue}
-                      id={`svc-${optValue}`}
+                      value={opt.value}
+                      id={`svc-${opt.value}`}
                       className="mt-1 data-[state=checked]:border-amber-400"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-white leading-tight">
+                        <span className="text-sm font-bold text-white">
                           {opt.label}
                         </span>
                         <span
@@ -1188,14 +1182,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                           {opt.price} BDT
                         </span>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                        {opt.subLabel}
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                        {opt.desc}
                       </p>
-                      {isArtistNotebook && (
-                        <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                          +{artist.notebookCost} BDT notebook
-                        </span>
-                      )}
                     </div>
                   </label>
                 );
@@ -1203,9 +1192,60 @@ const BookingModal: React.FC<BookingModalProps> = ({
             </RadioGroup>
           </section>
 
-          {/* Step 2 — Subject */}
+          {/* Step 2 — Notebook provider (2 mandatory options) */}
           <section>
-            <StepHeader index={2} title="Select subject" />
+            <StepHeader index={2} title="Who provides the notebook?" />
+            <RadioGroup
+              value={notebookProvider}
+              onValueChange={(v) => setNotebookProvider(v as NotebookProvider)}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3"
+            >
+              {notebookOptions.map((opt) => {
+                const active = notebookProvider === opt.value;
+                const isArtist = opt.value === 'artist';
+                return (
+                  <label
+                    key={opt.value}
+                    htmlFor={`np-${opt.value}`}
+                    className={`relative flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      active
+                        ? 'border-emerald-500/40 bg-emerald-500/[0.06]'
+                        : 'border-white/[0.06] bg-slate-950/40 hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    <RadioGroupItem
+                      value={opt.value}
+                      id={`np-${opt.value}`}
+                      className="mt-1 data-[state=checked]:border-emerald-400"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-white">
+                          {opt.label}
+                        </span>
+                        {opt.extra > 0 ? (
+                          <span className="text-xs font-black text-emerald-300 shrink-0">
+                            +{opt.extra} BDT
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-500 shrink-0">
+                            FREE
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                        {opt.desc}
+                      </p>
+                    </div>
+                  </label>
+                );
+              })}
+            </RadioGroup>
+          </section>
+
+          {/* Step 3 — Subject */}
+          <section>
+            <StepHeader index={3} title="Select subject" />
             <Select value={subject} onValueChange={setSubject}>
               <SelectTrigger
                 size="default"
@@ -1230,7 +1270,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
           {/* Step 3 — Description */}
           <section>
             <StepHeader
-              index={3}
+              index={4}
               title="Describe the work"
               subtitle="Be specific: apparatus name, required labels, board paper number, etc."
             />
@@ -1256,7 +1296,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
           {/* Step 4 — Reference images */}
           <section>
             <StepHeader
-              index={4}
+              index={5}
               title="Reference images"
               subtitle="Optional — paste URLs of diagrams you want the artist to mimic."
             />
@@ -1313,7 +1353,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
           {/* Step 5 — Client notes */}
           <section>
             <StepHeader
-              index={5}
+              index={6}
               title="Client notes"
               subtitle="Optional — deadline, format, anything else the artist should know."
             />
@@ -1353,6 +1393,18 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 {serviceType === 'drawing_only'
                   ? 'Drawing Only'
                   : 'Drawing + Writing'}
+              </div>
+            </div>
+
+            {/* Notebook provider summary */}
+            <div className="flex flex-col gap-1 min-w-0">
+              <div className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold">
+                Notebook
+              </div>
+              <div className="text-sm font-black text-emerald-300">
+                {notebookProvider === 'client'
+                  ? 'I will provide'
+                  : `Artist provides (+${artist.notebookCost} BDT)`}
               </div>
             </div>
           </div>

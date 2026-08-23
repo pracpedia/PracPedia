@@ -25,6 +25,14 @@ model User {
   scareTriggered Boolean @default(false)
   catTriggered  Boolean  @default(false)
 
+  // Granular permissions for admins — JSON array of permission keys.
+  // Super admins have all permissions implicitly. Regular admins only have
+  // the permissions assigned to them by a super admin.
+  // Examples: "manage_users", "manage_subjects", "manage_folders",
+  //           "manage_announcements", "manage_hire_requests",
+  //           "manage_commissions", "view_credentials", "manage_artists"
+  permissionsJson String   @default("[]")
+
   // Artist marketplace fields
   rateDrawingOnly  Int      @default(150)   // BDT price for "Drawing Only" service
   rateDrawingWriting Int    @default(300)   // BDT price for "Drawing + Writing" service

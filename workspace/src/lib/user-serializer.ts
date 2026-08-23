@@ -14,6 +14,8 @@ export interface SerializedUser {
   isAdminStudent: boolean;
   isPremium: boolean;
   aiCredits: number;
+  // Admin permissions (granular) — super admins have all; regular admins have assigned subset
+  permissions: string[];
   // Artist marketplace fields
   rateDrawingOnly: number;
   rateDrawingWriting: number;
@@ -34,6 +36,15 @@ export function serializeUser(u: User): SerializedUser {
   } catch {
     // ignore malformed JSON
   }
+  let permissions: string[] = [];
+  try {
+    const parsed = JSON.parse(u.permissionsJson || '[]');
+    if (Array.isArray(parsed)) {
+      permissions = parsed.filter((x) => typeof x === 'string');
+    }
+  } catch {
+    // ignore
+  }
   return {
     id: u.id,
     name: u.name,
@@ -46,6 +57,7 @@ export function serializeUser(u: User): SerializedUser {
     isAdminStudent: u.isAdminStudent,
     isPremium: u.isPremium,
     aiCredits: u.aiCredits,
+    permissions,
     rateDrawingOnly: u.rateDrawingOnly,
     rateDrawingWriting: u.rateDrawingWriting,
     notebookCost: u.notebookCost,

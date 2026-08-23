@@ -867,6 +867,34 @@ const UploadModal: React.FC<UploadModalProps> = ({
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [previewBroken, setPreviewBroken] = useState(false);
+  const portfolioFileRef = useRef<HTMLInputElement>(null);
+
+  // Local file picker — converts to base64 data URL and fills the imageUrl field
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (portfolioFileRef.current) portfolioFileRef.current.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please choose an image file.');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      alert('Max 4 MB for portfolio images.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageUrl(String(reader.result || ''));
+      setPreviewBroken(false);
+      // Auto-fill title from filename if empty
+      if (!title.trim()) {
+        const name = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+        setTitle(name.slice(0, 60));
+      }
+    };
+    reader.onerror = () => alert('Could not read image file.');
+    reader.readAsDataURL(file);
+  };
 
   // The parent remounts this component via `key` whenever the modal reopens,
   // so local form state is naturally fresh for every upload session — no
@@ -939,25 +967,59 @@ const UploadModal: React.FC<UploadModalProps> = ({
           </div>
 
           <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4">
-            {/* Image URL with live preview */}
+            {/* Image source — file upload OR URL */}
             <div className="space-y-2">
               <Label
                 htmlFor="portfolio-url"
                 className="text-[11px] uppercase tracking-widest text-slate-400 font-mono font-bold"
               >
-                Image URL <span className="text-rose-400">*</span>
+                Image <span className="text-rose-400">*</span>
               </Label>
+
+              {/* File picker button */}
+              <input
+                ref={portfolioFileRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFilePick}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => portfolioFileRef.current?.click()}
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 hover:border-amber-500/40 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                Upload from device
+              </button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-2 py-1">
+                <div className="flex-1 h-px bg-white/[0.06]" />
+                <span className="text-[9px] uppercase font-mono text-slate-500 tracking-widest">or paste URL</span>
+                <div className="flex-1 h-px bg-white/[0.06]" />
+              </div>
+
               <Input
                 id="portfolio-url"
-                value={imageUrl}
+                value={imageUrl.startsWith('data:') ? '(uploaded image)' : imageUrl}
                 onChange={(e) => {
                   setImageUrl(e.target.value);
                   setPreviewBroken(false);
                 }}
                 placeholder="https://…/my-drawing.jpg"
-                required
-                className="bg-slate-900/60 border-white/[0.08] text-slate-200 text-sm placeholder:text-slate-600 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 min-h-[44px]"
+                disabled={imageUrl.startsWith('data:')}
+                className="bg-slate-900/60 border-white/[0.08] text-slate-200 text-sm placeholder:text-slate-600 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 min-h-[44px] disabled:opacity-60"
               />
+              {imageUrl.startsWith('data:') && (
+                <button
+                  type="button"
+                  onClick={() => setImageUrl('')}
+                  className="text-[10px] text-rose-300 hover:text-rose-200 underline cursor-pointer"
+                >
+                  Remove uploaded image
+                </button>
+              )}
               {imageUrl.trim().length > 5 && (
                 <div className="rounded-xl border border-white/[0.06] bg-slate-950/60 overflow-hidden">
                   {previewBroken ? (
