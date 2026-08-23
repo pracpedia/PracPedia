@@ -57,13 +57,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const body = await request.json();
-    const { artistId, serviceType, subject, description, referenceImages, clientNotes } = body;
+    const { artistId, serviceType, notebookProvider, subject, description, referenceImages, clientNotes } = body;
 
     if (!artistId || !subject || !description) {
       return NextResponse.json({ error: 'artistId, subject, and description required.' }, { status: 400 });
     }
     const validServiceTypes = ['drawing_only', 'drawing_writing'];
     const svc = validServiceTypes.includes(serviceType) ? serviceType : 'drawing_only';
+    // notebookProvider: "client" (I will provide) or "artist" (artist provides)
+    const np = notebookProvider === 'artist' ? 'artist' : 'client';
 
     const artist = await db.user.findUnique({ where: { id: String(artistId) } });
     if (!artist || artist.role !== 'artist') {
@@ -73,13 +75,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This artist is currently unavailable for new commissions.' }, { status: 400 });
     }
 
-    const price = svc === 'drawing_only' ? artist.rateDrawingOnly : artist.rateDrawingWriting;
+    // 4-tier pricing: base price (drawing_only | drawing_writing) + notebookCost if artist provides
+    const basePrice = svc === 'drawing_only' ? artist.rateDrawingOnly : artist.rateDrawingWriting;
+    const notebookExtra = np === 'artist' ? (artist.notebookCost || 0) : 0;
+    const price = basePrice + notebookExtra;
 
     const booking = await db.booking.create({
       data: {
         clientId: payload.userId,
         artistId: artist.id,
         serviceType: svc,
+        notebookProvider: np,
         subject: String(subject),
         description: String(description),
         referenceImagesJson: JSON.stringify(Array.isArray(referenceImages) ? referenceImages : []),

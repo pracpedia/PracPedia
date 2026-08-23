@@ -28,6 +28,7 @@ model User {
   // Artist marketplace fields
   rateDrawingOnly  Int      @default(150)   // BDT price for "Drawing Only" service
   rateDrawingWriting Int    @default(300)   // BDT price for "Drawing + Writing" service
+  notebookCost     Int      @default(100)   // BDT extra if artist provides the notebook
   specialtiesJson String   @default("[]")   // JSON array of strings
   isAvailable     Boolean  @default(true)   // accepting new commissions?
   rating          Float    @default(5.0)    // average rating (0-5)
@@ -129,10 +130,12 @@ model Booking {
   clientId      String
   artistId      String
   serviceType   String   @default("drawing_only") // "drawing_only" | "drawing_writing"
+  notebookProvider String @default("client") // "client" (I will provide) | "artist" (artist provides)
   subject       String
   description   String
   referenceImagesJson String @default("[]") // JSON array of {url, title}
   price         Int      @default(0)        // BDT
+  commissionAmount Int   @default(0)        // BDT — admin commission override
   status        String   @default("pending") // pending | in_progress | completed | cancelled
   paymentStatus String   @default("unpaid")  // unpaid | paid | refunded
   clientNotes   String?

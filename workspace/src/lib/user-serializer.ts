@@ -17,6 +17,7 @@ export interface SerializedUser {
   // Artist marketplace fields
   rateDrawingOnly: number;
   rateDrawingWriting: number;
+  notebookCost: number;
   specialties: string[];
   isAvailable: boolean;
   rating: number;
@@ -47,6 +48,7 @@ export function serializeUser(u: User): SerializedUser {
     aiCredits: u.aiCredits,
     rateDrawingOnly: u.rateDrawingOnly,
     rateDrawingWriting: u.rateDrawingWriting,
+    notebookCost: u.notebookCost,
     specialties,
     isAvailable: u.isAvailable,
     rating: u.rating,

@@ -74,6 +74,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 /* -------------------------------------------------------------------------- */
 
 type ServiceType = 'drawing_only' | 'drawing_writing';
+type NotebookProvider = 'client' | 'artist';
 
 interface Artist {
   id: string;
@@ -84,11 +85,12 @@ interface Artist {
   role: 'artist';
   rateDrawingOnly: number;
   rateDrawingWriting: number;
+  notebookCost: number;
   specialties: string[];
   isAvailable: boolean;
   rating: number;
   completedOrders: number;
-  phoneNumber?: string;   // shown to students for contact
+  phoneNumber?: string;
 }
 
 interface PortfolioItem {
@@ -350,33 +352,39 @@ const ArtistCard: React.FC<ArtistCardProps> = ({
         {artist.bio || 'No bio provided.'}
       </p>
 
-      {/* Contact phone — visible to students for direct commission inquiries */}
-      {artist.phoneNumber && (
-        <a
-          href={`tel:${artist.phoneNumber}`}
-          className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-400/40 transition-all text-[11px] font-bold cursor-pointer min-h-[28px]"
-          title={`Call ${artist.name}`}
-        >
-          <Phone className="w-3 h-3 shrink-0" />
-          <span className="font-mono">{artist.phoneNumber}</span>
-        </a>
-      )}
+      {/* Rating + completed orders — replaces the old 2-card pricing block */}
+      <div className="flex items-center justify-between gap-2 rounded-2xl bg-slate-950/40 border border-white/[0.04] p-2.5">
+        <div className="flex items-center gap-1.5">
+          <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+          <span className="text-sm font-black text-amber-300">
+            {artist.rating.toFixed(1)}
+          </span>
+          <span className="text-[10px] text-slate-500 font-mono">
+            · {artist.completedOrders} done
+          </span>
+        </div>
+        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+          <span className="text-amber-300 font-bold">{artist.rateDrawingOnly}</span>
+          <span>–</span>
+          <span className="text-indigo-300 font-bold">{artist.rateDrawingWriting}</span>
+          <span>BDT</span>
+        </div>
+      </div>
 
       {/* Specialties */}
       {artist.specialties.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {artist.specialties.slice(0, 4).map((s) => (
-            <Badge
+          {artist.specialties.slice(0, 3).map((s) => (
+            <span
               key={s}
-              variant="outline"
-              className="bg-white/[0.03] border-white/[0.06] text-slate-300 text-[9px] font-mono"
+              className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-[10px] font-bold"
             >
               {s}
-            </Badge>
+            </span>
           ))}
-          {artist.specialties.length > 4 && (
-            <span className="text-[10px] text-slate-500 font-mono">
-              +{artist.specialties.length - 4}
+          {artist.specialties.length > 3 && (
+            <span className="px-2 py-0.5 rounded-full bg-slate-700/40 text-slate-400 text-[10px] font-bold">
+              +{artist.specialties.length - 3}
             </span>
           )}
         </div>
@@ -411,26 +419,6 @@ const ArtistCard: React.FC<ArtistCardProps> = ({
             </button>
           );
         })}
-      </div>
-
-      {/* Pricing */}
-      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-950/40 border border-white/[0.04] p-2.5">
-        <div className="flex flex-col">
-          <span className="text-[9px] uppercase font-mono text-amber-400/80 tracking-wider font-bold">
-            Drawing Only
-          </span>
-          <span className="text-sm font-black text-amber-300">
-            {artist.rateDrawingOnly} BDT
-          </span>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-[9px] uppercase font-mono text-indigo-400/80 tracking-wider font-bold">
-            Drawing + Writing
-          </span>
-          <span className="text-sm font-black text-indigo-300">
-            {artist.rateDrawingWriting} BDT
-          </span>
-        </div>
       </div>
 
       {/* Actions */}
@@ -989,6 +977,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
   apiFetch,
 }) => {
   const [serviceType, setServiceType] = useState<ServiceType>('drawing_only');
+  const [notebookProvider, setNotebookProvider] = useState<NotebookProvider>('client');
   const [subject, setSubject] = useState<string>('Physics');
   const [description, setDescription] = useState<string>('');
   const [referenceImages, setReferenceImages] = useState<string[]>(['']);
@@ -1001,10 +990,42 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
   if (!artist) return null;
 
-  const price =
-    serviceType === 'drawing_only'
-      ? artist.rateDrawingOnly
-      : artist.rateDrawingWriting;
+  // 4-tier pricing: base price + notebookCost if artist provides the notebook
+  const basePrice = serviceType === 'drawing_only' ? artist.rateDrawingOnly : artist.rateDrawingWriting;
+  const notebookExtra = notebookProvider === 'artist' ? (artist.notebookCost || 0) : 0;
+  const price = basePrice + notebookExtra;
+
+  // 4 service tier options: 2 service types × 2 notebook providers
+  const serviceOptions: { value: ServiceType; notebook: NotebookProvider; label: string; subLabel: string; price: number }[] = [
+    {
+      value: 'drawing_only',
+      notebook: 'client',
+      label: 'Drawing Only · I provide notebook',
+      subLabel: 'You supply the notebook, artist draws only',
+      price: artist.rateDrawingOnly,
+    },
+    {
+      value: 'drawing_only',
+      notebook: 'artist',
+      label: 'Drawing Only · Artist provides notebook',
+      subLabel: `Artist supplies notebook (+${artist.notebookCost} BDT)`,
+      price: artist.rateDrawingOnly + artist.notebookCost,
+    },
+    {
+      value: 'drawing_writing',
+      notebook: 'client',
+      label: 'Drawing + Writing · I provide notebook',
+      subLabel: 'You supply the notebook, artist draws + writes',
+      price: artist.rateDrawingWriting,
+    },
+    {
+      value: 'drawing_writing',
+      notebook: 'artist',
+      label: 'Drawing + Writing · Artist provides notebook',
+      subLabel: `Artist supplies notebook (+${artist.notebookCost} BDT)`,
+      price: artist.rateDrawingWriting + artist.notebookCost,
+    },
+  ];
 
   const canSubmit =
     isAuthed &&
@@ -1035,6 +1056,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
         body: JSON.stringify({
           artistId: artist.id,
           serviceType,
+          notebookProvider,
           subject,
           description: description.trim(),
           referenceImages: referenceImages
@@ -1058,19 +1080,6 @@ const BookingModal: React.FC<BookingModalProps> = ({
       setSubmitting(false);
     }
   };
-
-  const serviceOptions: { value: ServiceType; label: string; price: number }[] = [
-    {
-      value: 'drawing_only',
-      label: 'Drawing Only',
-      price: artist.rateDrawingOnly,
-    },
-    {
-      value: 'drawing_writing',
-      label: 'Drawing + Writing',
-      price: artist.rateDrawingWriting,
-    },
-  ];
 
   return (
     <Dialog open={!!artist} onOpenChange={(o) => !o && onClose()}>
@@ -1132,53 +1141,61 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
         {/* Body — step-by-step form */}
         <div className="p-5 sm:p-6 space-y-5">
-          {/* Step 1 — Service type */}
+          {/* Step 1 — Service type + notebook provider (4 tiers) */}
           <section>
             <StepHeader index={1} title="Choose a service tier" />
             <RadioGroup
-              value={serviceType}
-              onValueChange={(v) => setServiceType(v as ServiceType)}
+              value={`${serviceType}|${notebookProvider}`}
+              onValueChange={(v) => {
+                const [svc, np] = v.split('|');
+                setServiceType(svc as ServiceType);
+                setNotebookProvider(np as NotebookProvider);
+              }}
               className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3"
             >
               {serviceOptions.map((opt) => {
-                const active = serviceType === opt.value;
+                const optValue = `${opt.value}|${opt.notebook}`;
+                const active = serviceType === opt.value && notebookProvider === opt.notebook;
+                const isDrawingOnly = opt.value === 'drawing_only';
+                const isArtistNotebook = opt.notebook === 'artist';
                 return (
                   <label
-                    key={opt.value}
-                    htmlFor={`svc-${opt.value}`}
+                    key={optValue}
+                    htmlFor={`svc-${optValue}`}
                     className={`relative flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${
                       active
-                        ? opt.value === 'drawing_only'
+                        ? isDrawingOnly
                           ? 'border-amber-500/40 bg-amber-500/[0.06]'
                           : 'border-indigo-500/40 bg-indigo-500/[0.06]'
                         : 'border-white/[0.06] bg-slate-950/40 hover:bg-white/[0.02]'
                     }`}
                   >
                     <RadioGroupItem
-                      value={opt.value}
-                      id={`svc-${opt.value}`}
+                      value={optValue}
+                      id={`svc-${optValue}`}
                       className="mt-1 data-[state=checked]:border-amber-400"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-bold text-white">
+                        <span className="text-xs font-bold text-white leading-tight">
                           {opt.label}
                         </span>
                         <span
-                          className={`text-sm font-black ${
-                            opt.value === 'drawing_only'
-                              ? 'text-amber-300'
-                              : 'text-indigo-300'
+                          className={`text-sm font-black shrink-0 ${
+                            isDrawingOnly ? 'text-amber-300' : 'text-indigo-300'
                           }`}
                         >
                           {opt.price} BDT
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                        {opt.value === 'drawing_only'
-                          ? 'Diagram only — you handle the write-up.'
-                          : 'Diagram + full written practical content.'}
+                      <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                        {opt.subLabel}
                       </p>
+                      {isArtistNotebook && (
+                        <span className="inline-block mt-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                          +{artist.notebookCost} BDT notebook
+                        </span>
+                      )}
                     </div>
                   </label>
                 );
