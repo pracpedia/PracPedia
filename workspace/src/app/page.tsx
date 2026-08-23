@@ -1401,7 +1401,7 @@ function PortalConsole() {
   void selectRandomRealCat;
 
   return (
-    <div className={`min-h-screen flex flex-col lg:flex-row text-slate-100 relative transition-all duration-300 ${
+    <div className={`min-h-screen flex flex-col lg:flex-row text-slate-100 relative transition-all duration-300 safe-area-padding ${
       activeTheme === 'peaceful-purple' ? 'theme-peaceful-purple' :
       activeTheme === 'deep-blue' ? 'theme-deep-blue' :
       activeTheme === 'cosmic-black' ? 'theme-cosmic-black' :
