@@ -2761,9 +2761,6 @@ function PortalConsole() {
                   BD Time: <span className="text-cyan-400">{bdTime}</span>
                 </span>
               )}
-              <span className="text-slate-500">
-                Session: <span className="text-cyan-400">{Math.floor(sessionSeconds / 60)}m {sessionSeconds % 60}s</span>
-              </span>
               <span className="text-slate-600 hidden md:inline">
                 · Encrypted Workspace Stream
               </span>

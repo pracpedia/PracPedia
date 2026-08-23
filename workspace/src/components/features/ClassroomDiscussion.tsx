@@ -82,13 +82,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
   // Real-time active users
   const [activeUsers, setActiveUsers] = useState<any[]>((window as any).__activeUsers || []);
 
-  // Quick Action triggers for easy classroom conversation starter
-  const quickChips = [
-    t('quickChip1'),
-    t('quickChip2'),
-    t('quickChip3'),
-    t('quickChip4'),
-  ];
+  // Quick Action triggers removed per user request — chat input is now clean.
 
   // Fetch messages of specified subject channel.
   // If `since` is provided, uses long-polling (server holds up to 20s waiting
@@ -659,15 +653,6 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
                           </span>
                         )}
                         <span className="text-slate-500 font-mono text-[9px]">{formatDateLabel(msg.createdAt)}</span>
-                        {(isMine || user?.role === 'admin' || user?.role === 'super_admin') && dbId && (
-                          <button
-                            onClick={() => handleDeleteMessage(dbId as string)}
-                            className="p-1 rounded hover:bg-rose-500/15 text-slate-500 hover:text-rose-400 transition-colors"
-                            title={t('deleteMessage')}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
                       </div>
 
                       {/* Image (if present) */}
@@ -751,21 +736,6 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
 
         {/* Input bar */}
         <div className="border-t border-white/[0.04] bg-slate-950/60 p-3 sm:p-4 shrink-0">
-          {/* Quick reply chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 scrollbar-none">
-            {quickChips.map((chip, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleSendMessage(chip)}
-                disabled={submitting}
-                className="px-2.5 py-1 rounded-lg border border-white/5 bg-slate-900/60 hover:bg-slate-800 text-[10px] font-medium text-slate-400 hover:text-cyan-300 transition-all whitespace-nowrap disabled:opacity-40"
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
-
           <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
             <input
               ref={imageInputRef}
@@ -798,13 +768,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
               }}
               rows={1}
               maxLength={4000}
-              placeholder={
-                pendingImage
-                  ? 'Add a caption (optional)…'
-                  : activeChannelId === 'general'
-                  ? t('placeholderGeneral')
-                  : `${t('placeholderChannel')} #${activeChannelObj?.title}...`
-              }
+              placeholder={pendingImage ? 'Add a caption…' : 'Type a message…'}
               className="flex-1 min-w-0 min-h-[40px] max-h-32 resize-none bg-slate-900 border border-white/5 focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20 px-3 py-2 rounded-2xl text-xs sm:text-[13px] text-slate-100 placeholder:text-slate-500 focus:outline-none transition-all overflow-y-auto"
             />
 
