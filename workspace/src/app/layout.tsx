@@ -66,7 +66,7 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning style={{ backgroundColor: 'oklch(0.145 0 0)' }}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        style={{ backgroundColor: 'oklch(0.145 0 0)', minHeight: '100dvh' }}
+        style={{ backgroundColor: 'oklch(0.145 0 0)' }}
       >
         <AuthProvider>
           <LanguageProvider>
