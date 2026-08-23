@@ -259,10 +259,13 @@
 }
 
 html, body {
+  margin: 0 !important;
+  padding: 0 !important;
   background-color: #05070e;
   color: #f8fafc;
   font-family: "Space Grotesk", "Geist", ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
+  width: 100%;
 }
 
 /* Math blocks custom safety wrapping */

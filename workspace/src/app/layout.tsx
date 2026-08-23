@@ -63,10 +63,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning style={{ backgroundColor: 'oklch(0.145 0 0)' }}>
+    <html lang="en" className="dark" suppressHydrationWarning style={{ backgroundColor: '#05070e' }}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        style={{ backgroundColor: 'oklch(0.145 0 0)' }}
+        style={{ backgroundColor: '#05070e' }}
       >
         <AuthProvider>
           <LanguageProvider>
