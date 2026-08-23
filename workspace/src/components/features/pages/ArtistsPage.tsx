@@ -823,43 +823,6 @@ const ArtistDetailModal: React.FC<ArtistDetailModalProps> = ({
             </section>
           )}
 
-          {/* Pricing table */}
-          <section>
-            <h3 className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold mb-2">
-              Pricing
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-3.5">
-                <div className="flex items-center gap-2">
-                  <Pen className="w-4 h-4 text-amber-300" />
-                  <span className="text-xs font-bold text-amber-300">Drawing Only</span>
-                </div>
-                <div className="text-2xl font-black text-white mt-2">
-                  {artist.rateDrawingOnly}{' '}
-                  <span className="text-sm font-bold text-slate-400">BDT</span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Diagram/sketch only — you supply the written practical.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.04] p-3.5">
-                <div className="flex items-center gap-2">
-                  <PenLine className="w-4 h-4 text-indigo-300" />
-                  <span className="text-xs font-bold text-indigo-300">
-                    Drawing + Writing
-                  </span>
-                </div>
-                <div className="text-2xl font-black text-white mt-2">
-                  {artist.rateDrawingWriting}{' '}
-                  <span className="text-sm font-bold text-slate-400">BDT</span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  Diagram + full written theory, observation & calculation.
-                </p>
-              </div>
-            </div>
-          </section>
-
           {/* Portfolio gallery */}
           <section>
             <div className="flex items-center justify-between mb-2">
@@ -1800,19 +1763,6 @@ export const ArtistsPage: React.FC<ArtistsPageProps> = ({ activeTheme }) => {
               label="Avg Rating"
               color="text-cyan-300"
             />
-          </div>
-        </section>
-
-        {/* ---------- Service tier comparison ---------- */}
-        <section>
-          <SectionTitle
-            kicker="Service Tiers"
-            title="Two ways to commission"
-            subtitle="Every artist publishes both tiers — pick what fits your deadline and notebook state."
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mt-4">
-            <TierCard type="drawing_only" artists={artists} />
-            <TierCard type="drawing_writing" artists={artists} />
           </div>
         </section>
 

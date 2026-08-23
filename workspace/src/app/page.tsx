@@ -1097,7 +1097,8 @@ function PortalConsole() {
   // State Navigation Helper
   const setView = (view: string, subjectId?: string, folderId?: string) => {
     setSearchQuery('');
-    if (view === 'admins' && user?.role !== 'admin') {
+    // Admin CMS — allow both admin and super_admin
+    if (view === 'admins' && user?.role !== 'admin' && user?.role !== 'super_admin') {
       return;
     }
     if (view === 'subject' && subjectId) {
