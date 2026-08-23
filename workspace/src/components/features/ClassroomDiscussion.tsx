@@ -622,22 +622,21 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2 }}
-                    className={`flex gap-2 sm:gap-3 max-w-full ${isMine ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
-                    style={{ maxWidth: '85%' }}
+                    className={`flex gap-2 sm:gap-3 w-full ${isMine ? 'justify-end' : 'justify-start'}`}
                   >
-                    {/* Avatar (only show for others) */}
+                    {/* Avatar — for others: left side; for me: right side (rendered first, flex-row handles order) */}
                     {!isMine && (
                       msg.userProfilePic ? (
                         <img
                           src={msg.userProfilePic}
                           alt={msg.userName}
                           referrerPolicy="no-referrer"
-                          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover shrink-0 border ${
+                          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover shrink-0 border self-end ${
                             isTeacher ? 'border-amber-400/40' : 'border-white/10'
                           }`}
                         />
                       ) : (
-                        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+                        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold self-end ${
                           isTeacher
                             ? 'bg-amber-500/15 border border-amber-500/30 text-amber-300'
                             : 'bg-slate-800 border border-white/5 text-slate-400'
@@ -647,8 +646,8 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
                       )
                     )}
 
-                    {/* Bubble */}
-                    <div className="min-w-0 flex-1">
+                    {/* Bubble column — sizes to content, max 80% width */}
+                    <div className="min-w-0 flex flex-col" style={{ maxWidth: '80%' }}>
                       {/* Name + meta */}
                       <div className={`flex items-center gap-1.5 text-[10px] mb-1 flex-wrap ${isMine ? 'justify-end' : 'justify-start'}`}>
                         <span className={`font-bold ${isTeacher ? 'text-amber-300' : 'text-slate-300'}`}>
@@ -673,7 +672,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
 
                       {/* Image (if present) */}
                       {hasImage && (
-                        <div className="mb-1">
+                        <div className={`mb-1 ${isMine ? 'flex justify-end' : 'flex justify-start'}`}>
                           <img
                             src={msg.imageUrl}
                             alt="Shared"
@@ -686,33 +685,35 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
 
                       {/* Text (if present) */}
                       {hasText && (
-                        <div
-                          className={`
-                            inline-block px-3.5 py-2 text-xs sm:text-[13px] leading-relaxed break-words
-                            ${isMine
-                              ? 'bg-cyan-500 text-white rounded-2xl rounded-br-md'
-                              : isTeacher
-                                ? 'bg-slate-900 border border-amber-500/20 text-amber-50 rounded-2xl rounded-bl-md'
-                                : 'bg-slate-900 border border-white/[0.06] text-slate-200 rounded-2xl rounded-bl-md'
-                            }
-                          `}
-                        >
-                          <p className="whitespace-pre-line">{msg.content}</p>
+                        <div className={isMine ? 'flex justify-end' : 'flex justify-start'}>
+                          <div
+                            className={`
+                              inline-block px-3.5 py-2 text-xs sm:text-[13px] leading-relaxed break-words
+                              ${isMine
+                                ? 'bg-cyan-500 text-white rounded-2xl rounded-br-md'
+                                : isTeacher
+                                  ? 'bg-slate-900 border border-amber-500/20 text-amber-50 rounded-2xl rounded-bl-md'
+                                  : 'bg-slate-900 border border-white/[0.06] text-slate-200 rounded-2xl rounded-bl-md'
+                              }
+                            `}
+                          >
+                            <p className="whitespace-pre-line">{msg.content}</p>
+                          </div>
                         </div>
                       )}
                     </div>
 
-                    {/* Own avatar (right side) */}
+                    {/* Own avatar — right side for my messages */}
                     {isMine && (
                       msg.userProfilePic ? (
                         <img
                           src={msg.userProfilePic}
                           alt="You"
                           referrerPolicy="no-referrer"
-                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover shrink-0 border border-cyan-500/30"
+                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover shrink-0 border border-cyan-500/30 self-end"
                         />
                       ) : (
-                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0 text-cyan-300 text-xs font-bold">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0 text-cyan-300 text-xs font-bold self-end">
                           {user?.name?.charAt(0).toUpperCase() || 'M'}
                         </div>
                       )
