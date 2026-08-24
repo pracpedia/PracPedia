@@ -96,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         fixed inset-y-0 left-0 glass-sidebar w-72 max-w-[85vw]
         p-4 sm:p-5 flex flex-col justify-between z-50 transition-all duration-300 ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        lg:sticky lg:top-0 lg:h-screen lg:w-72 shrink-0 border-r border-white/5
+        lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:overflow-y-auto shrink-0 border-r border-white/5
       `}>
 
         {/* Brand, Profile, and Scrollable Navigation Section */}

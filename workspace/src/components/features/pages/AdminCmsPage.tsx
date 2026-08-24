@@ -411,8 +411,6 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'admin' | 'student'>('all');
   const [promoteEmail, setPromoteEmail] = useState('');
   const [confirmDemoteId, setConfirmDemoteId] = useState<string | null>(null);
-  const [editingCreditsUser, setEditingCreditsUser] = useState<StudentUser | null>(null);
-  const [newCreditsValue, setNewCreditsValue] = useState<number>(10);
 
   // Commissions Tab States
   const [commissionsList, setCommissionsList] = useState<CommissionBooking[]>([]);
@@ -428,7 +426,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   const [superPromoteEmail, setSuperPromoteEmail] = useState('');
   const [credsDialogOpen, setCredsDialogOpen] = useState(false);
 
-  const isMainOwner = user?.email?.toLowerCase() === 'mahabubrahmanakash275@gmail.com';
+  const isMainOwner = user?.email?.toLowerCase() === 'admin@gallery.com' || user?.email?.toLowerCase() === 'mahabubrahmanakash275@gmail.com';
   const isSuperAdmin = user?.role === 'super_admin';
 
   // Helper notice handlers
@@ -831,32 +829,6 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
       onNavigateToCreds();
     } else {
       setCredsDialogOpen(true);
-    }
-  };
-
-  const handleUpdateCredits = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingCreditsUser) return;
-    setIsActionLoading(true);
-    try {
-      const res = await apiFetch('/api/users/set-credits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: editingCreditsUser.id, credits: newCreditsValue })
-      });
-      if (res.ok) {
-        showSuccess(`Updated credits for ${editingCreditsUser.name} to ${newCreditsValue}!`);
-        setEditingCreditsUser(null);
-        fetchStudents();
-      } else {
-        const err = await res.json();
-        showError(err.error || "Failed to update student credits.");
-      }
-    } catch (e) {
-      console.warn('Set-credits endpoint not yet implemented in Next.js backend:', e);
-      showError("Network error setting credits.");
-    } finally {
-      setIsActionLoading(false);
     }
   };
 
@@ -1999,7 +1971,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {filteredAdmins.map(adm => {
-                  const isRowMainOwner = adm.email?.toLowerCase() === 'mahabubrahmanakash275@gmail.com';
+                  const isRowMainOwner = adm.email?.toLowerCase() === 'admin@gallery.com' || adm.email?.toLowerCase() === 'mahabubrahmanakash275@gmail.com';
                   const isRowSuperAdmin = adm.role === 'super_admin';
                   const canDemoteRow = !isRowSuperAdmin && !isRowMainOwner && (isSuperAdmin || isMainOwner);
 
@@ -2058,7 +2030,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                                 const res = await apiFetch('/api/users/demote', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ targetAdminId: adm.id })
+                                  body: JSON.stringify({ email: adm.email })
                                 });
                                 if (res.ok) {
                                   showSuccess(`Demoted ${adm.name}.`);
@@ -2129,23 +2101,8 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                       <div className="min-w-0 flex-1">
                         <strong className="text-[11px] sm:text-xs font-bold text-white block truncate group-hover:text-sky-300 transition-colors">{student.name}</strong>
                         <span className="text-[9px] sm:text-[10px] text-slate-400 block truncate font-mono">{student.email}</span>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[8px] sm:text-[9px] font-mono px-1.5 sm:px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-bold border border-cyan-500/20 truncate">
-                            Cr: {student.credits !== undefined ? student.credits : 10}
-                          </span>
-                        </div>
                       </div>
                     </div>
-
-                    <button
-                      onClick={() => {
-                        setEditingCreditsUser(student);
-                        setNewCreditsValue(student.credits !== undefined ? student.credits : 10);
-                      }}
-                      className="w-full py-1.5 sm:py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-[9px] sm:text-[10px] font-bold border border-white/10 cursor-pointer transition-colors shadow-sm text-center min-h-[36px]"
-                    >
-                      Set Credits
-                    </button>
                   </div>
                 ))}
               </div>
@@ -2566,54 +2523,6 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                   className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black rounded-xl cursor-pointer shadow-lg shadow-cyan-500/20 min-h-[44px]"
                 >
                   Upload Scan Page
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          MODAL 4: EDIT STUDENT CREDITS
-          ========================================================================= */}
-      {editingCreditsUser && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
-          <div className="w-full max-w-xs max-w-[92vw] bg-slate-900 border border-white/10 rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10 gap-2">
-              <h3 className="text-xs font-extrabold text-white truncate">Adjust Student Credits</h3>
-              <button onClick={() => setEditingCreditsUser(null)} className="text-slate-400 hover:text-white shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-400 break-words">
-              Set available credits for <strong className="text-white">{editingCreditsUser.name}</strong>:
-            </p>
-
-            <form onSubmit={handleUpdateCredits} className="space-y-4">
-              <input
-                type="number"
-                min={0}
-                max={999}
-                value={newCreditsValue}
-                onChange={(e) => setNewCreditsValue(parseInt(e.target.value) || 0)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-white/10 text-sm font-bold text-center text-cyan-400 rounded-xl outline-none focus:border-cyan-500/50 min-h-[44px]"
-              />
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingCreditsUser(null)}
-                  className="px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl cursor-pointer min-h-[44px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isActionLoading}
-                  className="px-3.5 py-1.5 bg-cyan-500 text-slate-950 text-xs font-black rounded-xl cursor-pointer min-h-[44px]"
-                >
-                  Save Credits
                 </button>
               </div>
             </form>
