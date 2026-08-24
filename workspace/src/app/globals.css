@@ -299,9 +299,8 @@ html, body {
   font-family: "Space Grotesk", "Geist", ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
   width: 100%;
-  /* Critical for curved-edge phones — prevents the browser from showing
-     its default white background when scrolling past the top/bottom edges. */
-  overscroll-behavior: none;
+  /* Prevent overscroll bounce on curved-edge phones without blocking scroll */
+  overscroll-behavior-y: contain;
 }
 
 /* Fixed full-screen dark background — covers the entire viewport at all times,
