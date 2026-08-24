@@ -245,7 +245,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Key className="w-2.5 h-2.5" />
                   {geminiApiKey
                     ? (language === 'en' ? 'Change' : 'পরিবর্তন')
-                    : (language === 'en' ? 'Add Key' : 'কি দিন')}
+                    : (language === 'en' ? 'Connect AI Key' : 'কি যুক্ত করুন')}
                 </button>
               </div>
               <p className="text-[9px] text-slate-400 leading-normal font-medium break-words">

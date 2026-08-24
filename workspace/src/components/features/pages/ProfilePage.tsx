@@ -60,6 +60,7 @@ import {
   ChevronRight,
   GraduationCap,
   Crown,
+  Upload,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -465,30 +466,69 @@ interface AvatarFieldProps {
 // state resets whenever the saved URL changes (after a successful save).
 const AvatarField: React.FC<AvatarFieldProps> = ({ url, onApply, saving }) => {
   const [draft, setDraft] = useState(url);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const isUnchanged = draft.trim() === url;
+
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileRef.current) fileRef.current.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('Please choose an image file.'); return; }
+    if (file.size > 2 * 1024 * 1024) { alert('Max 2 MB for avatars.'); return; }
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = () => { setDraft(String(reader.result || '')); setIsUploading(false); };
+    reader.onerror = () => { alert('Read failed.'); setIsUploading(false); };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-4">
-        {/* key={draft} remounts the inner LiveAvatar so its broken-image
-            flag resets whenever the user types a new URL. */}
         <LiveAvatar key={draft} url={draft} />
         <div className="flex-1 min-w-0">
           <Label
             htmlFor="avatar-url"
             className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-bold"
           >
-            Profile Picture URL
+            Profile Picture
           </Label>
           <Input
             id="avatar-url"
-            value={draft}
+            value={draft.startsWith('data:') ? '(uploaded image)' : draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="https://…/avatar.png"
-            className="mt-1.5 bg-slate-950 border-white/10 text-slate-100 placeholder:text-slate-500 h-10"
+            disabled={draft.startsWith('data:')}
+            className="mt-1.5 bg-slate-950 border-white/10 text-slate-100 placeholder:text-slate-500 h-10 disabled:opacity-60"
           />
         </div>
       </div>
+
+      {/* Upload from device */}
+      <input ref={fileRef} type="file" accept="image/*" onChange={handleFilePick} className="hidden" />
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={saving || isUploading}
+        onClick={() => fileRef.current?.click()}
+        className="w-full h-9 min-h-[36px] text-[12px] bg-slate-950 border-white/10 text-slate-200 hover:bg-slate-900 gap-1.5"
+      >
+        {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Upload className="w-3.5 h-3.5 shrink-0" />}
+        <span className="truncate">Upload from device</span>
+      </Button>
+
+      {draft.startsWith('data:') && (
+        <button
+          type="button"
+          onClick={() => setDraft('')}
+          className="text-[10px] text-rose-300 hover:text-rose-200 underline cursor-pointer"
+        >
+          Remove uploaded image
+        </button>
+      )}
+
       <Button
         type="button"
         size="sm"
