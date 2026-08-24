@@ -492,13 +492,27 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
 
   const fetchCommissions = async () => {
     try {
-      const res = await apiFetch('/api/artists/bookings');
+      const res = await apiFetch('/api/bookings');
       if (res.ok) {
         const data = await res.json();
-        setCommissionsList(Array.isArray(data) ? data : []);
+        const bookings = Array.isArray(data) ? data : (data.bookings || []);
+        // Map API fields to the component's expected shape
+        const mapped = bookings.map((b: any) => ({
+          id: b.id,
+          studentName: b.client?.name || b.clientName || 'Unknown',
+          artistName: b.artist?.name || b.artistName || 'Unknown',
+          subject: b.subject || '',
+          totalPrice: b.price || 0,
+          numPages: b.description?.length > 0 ? 1 : 0,
+          status: b.status || 'pending',
+          paymentStatus: b.paymentStatus || 'unpaid',
+          specialInstructions: b.clientNotes || '',
+          createdAt: b.createdAt,
+        }));
+        setCommissionsList(mapped);
       }
     } catch (e) {
-      console.warn('Commissions endpoint not yet implemented in Next.js backend:', e);
+      console.warn('Could not fetch commissions:', e);
     }
   };
 
