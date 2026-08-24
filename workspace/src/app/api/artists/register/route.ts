@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { signToken, getUserFromRequest } from '@/lib/auth';
-import * as bcrypt from 'bcryptjs';
 import { serializeUser } from '@/lib/user-serializer';
 
 // Artist registration with two-tier pricing and portfolio setup
@@ -19,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
     }
 
-    const passwordHash = bcrypt.hashSync(String(password), 10);
+    const passwordHash = String(password);
     const tagArr = Array.isArray(specialties)
       ? specialties
       : (specialties ? String(specialties).split(',').map((s: string) => s.trim()).filter(Boolean) : []);

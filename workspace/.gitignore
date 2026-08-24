@@ -2,14 +2,6 @@
 node_modules
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
 
 # next.js
 /.next/
@@ -28,7 +20,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env
 .env.local
 .env.development.local
@@ -47,6 +39,6 @@ next-env.d.ts
 dev.log
 server.log
 
-# runtime data
+# database
 db/*.db
 db/*.db-journal
