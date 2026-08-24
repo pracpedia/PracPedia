@@ -746,29 +746,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
             </p>
           )}
         </div>
-
-        {/* Profile Picture URL */}
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="profile-pic-url"
-            className="text-xs font-bold text-slate-300"
-          >
-            Profile Picture URL
-          </Label>
-          <div className="flex items-center gap-3">
-            <LiveAvatar key={profilePic} url={profilePic} size="w-14 h-14" rounded="rounded-xl" />
-            <Input
-              id="profile-pic-url"
-              value={profilePic}
-              onChange={(e) => onChange({ profilePic: e.target.value })}
-              placeholder="https://…/avatar.png"
-              className="bg-slate-950 border-white/10 text-slate-100 placeholder:text-slate-500 h-11"
-            />
-          </div>
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            Paste a direct image URL. The preview updates as you type.
-          </p>
-        </div>
       </CardContent>
 
       <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/[0.04]">
