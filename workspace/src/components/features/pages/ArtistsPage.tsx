@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Marketplace — Professional commission board for practical notebook
+ * Marketplace — Professional hire board for practical notebook
  * drawings. Two service tiers (Drawing Only vs Drawing + Writing), artist
  * grid with portfolio previews, full artist detail modal with portfolio
  * lightbox, and a 5-step booking modal that POSTs to /api/bookings.
@@ -10,7 +10,7 @@
  * dashboard lives elsewhere; this page is now a pure marketplace view.
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -45,6 +45,7 @@ import {
   ChevronRight,
   Wand2,
   Phone,
+  Upload,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -179,7 +180,7 @@ const TierCard: React.FC<TierCardProps> = ({ type, artists }) => {
       ]
     : [
         'Complete practical write-up: theory, observation, calculation, conclusion',
-        'Hand-drawn labelled diagram included in the same commission',
+        'Hand-drawn labelled diagram included in the same hire',
         'Board-curriculum-aligned theory section, word-perfect',
         'Combined delivery — no need to hire a separate writer',
       ];
@@ -274,6 +275,44 @@ const TierCard: React.FC<TierCardProps> = ({ type, artists }) => {
 /*  Artist Card                                                                */
 /* -------------------------------------------------------------------------- */
 
+/* ── Visual star rating display (1-5 stars) ── */
+const StarRating: React.FC<{ rating: number; size?: string; showNumber?: boolean }> = ({
+  rating,
+  size = 'w-3 h-3',
+  showNumber = true,
+}) => {
+  const fullStars = Math.floor(rating);
+  const hasHalf = rating - fullStars >= 0.5;
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => {
+        const isFull = n <= fullStars;
+        const isHalf = n === fullStars + 1 && hasHalf;
+        return (
+          <div key={n} className="relative">
+            {/* Empty star (background) */}
+            <Star className={`${size} text-slate-700`} />
+            {/* Filled star (overlay) */}
+            {(isFull || isHalf) && (
+              <div
+                className="absolute inset-0 overflow-hidden"
+                style={{ width: isHalf ? '50%' : '100%' }}
+              >
+                <Star className={`${size} text-amber-400 fill-amber-400`} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {showNumber && (
+        <span className="ml-1 text-[10px] font-bold text-amber-300 font-mono">
+          {rating.toFixed(1)}
+        </span>
+      )}
+    </div>
+  );
+};
+
 interface ArtistCardProps {
   artist: Artist;
   portfolioThumbs: string[];
@@ -339,9 +378,8 @@ const ArtistCard: React.FC<ArtistCardProps> = ({
             <span className="text-[10px] text-slate-400 font-mono inline-flex items-center gap-1">
               <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
               {artist.rating.toFixed(1)}
-            </span>
-            <span className="text-[10px] text-slate-400 font-mono">
-              · {artist.completedOrders} done
+              <span className="text-slate-600">·</span>
+              <span>{artist.completedOrders} done</span>
             </span>
           </div>
         </div>
@@ -352,17 +390,9 @@ const ArtistCard: React.FC<ArtistCardProps> = ({
         {artist.bio || 'No bio provided.'}
       </p>
 
-      {/* Rating + completed orders — replaces the old 2-card pricing block */}
+      {/* Rating + completed orders */}
       <div className="flex items-center justify-between gap-2 rounded-2xl bg-slate-950/40 border border-white/[0.04] p-2.5">
-        <div className="flex items-center gap-1.5">
-          <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-          <span className="text-sm font-black text-amber-300">
-            {artist.rating.toFixed(1)}
-          </span>
-          <span className="text-[10px] text-slate-500 font-mono">
-            · {artist.completedOrders} done
-          </span>
-        </div>
+        <StarRating rating={artist.rating} size="w-3.5 h-3.5" />
         <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
           <span className="text-amber-300 font-bold">{artist.rateDrawingOnly}</span>
           <span>–</span>
@@ -946,6 +976,32 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const [referenceImages, setReferenceImages] = useState<string[]>(['']);
   const [clientNotes, setClientNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const refImageFileRef = useRef<HTMLInputElement>(null);
+
+  // Upload a local image file → convert to base64 data URL
+  const handleRefImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (refImageFileRef.current) refImageFileRef.current.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { onError('Please choose an image file.'); return; }
+    if (file.size > 4 * 1024 * 1024) { onError('Max 4 MB per reference image.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      // Find the first empty slot, or append
+      setReferenceImages((prev) => {
+        const firstEmpty = prev.findIndex((u) => !u.trim());
+        if (firstEmpty >= 0) {
+          const next = [...prev];
+          next[firstEmpty] = dataUrl;
+          return next;
+        }
+        return [...prev, dataUrl];
+      });
+    };
+    reader.onerror = () => onError('Could not read image file.');
+    reader.readAsDataURL(file);
+  };
 
   // The parent passes a `key` containing the artist id so this modal remounts
   // (and resets all form state) whenever a different artist is opened — no
@@ -999,11 +1055,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const handleSubmit = async () => {
     if (!artist) return;
     if (!isAuthed) {
-      onError('Please log in to submit a commission request.');
+      onError('Please log in to submit a hire request.');
       return;
     }
     if (!artist.isAvailable) {
-      onError('This artist is currently unavailable for new commissions.');
+      onError('This artist is currently unavailable for new hires.');
       return;
     }
     if (description.trim().length < 10) {
@@ -1051,10 +1107,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
         showCloseButton
       >
         <DialogTitle className="sr-only">
-          Commission {artist.name}
+          Hire {artist.name}
         </DialogTitle>
         <DialogDescription className="sr-only">
-          Submit a new commission request to {artist.name}.
+          Submit a new hire request to {artist.name}.
         </DialogDescription>
 
         {/* Header */}
@@ -1072,7 +1128,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
             </Avatar>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
-                Commission {artist.name}
+                Hire {artist.name}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
                 Tell us exactly what diagram or write-up you need. Pricing is
@@ -1085,7 +1141,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
             <div className="mt-4 flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200">
               <Info className="w-4 h-4 shrink-0 mt-0.5" />
               <p className="text-xs leading-relaxed">
-                You need to be logged in to submit a commission request. Log in
+                You need to be logged in to submit a hire request. Log in
                 to your account, then return here to hire {artist.name}.
               </p>
             </div>
@@ -1096,7 +1152,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <p className="text-xs leading-relaxed">
                 This artist is currently unavailable and not accepting new
-                commissions. Try another artist or check back later.
+                hires. Try another artist or check back later.
               </p>
             </div>
           )}
@@ -1261,45 +1317,80 @@ const BookingModal: React.FC<BookingModalProps> = ({
             <StepHeader
               index={5}
               title="Reference images"
-              subtitle="Optional — paste URLs of diagrams you want the artist to mimic."
+              subtitle="Optional — upload from device or paste URLs of diagrams you want the artist to follow."
             />
             <div className="space-y-2 mt-3">
+              {/* Upload from device button */}
+              <input
+                ref={refImageFileRef}
+                type="file"
+                accept="image/*"
+                onChange={handleRefImageUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => refImageFileRef.current?.click()}
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 hover:border-amber-500/40 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                Upload from device
+              </button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-2 py-1">
+                <div className="flex-1 h-px bg-white/[0.06]" />
+                <span className="text-[9px] uppercase font-mono text-slate-500 tracking-widest">or paste URL</span>
+                <div className="flex-1 h-px bg-white/[0.06]" />
+              </div>
+
               {referenceImages.map((url, idx) => (
                 <div
                   key={idx}
                   className="flex items-center gap-2"
                 >
+                  {/* Thumbnail if uploaded image */}
+                  {url.startsWith('data:') && (
+                    <img
+                      src={url}
+                      alt={`Reference ${idx + 1}`}
+                      className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
+                    />
+                  )}
                   <div className="relative flex-1">
-                    <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+                    {!url.startsWith('data:') && (
+                      <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+                    )}
                     <Input
-                      type="url"
-                      value={url}
+                      type={url.startsWith('data:') ? 'text' : 'url'}
+                      value={url.startsWith('data:') ? '(uploaded image)' : url}
                       onChange={(e) => {
                         const next = [...referenceImages];
                         next[idx] = e.target.value;
                         setReferenceImages(next);
                       }}
+                      disabled={url.startsWith('data:')}
                       placeholder="https://example.com/reference.png"
-                      className="pl-9 h-10 bg-slate-950/40 border-white/[0.06] text-slate-200 placeholder:text-slate-500 text-xs sm:text-sm"
-                      aria-label={`Reference image ${idx + 1} URL`}
+                      className={`${url.startsWith('data:') ? 'pl-3' : 'pl-9'} h-10 bg-slate-950/40 border-white/[0.06] text-slate-200 placeholder:text-slate-500 text-xs sm:text-sm disabled:opacity-60`}
+                      aria-label={`Reference image ${idx + 1}`}
                     />
                   </div>
-                  {referenceImages.length > 1 && (
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="outline"
-                      onClick={() =>
-                        setReferenceImages(
-                          referenceImages.filter((_, i) => i !== idx),
-                        )
-                      }
-                      className="h-10 w-10 bg-slate-950/40 border-white/[0.06] text-slate-400 hover:text-rose-300 hover:border-rose-500/30"
-                      aria-label="Remove reference image"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={() =>
+                      setReferenceImages(
+                        referenceImages.length > 1
+                          ? referenceImages.filter((_, i) => i !== idx)
+                          : ['']
+                      )
+                    }
+                    className="h-10 w-10 bg-slate-950/40 border-white/[0.06] text-slate-400 hover:text-rose-300 hover:border-rose-500/30 shrink-0"
+                    aria-label="Remove reference image"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
               ))}
               <button
@@ -1390,7 +1481,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Submit Commission Request
+                Submit Hire Request
               </>
             )}
           </Button>
@@ -1718,10 +1809,10 @@ export const ArtistsPage: React.FC<ArtistsPageProps> = ({ activeTheme }) => {
         <section className="text-center sm:text-left">
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-300 font-mono tracking-widest uppercase mb-3 font-bold">
             <Sparkles className="w-3 h-3 animate-pulse" />
-            PracPedia Commission Board
+            PracPedia Hire Board
           </div>
           <h1 className="text-3xl sm:text-5xl font-black text-white font-sans tracking-tight leading-[1.05] break-words">
-            Commission{' '}
+            Hire{' '}
             <span className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 bg-clip-text text-transparent">
               Board-Standard
             </span>{' '}
@@ -1734,7 +1825,7 @@ export const ArtistsPage: React.FC<ArtistsPageProps> = ({ activeTheme }) => {
             labelled figures, or{' '}
             <span className="text-indigo-300 font-bold">Drawing + Writing</span>{' '}
             for the full practical write-up — diagram, theory, observation and
-            calculation, all in one commission.
+            calculation, all in one place.
           </p>
 
           {/* Stats strip */}
@@ -1748,7 +1839,7 @@ export const ArtistsPage: React.FC<ArtistsPageProps> = ({ activeTheme }) => {
             <StatTile
               icon={Award}
               value={loading ? '—' : stats.totalCompleted.toString()}
-              label="Commissions"
+              label="Hires"
               color="text-emerald-300"
             />
             <StatTile
@@ -1828,7 +1919,7 @@ export const ArtistsPage: React.FC<ArtistsPageProps> = ({ activeTheme }) => {
                     onHire={() => {
                       if (!user) {
                         showError(
-                          'Please log in to commission an artist.',
+                          'Please log in to hire an artist.',
                         );
                         return;
                       }
@@ -1858,7 +1949,7 @@ export const ArtistsPage: React.FC<ArtistsPageProps> = ({ activeTheme }) => {
         onHire={() => {
           if (!detailArtist) return;
           if (!user) {
-            showError('Please log in to commission an artist.');
+            showError('Please log in to hire an artist.');
             return;
           }
           if (!detailArtist.isAvailable) {

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * ArtistDashboard — a comprehensive control panel for commission artists.
+ * ArtistDashboard — a comprehensive control panel for hire artists.
  *
  * Three core surfaces wired to the new marketplace APIs:
  *   1. Incoming Orders (filter, status-lifecycle actions, inline artist notes)
@@ -536,7 +536,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
             {fmtBDT(booking.price)}
           </div>
           <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-            Commission
+            Hire
           </div>
         </div>
       </div>
@@ -612,7 +612,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
             id={`notes-${booking.id}`}
             value={notesDraft}
             onChange={(e) => onNotesChange(booking.id, e.target.value)}
-            placeholder="Add private notes about this commission — client preferences, progress, TODOs…"
+            placeholder="Add private notes about this hire — client preferences, progress, TODOs…"
             rows={expanded ? 4 : 2}
             className="bg-slate-900/60 border-white/[0.06] text-slate-200 text-xs placeholder:text-slate-600 focus-visible:ring-amber-500/30 focus-visible:border-amber-500/40 resize-y min-h-[60px]"
           />
@@ -1282,7 +1282,7 @@ const SubjectBar: React.FC<{
         />
       </div>
       <div className="mt-1 text-[10px] text-slate-500">
-        {count} commission{count === 1 ? '' : 's'} • {pct}% of top subject
+        {count} hire{count === 1 ? '' : 's'} • {pct}% of top subject
       </div>
     </div>
   );
@@ -1511,8 +1511,8 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
         const label = STATUS_META[newStatus].label.toLowerCase();
         showSuccess(
           newStatus === 'completed'
-            ? `Commission marked complete — well done!`
-            : `Commission moved to ${label}.`,
+            ? `Hire marked complete — well done!`
+            : `Hire moved to ${label}.`,
         );
         // Refresh user record so completedOrders / stats stay in sync.
         // Only the completed transition changes the user.completedOrders count.
@@ -1714,8 +1714,8 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
         }
         showSuccess(
           checked
-            ? 'You are now accepting new commissions.'
-            : 'You are no longer accepting new commissions.',
+            ? 'You are now accepting new hires.'
+            : 'You are no longer accepting new hires.',
         );
       } catch (err: unknown) {
         // Rollback on failure
@@ -1812,7 +1812,7 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
                   {user?.name || 'Artist'}
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                  Manage incoming commissions, your portfolio and your earnings
+                  Manage incoming hires, your portfolio and your earnings
                   in one place.
                 </p>
               </div>
@@ -1831,7 +1831,7 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-bold text-white">
-                  Accepting New Commissions
+                  Accepting New Hires
                 </span>
                 {isAvailable ? (
                   <Badge className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
@@ -1951,7 +1951,7 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
             <SectionTitle
               icon={Package}
               title="Incoming Orders"
-              sub="Commissions requested from you by students"
+              sub="Hires requested from you by students"
             />
 
             {/* Filter pills */}

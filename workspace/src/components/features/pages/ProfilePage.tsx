@@ -10,7 +10,7 @@
  *   2. Artist Marketplace Settings — two-tier BDT pricing, specialties,
  *      availability toggle + live marketplace card preview (artist only)
  *   3. Portfolio Preview         — artist's own portfolio grid (artist only)
- *   4. My Commissions            — bookings where the user is a client (all)
+ *   4. My Hires            — bookings where the user is a client (all)
  *   5. Account & Security        — email display, change-password placeholder,
  *      AI credits, account type, delete account confirmation (all)
  *
@@ -811,7 +811,7 @@ const ArtistSettingsTab: React.FC<ArtistSettingsTabProps> = ({
             <SectionTitle
               icon={Coins}
               title="Two-Tier Pricing"
-              sub="Set your BDT rates for each commission type"
+              sub="Set your BDT rates for each hire type"
             />
           </CardHeader>
           <CardContent className="pt-5">
@@ -956,7 +956,7 @@ const ArtistSettingsTab: React.FC<ArtistSettingsTabProps> = ({
             <div className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
               <div className="min-w-0">
                 <div className="text-sm font-bold text-white">
-                  Accepting New Commissions
+                  Accepting New Hires
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
                   When off, you won&apos;t appear in marketplace search results.
@@ -1119,7 +1119,7 @@ const PortfolioTab: React.FC<PortfolioTabProps> = ({ loading, items, onManage })
         <EmptyState
           icon={Sparkles}
           title="No portfolio items yet"
-          message="Go to the Artist Dashboard to upload your first work — clients love to see samples before commissioning."
+          message="Go to the Artist Dashboard to upload your first work — clients love to see samples before hiring."
           action={
             <Button
               type="button"
@@ -1192,7 +1192,7 @@ const PortfolioTab: React.FC<PortfolioTabProps> = ({ loading, items, onManage })
 };
 
 /* -------------------------------------------------------------------------- */
-/*  Tab 4: My Commissions                                                       */
+/*  Tab 4: My Hires                                                       */
 /* -------------------------------------------------------------------------- */
 
 interface CommissionsTabProps {
@@ -1383,8 +1383,8 @@ const CommissionsTab: React.FC<CommissionsTabProps> = ({ loading, bookings, apiF
     return (
       <EmptyState
         icon={ShoppingBag}
-        title="No commissions yet"
-        message="You haven't commissioned any drawings yet. Browse the Marketplace to find an artist."
+        title="No hires yet"
+        message="You haven't hired any drawings yet. Browse the Marketplace to find an artist."
       />
     );
   }
@@ -1427,7 +1427,7 @@ const CommissionsTab: React.FC<CommissionsTabProps> = ({ loading, bookings, apiF
                     ) : null}
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    Commissioned {relTime(b.createdAt)} · {formatDate(b.createdAt)}
+                    Hired {relTime(b.createdAt)} · {formatDate(b.createdAt)}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
@@ -1821,11 +1821,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
       const res = await apiFetch('/api/bookings?scope=client');
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.error || 'Could not load commissions.');
+        throw new Error(data?.error || 'Could not load hires.');
       }
       setBookings(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Could not load commissions.';
+      const msg = err instanceof Error ? err.message : 'Could not load hires.';
       showError(msg);
     } finally {
       setBookingsLoading(false);
@@ -2193,11 +2193,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
                   </TabsTrigger>
                 )}
                 <TabsTrigger
-                  value="commissions"
+                  value="hires"
                   className="data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 text-slate-400 px-3 h-9 text-xs font-bold"
                 >
                   <ShoppingBag className="w-3.5 h-3.5" />
-                  Commissions
+                  Hires
                 </TabsTrigger>
                 <TabsTrigger
                   value="security"
@@ -2252,7 +2252,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
               </TabsContent>
             )}
 
-            <TabsContent value="commissions">
+            <TabsContent value="hires">
               <CommissionsTab
                 loading={bookingsLoading}
                 bookings={bookings}
