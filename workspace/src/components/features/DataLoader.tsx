@@ -97,7 +97,7 @@ export const DataLoader: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="w-full flex flex-col items-center justify-center min-h-[50vh] lg:min-h-[60vh] py-8 sm:py-12 relative overflow-hidden bg-slate-950/20 rounded-3xl border border-white/[0.03] p-4 sm:p-8 space-y-5 sm:space-y-7"
+      className="flex-1 w-full flex flex-col items-center justify-center min-h-full lg:min-h-full py-8 sm:py-12 relative overflow-hidden bg-slate-950/20 p-4 sm:p-8 space-y-5 sm:space-y-7"
     >
       {/* Decorative background grid network */}
       <div className="absolute inset-0 grid grid-cols-6 grid-rows-4 gap-2 sm:gap-4 p-4 sm:p-8 opacity-20 pointer-events-none select-none">

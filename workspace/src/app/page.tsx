@@ -1904,7 +1904,7 @@ function PortalConsole() {
         </header>
 
         {/* Dashboard Pages wrapper */}
-        <main className="flex-1 p-3 sm:p-6 md:p-8 space-y-6 w-full min-w-0 overflow-x-hidden">
+        <main className="flex-1 p-3 sm:p-6 md:p-8 space-y-6 w-full min-w-0">
 
           {isLoading && (
             <DataLoader />
