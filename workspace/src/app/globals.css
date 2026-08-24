@@ -239,23 +239,46 @@
   }
 }
 
-/* Custom Scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Custom Scrollbars — hidden on mobile, thin on desktop */
+/* Hide scrollbar completely on mobile (touch devices use native overlay scroll) */
+@media (max-width: 1024px) {
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+  /* Firefox — hide scrollbar */
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(2, 6, 23, 0.8);
-}
+/* Desktop — thin, dark, barely visible */
+@media (min-width: 1025px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
+  ::-webkit-scrollbar-track {
+    background: #05070e;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.4);
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.3);
+  }
+
+  /* Firefox — thin dark scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.08) #05070e;
+  }
 }
 
 html, body {
@@ -266,6 +289,10 @@ html, body {
   font-family: "Space Grotesk", "Geist", ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
   width: 100%;
+  /* Use overlay scrollbar behavior — scrollbar doesn't take up layout space */
+  scrollbar-gutter: stable both-edges;
+  /* Ensure the html element (which includes the scrollbar area) is dark */
+  box-shadow: inset 0 0 0 100px #05070e;
 }
 
 /* Math blocks custom safety wrapping */
