@@ -132,14 +132,24 @@
     width: 100%;
     overflow-x: hidden;
   }
-  /* Safe-area insets for curved/notched phones — padding so content
-     isn't clipped by the screen curve or notch. */
-  .safe-area-padding {
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
+}
+
+/* ── Force dark background on ALL elements — overrides Next.js defaults ── */
+/* Next.js injects body{background:#fff} for light mode and body{background:#000} */
+/* for dark mode via prefers-color-scheme. Both are wrong for our app. */
+/* This uses !important to guarantee our dark color wins. */
+html,
+body {
+  background-color: #05070e !important;
+  color: #f8fafc !important;
+}
+
+/* Safe-area insets for curved/notched phones */
+.safe-area-padding {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* PracPedia dark glass theme — applied to the root app shell */
@@ -284,15 +294,11 @@
 html, body {
   margin: 0 !important;
   padding: 0 !important;
-  background-color: #05070e;
-  color: #f8fafc;
+  background-color: #05070e !important;
+  color: #f8fafc !important;
   font-family: "Space Grotesk", "Geist", ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
   width: 100%;
-  /* Use overlay scrollbar behavior — scrollbar doesn't take up layout space */
-  scrollbar-gutter: stable both-edges;
-  /* Ensure the html element (which includes the scrollbar area) is dark */
-  box-shadow: inset 0 0 0 100px #05070e;
 }
 
 /* Math blocks custom safety wrapping */

@@ -1904,7 +1904,7 @@ function PortalConsole() {
         </header>
 
         {/* Dashboard Pages wrapper */}
-        <main className="flex-1 p-3 sm:p-6 md:p-8 space-y-6 max-w-7xl w-full mx-auto min-w-0 overflow-x-hidden">
+        <main className="flex-1 p-3 sm:p-6 md:p-8 space-y-6 w-full min-w-0 overflow-x-hidden">
 
           {isLoading && (
             <DataLoader />
@@ -2743,7 +2743,7 @@ function PortalConsole() {
 
         {/* Sticky footer per project rules — mt-auto keeps it pinned to the bottom on short viewports. */}
         <footer className="mt-auto border-t border-white/5 bg-slate-950/60 backdrop-blur-md py-3 px-4 sm:px-6 md:px-8 text-[10px] sm:text-[11px] font-mono text-slate-500">
-          <div className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4">
+          <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 min-w-0 truncate">
               <img
                 src="/pracpedia_logo.jpg"
