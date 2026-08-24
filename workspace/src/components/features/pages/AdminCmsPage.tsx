@@ -188,22 +188,41 @@ const ActivityLogTab: React.FC<ActivityLogTabProps> = ({ apiFetch }) => {
     }
   };
 
-  // Initial fetch + long-poll loop (5s interval — light on the server)
+  // Initial fetch + poll loop (5s interval)
   useEffect(() => {
-    fetchEntries();
     let cancelled = false;
+
+    const doFetch = async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const res = await apiFetch('/api/activity-log?limit=100');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setEntries(data.entries || []);
+          setLastRefresh(new Date());
+          setError(null);
+        }
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'Could not load activity log');
+      } finally {
+        if (!cancelled && !silent) setLoading(false);
+      }
+    };
+
+    doFetch();
 
     const pollLoop = async () => {
       while (!cancelled && autoRefresh) {
         await new Promise((r) => setTimeout(r, 5000));
         if (cancelled || !autoRefresh) break;
-        await fetchEntries(true);
+        await doFetch(true);
       }
     };
     pollLoop();
 
-    return () => { cancelled = true; if (pollRef.current) clearTimeout(pollRef.current); };
-  }, [autoRefresh]);
+    return () => { cancelled = true; };
+  }, [autoRefresh, apiFetch]);
 
   // Filter entries by category + search
   const filtered = entries.filter((e) => {
@@ -894,20 +913,20 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   const handleToggleCommissionPayment = async (bookingId: string) => {
     setIsActionLoading(true);
     try {
-      const res = await apiFetch(`/api/artists/bookings/${bookingId}/pay`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+      const res = await apiFetch(`/api/bookings/${bookingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentStatus: 'paid' })
       });
       if (res.ok) {
-        showSuccess("Commission payment status updated!");
+        showSuccess("Payment status updated!");
         fetchCommissions();
       } else {
         const err = await res.json();
         showError(err.error || "Failed to update payment.");
       }
     } catch (e) {
-      console.warn('Artist booking pay endpoint not yet implemented in Next.js backend:', e);
-      showError("Network error updating commission payment.");
+      showError("Network error updating payment.");
     } finally {
       setIsActionLoading(false);
     }

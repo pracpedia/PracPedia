@@ -2868,9 +2868,9 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-[#020617] flex flex-col items-center justify-center gap-4 text-slate-300 font-sans p-4">
-        <div className="w-9 h-9 rounded-full border-t-2 border-b-2 border-cyan-400 animate-spin" />
-        <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500">Decrypting Archive Key...</p>
+      <div className="fixed inset-0 bg-[#020617] flex flex-col items-center justify-center gap-4 text-slate-300 font-sans p-4 z-50">
+        <div className="w-10 h-10 rounded-full border-t-2 border-b-2 border-cyan-400 animate-spin" />
+        <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500 text-center">Loading PracPedia…</p>
       </div>
     );
   }
