@@ -305,15 +305,11 @@ html, body {
 }
 
 /* Fixed full-screen dark background — covers the entire viewport at all times,
-   including overscroll areas and curved-edge safe areas. This is the nuclear
-   option that guarantees no white can ever show through. */
+   including overscroll areas and curved-edge safe areas. */
 body::before {
   content: '';
   position: fixed;
-  top: -100px;
-  left: -100px;
-  right: -100px;
-  bottom: -100px;
+  inset: 0;
   background: #05070e;
   z-index: -1;
   pointer-events: none;

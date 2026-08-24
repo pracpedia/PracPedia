@@ -1401,7 +1401,7 @@ function PortalConsole() {
   void selectRandomRealCat;
 
   return (
-    <div className={`min-h-screen flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden text-slate-100 relative transition-all duration-300 ${
+    <div className={`min-h-screen lg:min-h-0 flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden text-slate-100 relative transition-all duration-300 ${
       activeTheme === 'peaceful-purple' ? 'theme-peaceful-purple' :
       activeTheme === 'deep-blue' ? 'theme-deep-blue' :
       activeTheme === 'cosmic-black' ? 'theme-cosmic-black' :
@@ -1812,7 +1812,7 @@ function PortalConsole() {
       />
 
       {/* Main dashboard view container — independently scrollable on desktop */}
-      <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden lg:h-screen lg:overflow-y-auto">
+      <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden lg:h-screen lg:overflow-y-auto min-h-0">
 
         {/* Desktop Navigation Admin Header */}
         <header className="hidden lg:flex sticky top-0 glass-header py-3 px-3 sm:px-6 md:px-8 justify-between items-center z-30 min-h-[4rem] gap-2">
