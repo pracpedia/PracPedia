@@ -1812,10 +1812,10 @@ function PortalConsole() {
       />
 
       {/* Main dashboard view container — independently scrollable on desktop */}
-      <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden lg:h-screen lg:overflow-y-auto min-h-0">
+      <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden lg:h-full lg:overflow-y-auto min-h-0">
 
         {/* Desktop Navigation Admin Header */}
-        <header className="hidden lg:flex sticky top-0 glass-header py-3 px-3 sm:px-6 md:px-8 justify-between items-center z-30 min-h-[4rem] gap-2">
+        <header className="hidden lg:flex shrink-0 sticky top-0 glass-header py-3 px-3 sm:px-6 md:px-8 justify-between items-center z-30 min-h-[4rem] gap-2">
           <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
             {/* Breadcrumb Navigation Trail */}
             <div className="flex items-center gap-1 sm:gap-2 text-xs text-slate-400 font-sans tracking-wide min-w-0 flex-1 truncate">
@@ -2742,7 +2742,7 @@ function PortalConsole() {
         </main>
 
         {/* Sticky footer per project rules — mt-auto keeps it pinned to the bottom on short viewports. */}
-        <footer className="mt-auto border-t border-white/5 bg-slate-950/60 backdrop-blur-md py-3 px-4 sm:px-6 md:px-8 text-[10px] sm:text-[11px] font-mono text-slate-500">
+        <footer className="mt-auto shrink-0 border-t border-white/5 bg-slate-950/60 backdrop-blur-md py-3 px-4 sm:px-6 md:px-8 text-[10px] sm:text-[11px] font-mono text-slate-500">
           <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 min-w-0 truncate">
               <img
