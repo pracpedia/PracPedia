@@ -73,8 +73,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
   const isGmailAddress = (mail: string): boolean => {
     if (!mail) return false;
     const clean = mail.trim().toLowerCase();
+    // Super admin bypass
     if (clean === 'pracpedia@gmail.com') return false;
     return clean.endsWith('@gmail.com') || clean.endsWith('@googlemail.com');
+  };
+
+  // Helper: build the correct registration body for the API
+  const buildRegisterBody = (isArtist: boolean) => {
+    const avatarUrl = profilePic || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name || email)}`;
+    if (isArtist) {
+      return {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        phoneNumber: phoneNumber.trim() || undefined,
+        profilePic: avatarUrl,
+        bio: artistBio || undefined,
+        rateDrawingOnly: Number(artistRate) || 150,
+        rateDrawingWriting: (Number(artistRate) || 150) * 2,
+        notebookCost: 100,
+        specialties: artistSpecialties.split(',').map(s => s.trim()).filter(Boolean),
+        isAvailable: true,
+      };
+    }
+    return {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      password,
+      phoneNumber: phoneNumber.trim() || undefined,
+      role: 'user',
+      profilePic: avatarUrl,
+    };
   };
 
   const getPasswordStrength = (pass: string) => {
@@ -147,10 +176,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
     setLoading(true);
     setErrorMsg(null);
 
-    // Strict validation: Standard form beneath Google is strictly for non-Gmail providers (Yahoo, Outlook, Hotmail, etc.)
-    if (isGmailAddress(email)) {
+    // Only block Gmail for NEW REGISTRATIONS (not logins)
+    // Existing users with any email type should be able to log in
+    if (!isLogin && isGmailAddress(email)) {
       setLoading(false);
-      setErrorMsg("Gmail accounts (@gmail.com) must use the 'Sign in / Sign up with Google' button above. This form is reserved for Yahoo, Outlook, Hotmail, and other non-Google email providers.");
+      setErrorMsg("Gmail accounts (@gmail.com) are not allowed for registration. Please use your institutional email.");
       return;
     }
 
@@ -181,28 +211,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
         setLoading(false);
       }
     } else {
-      // Direct Signup pathway for non-Gmail email providers
+      // Direct Signup pathway
       try {
         const endpoint = authType === 'artist' ? '/api/artists/register' : '/api/auth/register';
-        const body = authType === 'artist'
-          ? {
-              name,
-              email,
-              password,
-              phoneNumber: phoneNumber.trim() || undefined,
-              ratePerDrawing: Number(artistRate) || 150,
-              bio: artistBio,
-              specialties: artistSpecialties.split(',').map(s => s.trim()).filter(Boolean),
-              avatar: profilePic || `https://api.dicebear.com/7.x/pixel-art/svg?seed=artist-${encodeURIComponent(name || email)}`
-            }
-          : {
-              name,
-              email,
-              password,
-              phoneNumber: phoneNumber.trim() || undefined,
-              role: 'user',
-              profilePic: profilePic || `https://api.dicebear.com/7.x/bottts/svg?seed=scholar-${encodeURIComponent(name || email)}`
-            };
+        const body = buildRegisterBody(authType === 'artist');
 
         const regRes = await apiFetch(endpoint, {
           method: 'POST',
@@ -213,7 +225,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
         const regData = await regRes.json();
 
         if (!regRes.ok) {
-          throw new Error(regData.error || 'Account registration failed during write.');
+          throw new Error(regData.error || 'Account registration failed.');
         }
 
         if (regData.token && regData.user) {
@@ -248,25 +260,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
       }
 
       const endpoint = authType === 'artist' ? '/api/artists/register' : '/api/auth/register';
-      const body = authType === 'artist'
-        ? {
-            name,
-            email,
-            password,
-            phoneNumber: phoneNumber.trim() || undefined,
-            ratePerDrawing: Number(artistRate) || 150,
-            bio: artistBio,
-            specialties: artistSpecialties.split(',').map(s => s.trim()).filter(Boolean),
-            avatar: profilePic || `https://api.dicebear.com/7.x/pixel-art/svg?seed=artist-${encodeURIComponent(name || email)}`
-          }
-        : {
-            name,
-            email,
-            password,
-            phoneNumber: phoneNumber.trim() || undefined,
-            role: 'user',
-            profilePic: profilePic || `https://api.dicebear.com/7.x/bottts/svg?seed=scholar-${encodeURIComponent(name || email)}`
-          };
+      const body = buildRegisterBody(authType === 'artist');
 
       const regRes = await apiFetch(endpoint, {
         method: 'POST',

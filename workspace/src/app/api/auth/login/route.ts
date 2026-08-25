@@ -48,10 +48,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
     }
 
-    // ── Gmail block — reject Gmail addresses (except platform owners) ──
-    if (shouldBlockEmail(String(email))) {
-      return NextResponse.json({ error: GMAIL_BLOCK_ERROR }, { status: 403 });
-    }
+    // NOTE: Gmail blocking is ONLY for registration, NOT login.
+    // Existing users (including admins with Gmail) should be able to log in.
 
     // ── DB query with retry — handles Neon connection drops ──
     const u = await withRetry(() =>
