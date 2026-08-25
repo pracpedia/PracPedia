@@ -102,6 +102,9 @@ interface Booking {
   subject: string;
   description: string;
   price: number;
+  commissionPercent?: number;
+  commissionAmount?: number;
+  artistEarnings?: number;
   status: BookingStatus;
   paymentStatus: PaymentStatus;
   referenceImages: string[];
@@ -530,14 +533,19 @@ const OrderCard: React.FC<OrderCardProps> = ({
             </div>
           </div>
         </div>
-        {/* Price (top-right on desktop) */}
+        {/* Price + commission breakdown (top-right on desktop) */}
         <div className="flex sm:flex-col sm:items-end sm:justify-start shrink-0 gap-2 sm:gap-0.5">
           <div className="text-xl sm:text-2xl font-black text-amber-300 leading-none">
-            {fmtBDT(booking.price)}
+            {fmtBDT(booking.artistEarnings || booking.price)}
           </div>
           <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-            Hire
+            {booking.commissionPercent ? `Your earnings (after ${booking.commissionPercent}% commission)` : 'Hire'}
           </div>
+          {booking.commissionPercent ? (
+            <div className="text-[9px] text-fuchsia-400 font-mono">
+              Total: ৳{booking.price} − Comm: ৳{booking.commissionAmount}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -1421,10 +1429,13 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
       completedBookingsCount + (user?.completedOrders ?? 0);
     const totalEarnings = bookings
       .filter((b) => b.status === 'completed')
-      .reduce((sum, b) => sum + (Number(b.price) || 0), 0);
+      .reduce((sum, b) => sum + (Number(b.artistEarnings) || Number(b.price) || 0), 0);
     const pendingEarnings = bookings
       .filter((b) => b.status === 'in_progress')
-      .reduce((sum, b) => sum + (Number(b.price) || 0), 0);
+      .reduce((sum, b) => sum + (Number(b.artistEarnings) || Number(b.price) || 0), 0);
+    const totalCommissionPaid = bookings
+      .filter((b) => b.status === 'completed' && b.commissionAmount)
+      .reduce((sum, b) => sum + (Number(b.commissionAmount) || 0), 0);
     const rating = user?.rating ?? 0;
     return {
       active,

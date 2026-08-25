@@ -5,7 +5,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -143,8 +143,10 @@ model Booking {
   subject       String
   description   String
   referenceImagesJson String @default("[]") // JSON array of {url, title}
-  price         Int      @default(0)        // BDT
-  commissionAmount Int   @default(0)        // BDT — admin commission override
+  price             Int      @default(0)        // BDT — total price student pays
+  commissionPercent Int      @default(0)        // % commission admin takes (0-100)
+  commissionAmount  Int      @default(0)        // BDT — calculated commission amount (price * percent / 100)
+  artistEarnings    Int      @default(0)        // BDT — what artist keeps (price - commissionAmount)
   status        String   @default("pending") // pending | in_progress | completed | cancelled
   paymentStatus String   @default("unpaid")  // unpaid | paid | refunded
   clientNotes   String?

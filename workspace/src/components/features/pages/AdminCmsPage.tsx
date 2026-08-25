@@ -94,6 +94,9 @@ interface CommissionBooking {
   deliveryDate?: string;
   createdAt?: string;
   specialInstructions?: string;
+  commissionPercent?: number;
+  commissionAmount?: number;
+  artistEarnings?: number;
 }
 
 interface AdminCmsPageProps {
@@ -508,6 +511,9 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
           paymentStatus: b.paymentStatus || 'unpaid',
           specialInstructions: b.clientNotes || '',
           createdAt: b.createdAt,
+          commissionPercent: b.commissionPercent || 0,
+          commissionAmount: b.commissionAmount || 0,
+          artistEarnings: b.artistEarnings || b.price || 0,
         }));
         setCommissionsList(mapped);
       }
@@ -916,6 +922,36 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
       }
     } catch (e) {
       showError("Network error deleting announcement.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  // ===================================
+  // COMMISSION IMPOSER — admin sets commission % on a booking
+  // ===================================
+  const [commissionModalBooking, setCommissionModalBooking] = useState<CommissionBooking | null>(null);
+  const [commissionPctInput, setCommissionPctInput] = useState<number>(10);
+
+  const handleSetCommission = async (bookingId: string, pct: number) => {
+    setIsActionLoading(true);
+    try {
+      const res = await apiFetch(`/api/bookings/${bookingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commissionPercent: pct })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showSuccess(`Commission set to ${pct}% — ৳${data.commissionAmount} from ৳${data.price}`);
+        fetchCommissions();
+        setCommissionModalBooking(null);
+      } else {
+        const err = await res.json();
+        showError(err.error || "Failed to set commission.");
+      }
+    } catch (e) {
+      showError("Network error setting commission.");
     } finally {
       setIsActionLoading(false);
     }
@@ -2221,8 +2257,36 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                       >
                         {comm.paymentStatus === 'paid' ? '✓ Paid' : 'Mark Paid'}
                       </button>
+
+                      <button
+                        onClick={() => {
+                          setCommissionModalBooking(comm);
+                          setCommissionPctInput(comm.commissionPercent || 10);
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold cursor-pointer transition-all shadow-sm min-h-[36px] bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30 hover:bg-fuchsia-500/25"
+                      >
+                        {comm.commissionPercent ? `${comm.commissionPercent}% Comm` : 'Set Commission'}
+                      </button>
                     </div>
                   </div>
+
+                  {/* Commission breakdown (if set) */}
+                  {comm.commissionPercent ? (
+                    <div className="grid grid-cols-3 gap-2 p-3 bg-slate-900/60 rounded-xl border border-fuchsia-500/10">
+                      <div className="text-center">
+                        <div className="text-[9px] text-slate-500 font-mono uppercase">Total</div>
+                        <div className="text-sm font-black text-emerald-400">৳{comm.totalPrice}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[9px] text-slate-500 font-mono uppercase">Commission ({comm.commissionPercent}%)</div>
+                        <div className="text-sm font-black text-fuchsia-400">৳{comm.commissionAmount}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[9px] text-slate-500 font-mono uppercase">Artist Earns</div>
+                        <div className="text-sm font-black text-cyan-400">৳{comm.artistEarnings}</div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {comm.specialInstructions && (
                     <div className="p-3 bg-slate-900/60 rounded-xl text-xs text-slate-300 italic border border-white/5 leading-relaxed break-words">
@@ -2233,6 +2297,88 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* =========================================================================
+          COMMISSION IMPOSER MODAL
+          ========================================================================= */}
+      {commissionModalBooking && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+          <div className="w-full max-w-sm max-w-[92vw] bg-slate-900 border border-fuchsia-500/20 rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10 gap-2">
+              <h3 className="text-xs font-extrabold text-white truncate flex items-center gap-2">
+                <span className="text-fuchsia-400">Commission Imposer</span>
+              </h3>
+              <button onClick={() => setCommissionModalBooking(null)} className="text-slate-400 hover:text-white shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-3 bg-slate-950/60 rounded-xl border border-white/5 text-xs space-y-1">
+                <div className="flex justify-between"><span className="text-slate-400">Student:</span><span className="text-slate-200 font-bold">{commissionModalBooking.studentName}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Artist:</span><span className="text-slate-200 font-bold">{commissionModalBooking.artistName}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Total Price:</span><span className="text-emerald-400 font-black">৳{commissionModalBooking.totalPrice}</span></div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-bold block mb-2">
+                  Commission Percentage ({commissionPctInput}%)
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={50}
+                  value={commissionPctInput}
+                  onChange={(e) => setCommissionPctInput(Number(e.target.value))}
+                  className="w-full accent-fuchsia-500"
+                />
+                <div className="flex justify-between text-[9px] text-slate-500 font-mono mt-1">
+                  <span>0%</span>
+                  <span>10%</span>
+                  <span>20%</span>
+                  <span>30%</span>
+                  <span>40%</span>
+                  <span>50%</span>
+                </div>
+              </div>
+
+              {/* Live calculation */}
+              <div className="p-3 bg-fuchsia-500/5 rounded-xl border border-fuchsia-500/15 space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">Student pays:</span>
+                  <span className="text-emerald-400 font-bold">৳{commissionModalBooking.totalPrice}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">Admin commission ({commissionPctInput}%):</span>
+                  <span className="text-fuchsia-400 font-bold">৳{Math.round((commissionModalBooking.totalPrice * commissionPctInput) / 100)}</span>
+                </div>
+                <div className="flex justify-between text-xs border-t border-white/5 pt-1.5">
+                  <span className="text-slate-300 font-bold">Artist earns:</span>
+                  <span className="text-cyan-400 font-black">৳{commissionModalBooking.totalPrice - Math.round((commissionModalBooking.totalPrice * commissionPctInput) / 100)}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setCommissionModalBooking(null)}
+                  className="px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl cursor-pointer min-h-[40px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isActionLoading}
+                  onClick={() => handleSetCommission(commissionModalBooking.id, commissionPctInput)}
+                  className="px-4 py-1.5 bg-fuchsia-500 text-white text-xs font-black rounded-xl cursor-pointer min-h-[40px] hover:bg-fuchsia-400 transition-colors disabled:opacity-50"
+                >
+                  {isActionLoading ? 'Setting…' : 'Impose Commission'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

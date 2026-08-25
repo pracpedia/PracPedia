@@ -51,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const body = await request.json();
-    const { status, paymentStatus, artistNotes, clientNotes } = body;
+    const { status, paymentStatus, artistNotes, clientNotes, commissionPercent } = body;
 
     // Authorization rules
     const isClient = booking.clientId === payload.userId;
@@ -77,8 +77,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    // Cannot modify a cancelled or completed booking
-    if (booking.status === 'cancelled' || booking.status === 'completed') {
+    // Cannot modify a cancelled or completed booking (except admin setting commission)
+    const isCommissionUpdate = commissionPercent !== undefined && (isSuperAdmin || isAdmin);
+    if ((booking.status === 'cancelled' || booking.status === 'completed') && !isCommissionUpdate) {
       return NextResponse.json({ error: `Booking already ${booking.status}.` }, { status: 400 });
     }
 
@@ -87,6 +88,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (paymentStatus !== undefined) updateData.paymentStatus = String(paymentStatus);
     if (artistNotes !== undefined && isArtist) updateData.artistNotes = String(artistNotes);
     if (clientNotes !== undefined && isClient) updateData.clientNotes = String(clientNotes);
+
+    // Admin commission imposer — sets commission % on the booking
+    if (isCommissionUpdate) {
+      const pct = Math.max(0, Math.min(100, Number(commissionPercent) || 0));
+      const totalPrice = booking.price || 0;
+      const commAmount = Math.round((totalPrice * pct) / 100);
+      updateData.commissionPercent = pct;
+      updateData.commissionAmount = commAmount;
+      updateData.artistEarnings = totalPrice - commAmount;
+    }
 
     const updated = await db.booking.update({ where: { id }, data: updateData });
 
