@@ -11,7 +11,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const body = await request.json();
-    const { name, phoneNumber, bio, profilePic, rateDrawingOnly, rateDrawingWriting, specialties, isAvailable } = body;
+    const { name, phoneNumber, bio, profilePic, rateDrawingOnly, rateDrawingWriting, notebookCost, specialties, isAvailable } = body;
 
     const u = await db.user.findUnique({ where: { id: payload.userId } });
     if (!u) {
@@ -33,6 +33,7 @@ export async function PUT(request: NextRequest) {
     if (isArtist) {
       if (rateDrawingOnly !== undefined) updateData.rateDrawingOnly = Number(rateDrawingOnly) || 0;
       if (rateDrawingWriting !== undefined) updateData.rateDrawingWriting = Number(rateDrawingWriting) || 0;
+      if (notebookCost !== undefined) updateData.notebookCost = Number(notebookCost) || 0;
       if (specialties !== undefined) {
         const arr = Array.isArray(specialties)
           ? specialties

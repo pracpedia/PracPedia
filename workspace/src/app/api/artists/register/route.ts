@@ -7,7 +7,7 @@ import { serializeUser } from '@/lib/user-serializer';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, name, phoneNumber, profilePic, bio, rateDrawingOnly, rateDrawingWriting, specialties, isAvailable } = body;
+    const { email, password, name, phoneNumber, profilePic, bio, rateDrawingOnly, rateDrawingWriting, notebookCost, specialties, isAvailable } = body;
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
         profilePic: profilePic || null,
         rateDrawingOnly: Number(rateDrawingOnly) || 150,
         rateDrawingWriting: Number(rateDrawingWriting) || 300,
+        notebookCost: Number(notebookCost) || 100,
         specialtiesJson: JSON.stringify(tagArr),
         isAvailable: isAvailable !== false,
         rating: 5.0,
@@ -61,10 +62,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Only artists can update artist profiles.' }, { status: 403 });
     }
     const body = await request.json();
-    const { rateDrawingOnly, rateDrawingWriting, specialties, isAvailable } = body;
+    const { rateDrawingOnly, rateDrawingWriting, notebookCost, specialties, isAvailable } = body;
     const updateData: any = {};
     if (rateDrawingOnly !== undefined) updateData.rateDrawingOnly = Number(rateDrawingOnly) || 0;
     if (rateDrawingWriting !== undefined) updateData.rateDrawingWriting = Number(rateDrawingWriting) || 0;
+    if (notebookCost !== undefined) updateData.notebookCost = Number(notebookCost) || 0;
     if (specialties !== undefined) {
       const arr = Array.isArray(specialties)
         ? specialties
