@@ -176,11 +176,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
     setLoading(true);
     setErrorMsg(null);
 
-    // Only block Gmail for NEW REGISTRATIONS (not logins)
-    // Existing users with any email type should be able to log in
-    if (!isLogin && isGmailAddress(email)) {
+    // Gmail emails must use the Google Sign-In button, not this normal form.
+    // Applies to BOTH login and signup.
+    // pracpedia@gmail.com (super admin) is exempt — can use any form.
+    if (isGmailAddress(email)) {
       setLoading(false);
-      setErrorMsg("Gmail accounts (@gmail.com) are not allowed for registration. Please use your institutional email.");
+      setErrorMsg("Gmail accounts must use the 'Sign in / Sign up with Google' button above. This form is for Yahoo, Outlook, Hotmail, and other providers only.");
       return;
     }
 
