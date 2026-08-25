@@ -1,6 +1,5 @@
 // Clean seed script — creates ONLY one super admin account.
 // No demo subjects, folders, images, bookings, or portfolio items.
-// The user will create all content themselves after first login.
 //
 // ⚠️  TEST MODE: password is stored as PLAINTEXT (no bcrypt).
 import { db } from '../src/lib/db';
@@ -12,7 +11,6 @@ async function hashPassword(password: string): Promise<string> {
 async function main() {
   console.log('🧹 Wiping all existing data...');
 
-  // Delete in dependency order (children first)
   await db.activityLog.deleteMany();
   await db.portfolioItem.deleteMany();
   await db.booking.deleteMany();
@@ -24,28 +22,26 @@ async function main() {
   await db.user.deleteMany();
 
   console.log('✓ All data wiped');
+  console.log('👤 Creating super admin...');
 
-  console.log('👤 Creating single super admin...');
-
-  const adminPassword = await hashPassword('admin123');
+  const adminPassword = await hashPassword('pracpedia123456789');
 
   const superAdmin = await db.user.create({
     data: {
       id: 'u-admin',
-      email: 'admin@gallery.com',
-      name: 'Super Admin',
+      email: 'pracpedia@gmail.com',
+      name: 'PracPedia Super Admin',
       passwordHash: adminPassword,
       role: 'super_admin',
-      bio: 'Platform super administrator.',
+      bio: 'PracPedia platform super administrator.',
       isPremium: true,
     },
   });
 
   console.log('✅ Seed complete!');
-  console.log(`   Super Admin: ${superAdmin.email} / admin123`);
+  console.log(`   Super Admin: ${superAdmin.email} / pracpedia123456789`);
   console.log('');
   console.log('   No subjects, folders, images, or demo users were created.');
-  console.log('   Log in and create everything yourself.');
 }
 
 main()

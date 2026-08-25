@@ -17,8 +17,8 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading, user } = useAuth();
 
-  const [email, setEmail] = useState('admin@gallery.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('pracpedia@gmail.com');
+  const [password, setPassword] = useState('pracpedia123456789');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -167,7 +167,7 @@ export default function AdminLoginPage() {
           {/* Demo credentials hint */}
           <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-200/80 text-[11px] leading-relaxed">
             <p className="font-bold text-amber-300 mb-1">Demo Admin Credentials:</p>
-            <p>Super Admin: <code className="font-mono">admin@gallery.com</code> / <code className="font-mono">admin123</code></p>
+            <p>Super Admin: <code className="font-mono">pracpedia@gmail.com / pracpedia123456789</code></p>
             <p>Admin: <code className="font-mono">admin2@gallery.com</code> / <code className="font-mono">admin123</code></p>
           </div>
         </div>

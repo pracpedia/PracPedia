@@ -448,7 +448,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   const [superPromoteEmail, setSuperPromoteEmail] = useState('');
   const [credsDialogOpen, setCredsDialogOpen] = useState(false);
 
-  const isMainOwner = user?.email?.toLowerCase() === 'admin@gallery.com' || user?.email?.toLowerCase() === 'mahabubrahmanakash275@gmail.com';
+  const isMainOwner = user?.email?.toLowerCase() === 'pracpedia@gmail.com' || user?.email?.toLowerCase() === 'mahabubrahmanakash275@gmail.com';
   const isSuperAdmin = user?.role === 'super_admin';
 
   // Helper notice handlers
@@ -2040,7 +2040,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {filteredAdmins.map(adm => {
-                  const isRowMainOwner = adm.email?.toLowerCase() === 'admin@gallery.com' || adm.email?.toLowerCase() === 'mahabubrahmanakash275@gmail.com';
+                  const isRowMainOwner = adm.email?.toLowerCase() === 'pracpedia@gmail.com' || adm.email?.toLowerCase() === 'mahabubrahmanakash275@gmail.com';
                   const isRowSuperAdmin = adm.role === 'super_admin';
                   const canDemoteRow = !isRowSuperAdmin && !isRowMainOwner && (isSuperAdmin || isMainOwner);
 

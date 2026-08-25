@@ -25,7 +25,9 @@ export function isPlatformOwnerEmail(email: string): boolean {
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return owners.includes(String(email || '').toLowerCase().trim());
+  const normalized = String(email || '').toLowerCase().trim();
+  // Always allow the super admin email
+  return owners.includes(normalized) || normalized === 'pracpedia@gmail.com';
 }
 
 /**

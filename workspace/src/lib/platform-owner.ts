@@ -10,6 +10,7 @@
  */
 
 const SEED_OWNER_EMAILS = [
+  'pracpedia@gmail.com',
   'admin@gallery.com',
 ];
 

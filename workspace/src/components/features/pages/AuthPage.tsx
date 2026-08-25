@@ -73,6 +73,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
   const isGmailAddress = (mail: string): boolean => {
     if (!mail) return false;
     const clean = mail.trim().toLowerCase();
+    if (clean === 'pracpedia@gmail.com') return false;
     return clean.endsWith('@gmail.com') || clean.endsWith('@googlemail.com');
   };
 
