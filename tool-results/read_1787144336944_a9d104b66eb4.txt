@@ -1,0 +1,718 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import React, { useState, useEffect, useRef } from 'react';
+     4→     4→import { useAuth } from '@/context/AuthContext';
+     5→     5→import { useLanguage } from '@/context/LanguageContext';
+     6→     6→import {
+     7→     7→  Send,
+     8→     8→  Trash2,
+     9→     9→  MessageSquare,
+    10→    10→  User,
+    11→    11→  ShieldCheck,
+    12→    12→  Hash,
+    13→    13→  Sparkles,
+    14→    14→  Clock,
+    15→    15→  AlertCircle,
+    16→    16→  Loader2,
+    17→    17→  BookOpen,
+    18→    18→  ChevronLeft,
+    19→    19→  Users,
+    20→    20→  GraduationCap,
+    21→    21→  Beaker,
+    22→    22→  Compass,
+    23→    23→  Code,
+    24→    24→  Sparkle,
+    25→    25→  BookmarkCheck,
+    26→    26→  Phone,
+    27→    27→  Video,
+    28→    28→  Info
+    29→    29→} from 'lucide-react';
+    30→    30→import { motion, AnimatePresence } from 'framer-motion';
+    31→    31→
+    32→    32→interface SubjectType {
+    33→    33→  id: string;
+    34→    34→  title: string;
+    35→    35→  description: string;
+    36→    36→}
+    37→    37→
+    38→    38→interface MessageType {
+    39→    39→  id?: string;
+    40→    40→  _id?: string;
+    41→    41→  userId: string;
+    42→    42→  userName: string;
+    43→    43→  userRole: 'user' | 'admin';
+    44→    44→  content: string;
+    45→    45→  subjectId: string;
+    46→    46→  createdAt: string;
+    47→    47→  userProfilePic?: string;
+    48→    48→}
+    49→    49→
+    50→    50→interface ClassroomDiscussionProps {
+    51→    51→  subjects: SubjectType[];
+    52→    52→}
+    53→    53→
+    54→    54→export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjects }) => {
+    55→    55→  const { user, apiFetch } = useAuth();
+    56→    56→  const { language, t } = useLanguage();
+    57→    57→  const [messages, setMessages] = useState<MessageType[]>([]);
+    58→    58→  const [activeChannelId, setActiveChannelId] = useState<string>('general');
+    59→    59→  const [typedMessage, setTypedMessage] = useState<string>('');
+    60→    60→  const [loading, setLoading] = useState<boolean>(false);
+    61→    61→  const [submitting, setSubmitting] = useState<boolean>(false);
+    62→    62→  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    63→    63→
+    64→    64→  // Custom mobile screen flow: 'channels' list vs the 'chat' window itself
+    65→    65→  const [mobileView, setMobileView] = useState<'channels' | 'chat'>('chat');
+    66→    66→
+    67→    67→  const scrollContainerRef = useRef<HTMLDivElement>(null);
+    68→    68→
+    69→    69→  // Real-time active users (SSR-safe — window may be undefined during prerender)
+    70→    70→  const [activeUsers, setActiveUsers] = useState<any[]>(() =>
+    71→    71→    typeof window !== 'undefined' ? (window as any).__activeUsers || [] : [],
+    72→    72→  );
+    73→    73→
+    74→    74→  // Quick Action triggers for easy classroom conversation starter
+    75→    75→  const quickChips = [
+    76→    76→    t('quickChip1'),
+    77→    77→    t('quickChip2'),
+    78→    78→    t('quickChip3'),
+    79→    79→    t('quickChip4'),
+    80→    80→  ];
+    81→    81→
+    82→    82→  // Fetch messages of specified subject channel
+    83→    83→  const fetchChannelMessages = async (subjId: string, silent: boolean = false) => {
+    84→    84→    if (!silent) {
+    85→    85→      setLoading(true);
+    86→    86→      setErrorMessage(null);
+    87→    87→    }
+    88→    88→    try {
+    89→    89→      // Next.js backend exposes /api/chat (general) and /api/chat/[subjectId] (subject-specific)
+    90→    90→      const endpoint = subjId === 'general' ? '/api/chat' : `/api/chat/${subjId}`;
+    91→    91→      const res = await apiFetch(endpoint);
+    92→    92→      if (res.ok) {
+    93→    93→        const raw = await res.json();
+    94→    94→        // Normalize API fields (text -> content, userAvatar -> userProfilePic) to match local MessageType shape
+    95→    95→        const data: MessageType[] = (Array.isArray(raw) ? raw : []).map((m: any) => ({
+    96→    96→          id: m.id,
+    97→    97→          _id: m._id,
+    98→    98→          userId: m.userId,
+    99→    99→          userName: m.userName,
+   100→   100→          userRole: m.userRole === 'admin' ? 'admin' : 'user',
+   101→   101→          content: m.text ?? m.content ?? '',
+   102→   102→          subjectId: m.subjectId ?? subjId,
+   103→   103→          createdAt: m.createdAt,
+   104→   104→          userProfilePic: m.userProfilePic ?? m.userAvatar,
+   105→   105→        }));
+   106→   106→        setMessages((prev) => {
+   107→   107→          // Compare previous message IDs to prevent redundant state re-renders which mess up the layout
+   108→   108→          const prevIds = prev.map(m => m.id || m._id).join(',');
+   109→   109→          const newIds = data.map((m) => m.id || m._id).join(',');
+   110→   110→          if (prevIds !== newIds || prev.length !== data.length) {
+   111→   111→            return data;
+   112→   112→          }
+   113→   113→          return prev;
+   114→   114→        });
+   115→   115→      } else if (!silent) {
+   116→   116→        const errData = await res.json();
+   117→   117→        setErrorMessage(errData.error || t('networkLoss'));
+   118→   118→      }
+   119→   119→    } catch (e: any) {
+   120→   120→      if (!silent) {
+   121→   121→        setErrorMessage(t('networkLoss'));
+   122→   122→      }
+   123→   123→    } finally {
+   124→   124→      if (!silent) {
+   125→   125→        setLoading(false);
+   126→   126→      }
+   127→   127→    }
+   128→   128→  };
+   129→   129→
+   130→   130→  // Perform post of typed message content
+   131→   131→  const handleSendMessage = async (incomingContent?: string) => {
+   132→   132→    const targetContent = incomingContent || typedMessage;
+   133→   133→    if (!targetContent.trim() || submitting) return;
+   134→   134→
+   135→   135→    setSubmitting(true);
+   136→   136→    setErrorMessage(null);
+   137→   137→
+   138→   138→    const messageContent = targetContent;
+   139→   139→    if (!incomingContent) {
+   140→   140→      setTypedMessage('');
+   141→   141→    }
+   142→   142→
+   143→   143→    try {
+   144→   144→      // Next.js /api/chat expects { text, subjectId } — pass null for general lounge
+   145→   145→      const subjectPayload = activeChannelId === 'general' ? null : activeChannelId;
+   146→   146→      const res = await apiFetch('/api/chat', {
+   147→   147→        method: 'POST',
+   148→   148→        headers: {
+   149→   149→          'Content-Type': 'application/json',
+   150→   150→        },
+   151→   151→        body: JSON.stringify({
+   152→   152→          text: messageContent,
+   153→   153→          subjectId: subjectPayload
+   154→   154→        })
+   155→   155→      });
+   156→   156→
+   157→   157→      if (res.ok) {
+   158→   158→        const newMsg = await res.json();
+   159→   159→        // Normalize the new message to match local MessageType shape
+   160→   160→        const normalized: MessageType = {
+   161→   161→          id: newMsg.id,
+   162→   162→          _id: newMsg._id,
+   163→   163→          userId: newMsg.userId,
+   164→   164→          userName: newMsg.userName,
+   165→   165→          userRole: newMsg.userRole === 'admin' ? 'admin' : 'user',
+   166→   166→          content: newMsg.text ?? newMsg.content ?? messageContent,
+   167→   167→          subjectId: newMsg.subjectId ?? activeChannelId,
+   168→   168→          createdAt: newMsg.createdAt,
+   169→   169→          userProfilePic: newMsg.userProfilePic ?? newMsg.userAvatar,
+   170→   170→        };
+   171→   171→        setMessages((prev) => [...prev, normalized]);
+   172→   172→        // Force scroll-to-bottom on newly typed posts from our side
+   173→   173→        setTimeout(() => {
+   174→   174→          if (scrollContainerRef.current) {
+   175→   175→            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+   176→   176→          }
+   177→   177→        }, 80);
+   178→   178→      } else {
+   179→   179→        const errData = await res.json();
+   180→   180→        setErrorMessage(errData.error || "Failed to broadcast message.");
+   181→   181→        if (!incomingContent) setTypedMessage(messageContent); // Restore text on failure
+   182→   182→      }
+   183→   183→    } catch (err) {
+   184→   184→      setErrorMessage("Broadcast failed due to structural network discrepancy.");
+   185→   185→      if (!incomingContent) setTypedMessage(messageContent); // Restore text on failure
+   186→   186→    } finally {
+   187→   187→      setSubmitting(false);
+   188→   188→    }
+   189→   189→  };
+   190→   190→
+   191→   191→  const handleFormSubmit = async (e: React.FormEvent) => {
+   192→   192→    e.preventDefault();
+   193→   193→    await handleSendMessage();
+   194→   194→  };
+   195→   195→
+   196→   196→  // Perform message eradication (admin or owner only)
+   197→   197→  const handleDeleteMessage = async (msgId: string) => {
+   198→   198→    if (!msgId) return;
+   199→   199→
+   200→   200→    try {
+   201→   201→      // Next.js /api/chat delete via ?id= query param
+   202→   202→      const res = await apiFetch(`/api/chat?id=${msgId}`, {
+   203→   203→        method: 'DELETE',
+   204→   204→      });
+   205→   205→
+   206→   206→      if (res.ok) {
+   207→   207→        // Remove locally from UI state
+   208→   208→        setMessages((prev) => prev.filter(m => (m.id || m._id) !== msgId));
+   209→   209→      } else {
+   210→   210→        const errData = await res.json();
+   211→   211→        alert(errData.error || "De-registration of message parameters refused.");
+   212→   212→      }
+   213→   213→    } catch (err) {
+   214→   214→      alert("Error deleting message. Check student permission rules.");
+   215→   215→    }
+   216→   216→  };
+   217→   217→
+   218→   218→  // Fetch initial posts and configure automatic polling every 1 second to make it act like a live Messenger
+   219→   219→  useEffect(() => {
+   220→   220→    fetchChannelMessages(activeChannelId, false);
+   221→   221→
+   222→   222→    const intervalId = setInterval(() => {
+   223→   223→      fetchChannelMessages(activeChannelId, true);
+   224→   224→    }, 1000);
+   225→   225→
+   226→   226→    return () => clearInterval(intervalId);
+   227→   227→  }, [activeChannelId]);
+   228→   228→
+   229→   229→  // Listen to WebSocket-triggered immediate reload event for instantaneous responsiveness
+   230→   230→  useEffect(() => {
+   231→   231→    const handleRemoteChatUpdate = (e: Event) => {
+   232→   232→      const customEvent = e as CustomEvent;
+   233→   233→      if (customEvent.detail && customEvent.detail.subjectId === activeChannelId) {
+   234→   234→        fetchChannelMessages(activeChannelId, true);
+   235→   235→      }
+   236→   236→    };
+   237→   237→
+   238→   238→    window.addEventListener('chat-updated', handleRemoteChatUpdate);
+   239→   239→    return () => {
+   240→   240→      window.removeEventListener('chat-updated', handleRemoteChatUpdate);
+   241→   241→    };
+   242→   242→  }, [activeChannelId]);
+   243→   243→
+   244→   244→  // Sync initial components presence data and update when event triggers
+   245→   245→  useEffect(() => {
+   246→   246→    if ((window as any).__activeUsers) {
+   247→   247→      setActiveUsers((window as any).__activeUsers);
+   248→   248→    }
+   249→   249→    const handlePresenceUpdated = (e: Event) => {
+   250→   250→      const customEvent = e as CustomEvent;
+   251→   251→      if (customEvent.detail && customEvent.detail.activeUsers) {
+   252→   252→        setActiveUsers(customEvent.detail.activeUsers);
+   253→   253→      }
+   254→   254→    };
+   255→   255→    window.addEventListener('presence-updated', handlePresenceUpdated);
+   256→   256→    return () => {
+   257→   257→      window.removeEventListener('presence-updated', handlePresenceUpdated);
+   258→   258→    };
+   259→   259→  }, []);
+   260→   260→
+   261→   261→  // Handle user-friendly quiet auto-scrolling on load or when sending message
+   262→   262→  const lastMessageCountRef = useRef<number>(0);
+   263→   263→  useEffect(() => {
+   264→   264→    const scrollContainer = scrollContainerRef.current;
+   265→   265→    if (!scrollContainer) return;
+   266→   266→
+   267→   267→    if (messages.length > lastMessageCountRef.current) {
+   268→   268→      const lastMsg = messages[messages.length - 1];
+   269→   269→      const isMyMessage = lastMsg && lastMsg.userId === user?.id;
+   270→   270→      const isInitialScroll = !loading && lastMessageCountRef.current === 0;
+   271→   271→
+   272→   272→      // Scroll to bottom immediately if it's the initial load or if the user sent a new message
+   273→   273→      if (isInitialScroll || isMyMessage) {
+   274→   274→        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+   275→   275→      } else {
+   276→   276→        // If someone else posted, scroll down only if the user is already near the bottom
+   277→   277→        // (to prevent interrupting their reading of history)
+   278→   278→        const threshold = 180; // pixels from bottom threshold zone
+   279→   279→        const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < threshold;
+   280→   280→        if (isNearBottom) {
+   281→   281→          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+   282→   282→        }
+   283→   283→      }
+   284→   284→    }
+   285→   285→    lastMessageCountRef.current = messages.length;
+   286→   286→  }, [messages, loading, user?.id]);
+   287→   287→
+   288→   288→  const activeChannelObj = subjects.find(s => s.id === activeChannelId);
+   289→   289→  const activeChannelTitle = activeChannelId === 'general' ? 'General Academic Lounge' : `${activeChannelObj?.title} Support Channel`;
+   290→   290→  const activeChannelDesc = activeChannelId === 'general'
+   291→   291→    ? 'Universal classroom bulletin board and loose peer conversation space.'
+   292→   292→    : activeChannelObj?.description;
+   293→   293→
+   294→   294→  const formatDateLabel = (isoStr: string) => {
+   295→   295→    try {
+   296→   296→      const date = new Date(isoStr);
+   297→   297→      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+   298→   298→    } catch (e) {
+   299→   299→      return '';
+   300→   300→    }
+   301→   301→  };
+   302→   302→
+   303→   303→  // Assign specific visual descriptors, emojis, and icons of subjects for professional feel
+   304→   304→  const getSubjectIcon = (title: string, sizeClass = "w-4 h-4") => {
+   305→   305→    const l = title.toLowerCase();
+   306→   306→    if (l.includes('physic')) return <Compass className={`${sizeClass} text-indigo-400`} />;
+   307→   307→    if (l.includes('chemist')) return <Beaker className={`${sizeClass} text-emerald-400`} />;
+   308→   308→    if (l.includes('biolog')) return <Sparkle className={`${sizeClass} text-amber-400`} />;
+   309→   309→    if (l.includes('math')) return <GraduationCap className={`${sizeClass} text-pink-400`} />;
+   310→   310→    if (l.includes('ict')) return <Code className={`${sizeClass} text-cyan-400`} />;
+   311→   311→    return <Hash className={`${sizeClass} text-slate-450`} />;
+   312→   312→  };
+   313→   313→
+   314→   314→  const getSubjectGradient = (title: string) => {
+   315→   315→    const l = title.toLowerCase();
+   316→   316→    if (l.includes('physic')) return 'from-indigo-505/20 to-indigo-950/25 border-indigo-500/20 text-indigo-350';
+   317→   317→    if (l.includes('chemist')) return 'from-emerald-505/20 to-emerald-950/25 border-emerald-500/20 text-emerald-350';
+   318→   318→    if (l.includes('biolog')) return 'from-amber-505/20 to-amber-950/25 border-amber-500/20 text-amber-350';
+   319→   319→    if (l.includes('math')) return 'from-pink-505/20 to-pink-950/25 border-pink-500/20 text-pink-350';
+   320→   320→    if (l.includes('ict')) return 'from-cyan-505/20 to-cyan-950/25 border-cyan-500/20 text-cyan-350';
+   321→   321→    return 'from-slate-800/10 to-slate-950/20 border-white/5 text-slate-350';
+   322→   322→  };
+   323→   323→
+   324→   324→  return (
+   325→   325→    <div id="classroom-chat-root" className="w-full h-[70vh] min-h-[520px] lg:h-[calc(100vh-175px)] flex flex-col lg:flex-row rounded-3xl border border-white/[0.05] bg-slate-950/40 overflow-hidden backdrop-blur-2xl relative shadow-2xl">
+   326→   326→
+   327→   327→      {/* Channels Sidebar Selection Block */}
+   328→   328→      {/* responsive class:hidden toggles visibility on mobile based on mobileView */}
+   329→   329→      <div className={`w-full lg:w-80 border-r border-white/[0.04] bg-slate-950/65 p-3 sm:p-4 shrink-0 flex flex-col gap-4 overflow-hidden h-full ${
+   330→   330→        mobileView === 'chat' ? 'hidden lg:flex' : 'flex'
+   331→   331→      }`}>
+   332→   332→        {/* Sidebar Title */}
+   333→   333→        <div className="flex items-center justify-between px-2 shrink-0 select-none">
+   334→   334→          <div className="flex items-center gap-2">
+   335→   335→            <Users className="w-4 h-4 text-pink-500" />
+   336→   336→            <span className="font-mono text-[10px] uppercase font-black tracking-widest text-slate-400">{t('lobby')}</span>
+   337→   337→          </div>
+   338→   338→          <span className="flex items-center gap-1.5 text-[9px] bg-emerald-555/10 text-emerald-450 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono font-black animate-pulse">
+   339→   339→            ● {t('synced')}
+   340→   340→          </span>
+   341→   341→        </div>        {/* MESSENGER ACTIVE PRESENCE ROW - HORIZONTAL AVATARS STRIP */}
+   342→   342→        <div className="bg-slate-900/15 border border-white/[0.03] p-3 rounded-2xl space-y-2 select-none shrink-0">
+   343→   343→          <div className="flex items-center gap-1.5 justify-between">
+   344→   344→            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider font-sans">{t('activeScholars')}</span>
+   345→   345→            <span className="text-[8px] font-mono text-cyan-400">{activeUsers.length} {t('onlineSuffix')}</span>
+   346→   346→          </div>
+   347→   347→
+   348→   348→          <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
+   349→   349→            {activeUsers.length === 0 ? (
+   350→   350→              <span className="text-[10px] text-slate-500 italic mt-1 px-1">Connecting...</span>
+   351→   351→            ) : (
+   352→   352→              activeUsers.map((item, idx) => (
+   353→   353→                <div key={item.id || idx} className="relative group shrink-0 flex flex-col items-center gap-1.5" title={`${item.name} (${item.role})`}>
+   354→   354→                  <div className="relative">
+   355→   355→                    {item.profilePic ? (
+   356→   356→                      <img
+   357→   357→                        src={item.profilePic}
+   358→   358→                        alt={item.name}
+   359→   359→                        referrerPolicy="no-referrer"
+   360→   360→                        className="w-9 h-9 rounded-full object-cover p-0.5 border border-emerald-500/80 shadow-[0_0_10px_rgba(16,185,129,0.2)] bg-slate-950"
+   361→   361→                      />
+   362→   362→                    ) : (
+   363→   363→                      <div className="w-9 h-9 rounded-full border border-emerald-500/80 bg-slate-900 flex items-center justify-center text-slate-200 text-xs font-black shadow-[0_0_10px_rgba(16,185,129,0.2)]">
+   364→   364→                        {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+   365→   365→                      </div>
+   366→   366→                    )}
+   367→   367→                    <span className="absolute bottom-0 right-0 flex h-2.5 w-2.5">
+   368→   368→                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+   369→   369→                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border border-slate-950" />
+   370→   370→                    </span>
+   371→   371→                  </div>
+   372→   372→                  <span className="text-[8px] text-slate-400 font-mono tracking-tight font-extrabold max-w-[50px] truncate leading-none text-center">
+   373→   373→                    {item.name ? item.name.split(' ')[0] : 'Scholar'}
+   374→   374→                  </span>
+   375→   375→
+   376→   376→                  <div className="absolute top-11 left-1/2 -translate-x-1/2 bg-slate-950/95 border border-white/10 px-2.5 py-1.5 rounded-lg text-[10px] text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 shadow-xl">
+   377→   377→                    <span className="font-extrabold block text-slate-100">{item.name}</span>
+   378→   378→                    <span className="text-[8px] text-emerald-405 font-bold block uppercase mt-0.5 tracking-wider">● {item.role === 'admin' ? t('teacher') : t('student')}</span>
+   379→   379→                  </div>
+   380→   380→                </div>
+   381→   381→              ))
+   382→   382→            )}
+   383→   383→          </div>
+   384→   384→        </div>
+   385→   385→
+   386→   386→        {/* Chats Channels List Container */}
+   387→   387→        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 select-none scrollbar-thin">
+   388→   388→          <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-widest px-2 pb-1 font-mono">{t('chatRooms')}</span>
+   389→   389→
+   390→   390→          {/* General Lounge Channel button */}
+   391→   391→          <button
+   392→   392→            onClick={() => {
+   393→   393→              setActiveChannelId('general');
+   394→   394→              setMobileView('chat');
+   395→   395→            }}
+   396→   396→            className={`w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-2xl text-xs font-semibold cursor-pointer transition-all duration-300 border text-left ${
+   397→   397→              activeChannelId === 'general'
+   398→   398→                ? 'bg-gradient-to-r from-cyan-600/10 to-indigo-600/10 border-cyan-500/25 text-cyan-300 shadow-md shadow-cyan-950/20'
+   399→   399→                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02] border-transparent'
+   400→   400→            }`}
+   401→   401→          >
+   402→   402→            <div className={`p-2 rounded-xl shrink-0 ${
+   403→   403→              activeChannelId === 'general' ? 'bg-cyan-500/15' : 'bg-slate-900/80 border border-white/5'
+   404→   404→            }`}>
+   405→   405→              <MessageSquare className="w-4 h-4 text-cyan-400" />
+   406→   406→            </div>
+   407→   407→
+   408→   408→            <div className="min-w-0 flex-1 leading-snug">
+   409→   409→              <div className="flex items-center justify-between">
+   410→   410→                <span className="font-extrabold text-slate-200 truncate">{t('generalLounge')}</span>
+   411→   411→                <span className="text-[8px] font-mono text-slate-500">Global</span>
+   412→   412→              </div>
+   413→   413→              <p className="text-[9px] text-slate-510 truncate mt-0.5 font-medium">{t('generalLoungeDesc')}</p>
+   414→   414→            </div>
+   415→   415→          </button>
+   416→   416→
+   417→   417→          {/* Subjects channels mapped */}
+   418→   418→          {subjects.map((sub) => {
+   419→   419→            const isActive = activeChannelId === sub.id;
+   420→   420→            const gradClass = getSubjectGradient(sub.title);
+   421→   421→
+   422→   422→            return (
+   423→   423→              <button
+   424→   424→                key={sub.id}
+   425→   425→                onClick={() => {
+   426→   426→                  setActiveChannelId(sub.id);
+   427→   427→                  setMobileView('chat');
+   428→   428→                }}
+   429→   429→                className={`w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-2xl text-xs font-semibold cursor-pointer transition-all duration-300 border text-left ${
+   430→   430→                  isActive
+   431→   431→                    ? 'bg-gradient-to-r ' + gradClass + ' font-extrabold shadow-md'
+   432→   432→                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02] border-transparent'
+   433→   433→                }`}
+   434→   434→              >
+   435→   435→                <div className={`p-2 rounded-xl shrink-0 ${
+   436→   436→                  isActive ? 'bg-white/10' : 'bg-slate-900/80 border border-white/5'
+   437→   437→                }`}>
+   438→   438→                  {getSubjectIcon(sub.title, "w-4 h-4")}
+   439→   439→                </div>
+   440→   440→
+   441→   441→                <div className="min-w-0 flex-1 leading-snug">
+   442→   442→                  <div className="flex items-center justify-between">
+   443→   443→                    <span className="font-extrabold text-slate-200 truncate">{sub.title} Channel</span>
+   444→   444→                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+   445→   445→                  </div>
+   446→   446→                  <p className="text-[9px] text-slate-510 truncate mt-0.5 font-medium">{sub.description}</p>
+   447→   447→                </div>
+   448→   448→              </button>
+   449→   449→            );
+   450→   450→          })}
+   451→   451→        </div>
+   452→   452→
+   453→   453→        {/* Bottom Sidebar Arabic calligraphy quote */}
+   454→   454→        <div className="hidden lg:flex flex-col items-center justify-center p-4 rounded-2xl border border-white/[0.03] bg-gradient-to-b from-slate-950 to-slate-950/60 shrink-0 text-center space-y-1 select-none">
+   455→   455→          <span className="text-sm font-bold bg-gradient-to-r from-amber-400 via-rose-300 to-indigo-400 bg-clip-text text-transparent font-arabic" style={{ direction: 'rtl' }}>
+   456→   456→            رَبِّ زِدْنِي عِلْمًا
+   457→   457→          </span>
+   458→   458→          <span className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest leading-none">
+   459→   459→            Rabbi Zidni Ilma
+   460→   460→          </span>
+   461→   461→        </div>
+   462→   462→      </div>
+   463→   463→
+   464→   464→      {/* Main Messaging Container Area */}
+   465→   465→      {/* responsive class:hidden toggles visibility on mobile based on mobileView */}
+   466→   466→      <div className={`flex-1 flex flex-col justify-between overflow-hidden relative h-full ${
+   467→   467→        mobileView === 'channels' ? 'hidden lg:flex' : 'flex'
+   468→   468→      }`}>
+   469→   469→
+   470→   470→        {/* Dynamic header of the active channel */}
+   471→   471→        <div className="bg-slate-950/75 border-b border-white/[0.04] px-3 sm:px-4 py-3 sm:py-3.5 flex items-center justify-between shrink-0 select-none">
+   472→   472→          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+   473→   473→            {/* Mobile Channel Back Navigation Arrow */}
+   474→   474→            <button
+   475→   475→              onClick={() => setMobileView('channels')}
+   476→   476→              className="lg:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-300 cursor-pointer transition-colors shrink-0"
+   477→   477→              title="Show Lobby"
+   478→   478→            >
+   479→   479→              <ChevronLeft className="w-4 h-4" />
+   480→   480→            </button>
+   481→   481→
+   482→   482→            {/* Subject Avatar in title */}
+   483→   483→            <div className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 border border-white/5 shrink-0 hidden sm:block">
+   484→   484→              {getSubjectIcon(activeChannelObj?.title || 'General', "w-5 h-5")}
+   485→   485→            </div>
+   486→   486→
+   487→   487→            <div className="min-w-0">
+   488→   488→              <div className="flex items-center gap-2">
+   489→   489→                <span className="text-[9px] uppercase font-black tracking-widest text-[#fbbf24] font-mono shrink-0">{t('liveClassChat')}</span>
+   490→   490→                <span className="text-slate-650 shrink-0 select-none">•</span>
+   491→   491→                <span className="font-mono text-cyan-400 text-[9px] tracking-widest font-bold truncate">{t('secureNode')}</span>
+   492→   492→              </div>
+   493→   493→              <h2 className="text-sm font-extrabold text-slate-100 tracking-tight mt-0.5 truncate">{activeChannelTitle}</h2>
+   494→   494→              <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1 hidden sm:block">{activeChannelDesc}</p>
+   495→   495→            </div>
+   496→   496→          </div>
+   497→   497→
+   498→   498→          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+   499→   499→            <div className="flex items-center gap-0.5 sm:gap-1 mr-0 sm:mr-2">
+   500→   500→              <button className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-white/5 text-slate-400 hover:text-cyan-300 transition-all cursor-pointer" title="Start Call Session">
+   501→   501→                <Phone className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+   502→   502→              </button>
+   503→   503→              <button className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-white/5 text-slate-400 hover:text-cyan-300 transition-all cursor-pointer" title="Start Video Meeting">
+   504→   504→                <Video className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+   505→   505→              </button>
+   506→   506→              <button className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-white/5 text-slate-400 hover:text-cyan-300 transition-all cursor-pointer" title="Room Information">
+   507→   507→                <Info className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+   508→   508→              </button>
+   509→   509→            </div>
+   510→   510→
+   511→   511→            <div className="flex items-center gap-2 bg-slate-900/70 border border-white/5 px-2.5 py-1.2 rounded-xl shrink-0">
+   512→   512→              <span className="inline-flex h-2 w-2 rounded-full bg-emerald-555 animate-ping" />
+   513→   513→              <span className="text-[9px] font-mono text-slate-445 font-black uppercase tracking-wider">{t('activeStream')}</span>
+   514→   514→            </div>
+   515→   515→          </div>
+   516→   516→        </div>
+   517→   517→
+   518→   518→        {/* Error Alert Display */}
+   519→   519→        {errorMessage && (
+   520→   520→          <div className="m-3 sm:m-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2.5 text-xs text-red-300 animate-shake shrink-0">
+   521→   521→            <AlertCircle className="shrink-0 w-4 h-4 text-red-400 mt-0.5 animate-pulse" />
+   522→   522→            <div className="min-w-0">
+   523→   523→              <span className="font-bold block">{t('networkAlert')}</span>
+   524→   524→              <span className="text-slate-300 text-[11px] mt-0.5 block break-words">{errorMessage}</span>
+   525→   525→            </div>
+   526→   526→          </div>
+   527→   527→        )}
+   528→   528→
+   529→   529→        {/* Message Feeds Scrolling Scroller */}
+   530→   530→        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 relative scrollbar-thin">
+   531→   531→
+   532→   532→          {loading ? (
+   533→   533→            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/20 backdrop-blur-sm z-10 select-none">
+   534→   534→              <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+   535→   535→              <span className="text-[10px] font-mono text-indigo-300 uppercase tracking-widest font-bold">Synchronizing discussions...</span>
+   536→   536→            </div>
+   537→   537→          ) : messages.length === 0 ? (
+   538→   538→            <div className="h-full flex flex-col items-center justify-center p-4 sm:p-8 text-center space-y-3 select-none">
+   539→   539→              <div className="p-4 bg-gradient-to-tr from-cyan-500/5 to-indigo-500/5 rounded-full border border-indigo-500/10 text-cyan-400 opacity-70">
+   540→   540→                <MessageSquare className="w-6 h-6 animate-pulse" />
+   541→   541→              </div>
+   542→   542→              <div className="space-y-1">
+   543→   543→                <h4 className="text-xs font-black text-slate-300 uppercase tracking-widest font-mono">{t('academicRoom')}</h4>
+   544→   544→                <p className="text-[10px] sm:text-[11px] text-slate-500 max-w-xs leading-normal">{t('noPostsYet')}</p>
+   545→   545→              </div>
+   546→   546→            </div>
+   547→   547→          ) : (
+   548→   548→            <div className="space-y-4">
+   549→   549→              {messages.map((msg, index) => {
+   550→   550→                const isMine = msg.userId === user?.id;
+   551→   551→                const dbId = msg.id || msg._id;
+   552→   552→                const isTeacher = msg.userRole === 'admin';
+   553→   553→
+   554→   554→                return (
+   555→   555→                  <motion.div
+   556→   556→                    key={index}
+   557→   557→                    initial={{ opacity: 0, y: 12 }}
+   558→   558→                    animate={{ opacity: 1, y: 0 }}
+   559→   559→                    transition={{ duration: 0.28, ease: 'easeOut' }}
+   560→   560→                    className={`flex gap-2 sm:gap-3 max-w-full sm:max-w-xl md:max-w-2xl ${
+   561→   561→                      isMine ? 'ml-auto justify-end' : 'mr-auto justify-start'
+   562→   562→                    }`}
+   563→   563→                  >
+   564→   564→                    {/* User Avatar with fallback - ONLY rendered for recipients (left side) as in Messenger */}
+   565→   565→                    {!isMine && (
+   566→   566→                      msg.userProfilePic ? (
+   567→   567→                        <img
+   568→   568→                          src={msg.userProfilePic}
+   569→   569→                          alt="Profile Avatar"
+   570→   570→                          referrerPolicy="no-referrer"
+   571→   571→                          className={`h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover shrink-0 select-none shadow-md border ${
+   572→   572→                            isTeacher ? 'border-amber-400/40 ring-2 ring-amber-500/10' : 'border-white/10'
+   573→   573→                          }`}
+   574→   574→                        />
+   575→   575→                      ) : (
+   576→   576→                        <div className={`p-1.5 sm:p-2 h-8 w-8 sm:h-10 sm:w-10 rounded-full border flex items-center justify-center shrink-0 select-none shadow-sm ${
+   577→   577→                          isTeacher
+   578→   578→                            ? 'bg-amber-450/10 border-amber-500/20 text-amber-400'
+   579→   579→                            : 'bg-slate-900 border-white/5 text-slate-400'
+   580→   580→                        }`}>
+   581→   581→                          {isTeacher ? <ShieldCheck className="w-4 h-4 text-amber-400" /> : <User className="w-4 h-4" />}
+   582→   582→                        </div>
+   583→   583→                      )
+   584→   584→                    )}
+   585→   585→
+   586→   586→                    {/* Chat Bubble card */}
+   587→   587→                    <div className="space-y-1 min-w-[120px] max-w-[85%]">
+   588→   588→
+   589→   589→                      <div className={`flex items-center gap-1.5 text-[9px] flex-wrap ${isMine ? 'justify-end' : 'justify-start'}`}>
+   590→   590→                        <span className={`font-black tracking-tight ${
+   591→   591→                          isTeacher ? 'text-[#fbbf24]' : 'text-slate-350'
+   592→   592→                        }`}>{msg.userName}</span>
+   593→   593→
+   594→   594→                        {isTeacher ? (
+   595→   595→                          <span className="text-[7px] px-1 py-0.2 rounded bg-amber-500/15 text-[#fbbf24] border border-amber-500/20 font-mono font-bold uppercase tracking-wider">{t('teacher')}</span>
+   596→   596→                        ) : (
+   597→   597→                          <span className="text-[7px] px-1 py-0.2 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/10 font-mono font-medium uppercase tracking-wider">{t('student')}</span>
+   598→   598→                        )}
+   599→   599→
+   600→   600→                        <span className="text-slate-500 font-bold font-mono text-[8px] ml-0.5">{formatDateLabel(msg.createdAt)}</span>
+   601→   601→
+   602→   602→                        {/* Accessible delete marker button — visible on hover (desktop) or always (mobile) for owner/admin/super_admin */}
+   603→   603→                        {(isMine || user?.role === 'admin' || user?.role === 'super_admin') && dbId && (
+   604→   604→                          <button
+   605→   605→                            onClick={() => handleDeleteMessage(dbId as string)}
+   606→   606→                            className="text-slate-500 hover:text-red-400 p-1 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md transition-colors cursor-pointer hover:bg-rose-500/10 ml-1 shrink-0 lg:opacity-60 lg:group-hover:opacity-100"
+   607→   607→                            title={t('deleteMessage')}
+   608→   608→                          >
+   609→   609→                            <Trash2 className="w-3.5 h-3.5" />
+   610→   610→                          </button>
+   611→   611→                        )}
+   612→   612→                      </div>
+   613→   613→
+   614→   614→                      {/* Content block in Messenger Layout */}
+   615→   615→                      <div
+   616→   616→                        className={`relative px-3.5 py-2 sm:py-1.5 text-xs sm:text-[11px] leading-relaxed font-sans font-medium break-words transition-all ${
+   617→   617→                          isMine
+   618→   618→                            ? 'bg-[#0084FF] border-none text-white rounded-[16px] rounded-br-[3px] shadow-lg shadow-indigo-600/5'
+   619→   619→                            : isTeacher
+   620→   620→                              ? 'bg-slate-900 border border-amber-500/20 text-[#ffeeb6] rounded-[16px] rounded-bl-[3px] shadow-md'
+   621→   621→                              : 'bg-slate-900 border border-white/[0.04] text-slate-200 rounded-[16px] rounded-bl-[3px]'
+   622→   622→                        }`}
+   623→   623→                      >
+   624→   624→                        <p className="whitespace-pre-line">{msg.content}</p>
+   625→   625→                      </div>
+   626→   626→                    </div>
+   627→   627→
+   628→   628→                    {/* Own Profile picture displayed on the right hand side */}
+   629→   629→                    {isMine && (
+   630→   630→                      msg.userProfilePic ? (
+   631→   631→                        <img
+   632→   632→                          src={msg.userProfilePic}
+   633→   633→                          alt="My Avatar"
+   634→   634→                          referrerPolicy="no-referrer"
+   635→   635→                          className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover shrink-0 select-none shadow-md border border-indigo-500/30"
+   636→   636→                        />
+   637→   637→                      ) : (
+   638→   638→                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-indigo-900/45 border border-indigo-500/20 flex items-center justify-center shrink-0 text-indigo-305 text-[9px] uppercase font-bold select-none font-mono">
+   639→   639→                          {user?.name ? user.name.substring(0, 1) : "ME"}
+   640→   640→                        </div>
+   641→   641→                      )
+   642→   642→                    )}
+   643→   643→                  </motion.div>
+   644→   644→                );
+   645→   645→              })}
+   646→   646→            </div>
+   647→   647→          )}
+   648→   648→        </div>
+   649→   649→
+   650→   650→        {/* Footer Area: Quick chips and Input container (sticky at bottom on mobile) */}
+   651→   651→        <div className="bg-slate-950/70 border-t border-white/[0.04] p-3 sm:p-4 shrink-0 space-y-3 sm:space-y-3.5 select-none sticky bottom-0">
+   652→   652→          {/* Quick Reply Chips — horizontally scrollable on mobile */}
+   653→   653→          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+   654→   654→            {quickChips.map((chip, idx) => (
+   655→   655→              <button
+   656→   656→                key={idx}
+   657→   657→                type="button"
+   658→   658→                onClick={() => handleSendMessage(chip)}
+   659→   659→                disabled={submitting}
+   660→   660→                className="px-3 py-1.5 min-h-[36px] flex items-center rounded-xl border border-white/[0.03] hover:border-cyan-500/20 bg-slate-900/60 hover:bg-slate-900 text-[10px] font-sans font-bold text-slate-400 hover:text-cyan-300 transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none"
+   661→   661→              >
+   662→   662→                {chip}
+   663→   663→              </button>
+   664→   664→            ))}
+   665→   665→          </div>
+   666→   666→
+   667→   667→          {/* Bottom Message Input Form Control */}
+   668→   668→          <form
+   669→   669→            onSubmit={handleFormSubmit}
+   670→   670→            className="flex items-center gap-2 sm:gap-3"
+   671→   671→          >
+   672→   672→            {user?.profilePic ? (
+   673→   673→              <img
+   674→   674→                src={user.profilePic}
+   675→   675→                alt={user.name}
+   676→   676→                referrerPolicy="no-referrer"
+   677→   677→                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover shrink-0 select-none shadow border border-white/10"
+   678→   678→              />
+   679→   679→            ) : (
+   680→   680→              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-white/5 bg-slate-900 flex items-center justify-center shrink-0 text-slate-400 select-none">
+   681→   681→                <User className="w-5 h-5" />
+   682→   682→              </div>
+   683→   683→            )}
+   684→   684→
+   685→   685→            <input
+   686→   686→              type="text"
+   687→   687→              required
+   688→   688→              value={typedMessage}
+   689→   689→              onChange={(e) => setTypedMessage(e.target.value)}
+   690→   690→              maxLength={600}
+   691→   691→              placeholder={
+   692→   692→                activeChannelId === 'general'
+   693→   693→                  ? t('placeholderGeneral')
+   694→   694→                  : `${t('placeholderChannel')} #${activeChannelObj?.title}...`
+   695→   695→              }
+   696→   696→              className="flex-1 min-w-0 min-h-[44px] bg-slate-900/90 border border-white/[0.05] focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/5 px-4 sm:px-5 h-11 rounded-full text-xs sm:text-[13px] text-slate-100 placeholder:text-slate-500 focus:outline-none transition-all font-sans font-medium"
+   697→   697→            />
+   698→   698→
+   699→   699→            <button
+   700→   700→              type="submit"
+   701→   701→              disabled={!typedMessage.trim() || submitting}
+   702→   702→              className="px-4 sm:px-5 min-h-[44px] min-w-[44px] rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-600 hover:from-cyan-405 hover:to-indigo-550 text-white font-bold h-11 flex items-center justify-center shrink-0 border border-white/5 active:scale-95 disabled:opacity-20 disabled:scale-100 transition-all cursor-pointer shadow-lg shadow-indigo-600/10"
+   703→   703→              title={t('liveClassChat')}
+   704→   704→            >
+   705→   705→              {submitting ? (
+   706→   706→                <Loader2 className="w-5 h-5 animate-spin" />
+   707→   707→              ) : (
+   708→   708→                <Send className="w-4 h-4 text-white" />
+   709→   709→              )}
+   710→   710→            </button>
+   711→   711→          </form>
+   712→   712→        </div>
+   713→   713→
+   714→   714→      </div>
+   715→   715→    </div>
+   716→   716→  );
+   717→   717→};
+   718→   718→

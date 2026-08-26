@@ -1,0 +1,2002 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import React, { useState, useEffect } from 'react';
+     4→     4→import {
+     5→     5→  ShieldCheck,
+     6→     6→  Layers,
+     7→     7→  FolderPlus,
+     8→     8→  Plus,
+     9→     9→  Search,
+    10→    10→  Trash2,
+    11→    11→  Edit3,
+    12→    12→  Upload,
+    13→    13→  Users,
+    14→    14→  Bell,
+    15→    15→  CheckCircle,
+    16→    16→  Sparkles,
+    17→    17→  ArrowLeft,
+    18→    18→  Eye,
+    19→    19→  Palette,
+    20→    20→  AlertTriangle,
+    21→    21→  X,
+    22→    22→  Database,
+    23→    23→  ChevronRight,
+    24→    24→  BookOpen,
+    25→    25→  Image as ImageIcon,
+    26→    26→  BarChart3,
+    27→    27→  Key,
+    28→    28→  Crown
+    29→    29→} from 'lucide-react';
+    30→    30→import { useAuth } from '@/context/AuthContext';
+    31→    31→import { CredentialsView } from '@/components/gallery/pages/CredentialsView';
+    32→    32→import { isPlatformOwner } from '@/lib/platform-owner';
+    33→    33→
+    34→    34→interface Subject {
+    35→    35→  id: string;
+    36→    36→  title: string;
+    37→    37→  description: string;
+    38→    38→}
+    39→    39→
+    40→    40→interface PracticalFolder {
+    41→    41→  id: string;
+    42→    42→  subjectId: string;
+    43→    43→  title: string;
+    44→    44→  description: string;
+    45→    45→  images: { url: string; title: string }[];
+    46→    46→  createdAt?: string;
+    47→    47→}
+    48→    48→
+    49→    49→interface AdminUser {
+    50→    50→  id: string;
+    51→    51→  name: string;
+    52→    52→  email: string;
+    53→    53→  role: string;
+    54→    54→  profilePic?: string;
+    55→    55→  isAdminStudent?: boolean;
+    56→    56→}
+    57→    57→
+    58→    58→interface StudentUser {
+    59→    59→  id: string;
+    60→    60→  name: string;
+    61→    61→  email: string;
+    62→    62→  credits?: number;
+    63→    63→  profilePic?: string;
+    64→    64→  createdAt?: string;
+    65→    65→}
+    66→    66→
+    67→    67→interface Announcement {
+    68→    68→  id: string;
+    69→    69→  title: string;
+    70→    70→  content: string;
+    71→    71→  date?: string;
+    72→    72→  authorName?: string;
+    73→    73→  urgency?: 'info' | 'warning' | 'urgent';
+    74→    74→}
+    75→    75→
+    76→    76→interface CommissionBooking {
+    77→    77→  id: string;
+    78→    78→  studentId: string;
+    79→    79→  studentName: string;
+    80→    80→  artistId: string;
+    81→    81→  artistName: string;
+    82→    82→  subject: string;
+    83→    83→  numPages: number;
+    84→    84→  totalPrice: number;
+    85→    85→  status: 'pending' | 'in_progress' | 'delivered' | 'completed' | 'cancelled';
+    86→    86→  paymentStatus: 'pending' | 'paid';
+    87→    87→  deliveryDate?: string;
+    88→    88→  createdAt?: string;
+    89→    89→  specialInstructions?: string;
+    90→    90→}
+    91→    91→
+    92→    92→interface AdminCmsPageProps {
+    93→    93→  user: any;
+    94→    94→  subjects: Subject[];
+    95→    95→  folders: PracticalFolder[];
+    96→    96→  adminsList: AdminUser[];
+    97→    97→  announcements: Announcement[];
+    98→    98→  refreshWorkspaceData: () => void;
+    99→    99→  setView: (view: 'dashboard' | 'subject' | 'folder' | 'admin_cms', subjectId?: string, folderId?: string) => void;
+   100→   100→  /** Super-admin only: switches the parent view to the /creds route. Falls back to an inline Dialog if omitted. */
+   101→   101→  onNavigateToCreds?: () => void;
+   102→   102→}
+   103→   103→
+   104→   104→export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
+   105→   105→  user,
+   106→   106→  subjects,
+   107→   107→  folders,
+   108→   108→  adminsList,
+   109→   109→  announcements,
+   110→   110→  refreshWorkspaceData,
+   111→   111→  setView,
+   112→   112→  onNavigateToCreds
+   113→   113→}) => {
+   114→   114→  const { apiFetch } = useAuth();
+   115→   115→  // Navigation tabs: 'overview' | 'content' | 'assets' | 'users' | 'commissions' | 'announcements'
+   116→   116→  const [activeTab, setActiveTab] = useState<'overview' | 'content' | 'assets' | 'users' | 'commissions' | 'announcements'>('overview');
+   117→   117→
+   118→   118→  // Notification Banner States
+   119→   119→  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+   120→   120→  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+   121→   121→
+   122→   122→  // Loading States
+   123→   123→  const [isActionLoading, setIsActionLoading] = useState(false);
+   124→   124→
+   125→   125→  // Content CMS Tab States
+   126→   126→  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
+   127→   127→  const [folderSearchQuery, setFolderSearchQuery] = useState('');
+   128→   128→
+   129→   129→  // Subject Modal / Form
+   130→   130→  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+   131→   131→  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+   132→   132→  const [subjectTitleInput, setSubjectTitleInput] = useState('');
+   133→   133→  const [subjectDescInput, setSubjectDescInput] = useState('');
+   134→   134→
+   135→   135→  // Folder Modal / Form
+   136→   136→  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+   137→   137→  const [editingFolder, setEditingFolder] = useState<PracticalFolder | null>(null);
+   138→   138→  const [folderSubjectIdInput, setFolderSubjectIdInput] = useState('');
+   139→   139→  const [folderTitleInput, setFolderTitleInput] = useState('');
+   140→   140→  const [folderDescInput, setFolderDescInput] = useState('');
+   141→   141→
+   142→   142→  // Scan Upload Modal per Folder
+   143→   143→  const [uploadScanFolder, setUploadScanFolder] = useState<PracticalFolder | null>(null);
+   144→   144→  const [scanTitleInput, setScanTitleInput] = useState('');
+   145→   145→  const [scanFileInput, setScanFileInput] = useState<File | null>(null);
+   146→   146→  const [scanUrlInput, setScanUrlInput] = useState('');
+   147→   147→
+   148→   148→  // Asset Library Tab States
+   149→   149→  const [assetSearchQuery, setAssetSearchQuery] = useState('');
+   150→   150→  const [assetSubjectFilter, setAssetSubjectFilter] = useState('all');
+   151→   151→  const [previewAssetUrl, setPreviewAssetUrl] = useState<string | null>(null);
+   152→   152→
+   153→   153→  // Users Tab States
+   154→   154→  const [studentsList, setStudentsList] = useState<StudentUser[]>([]);
+   155→   155→  const [userSearchQuery, setUserSearchQuery] = useState('');
+   156→   156→  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'admin' | 'student'>('all');
+   157→   157→  const [promoteEmail, setPromoteEmail] = useState('');
+   158→   158→  const [confirmDemoteId, setConfirmDemoteId] = useState<string | null>(null);
+   159→   159→  const [editingCreditsUser, setEditingCreditsUser] = useState<StudentUser | null>(null);
+   160→   160→  const [newCreditsValue, setNewCreditsValue] = useState<number>(10);
+   161→   161→
+   162→   162→  // Commissions Tab States
+   163→   163→  const [commissionsList, setCommissionsList] = useState<CommissionBooking[]>([]);
+   164→   164→  const [commissionStatusFilter, setCommissionStatusFilter] = useState<string>('all');
+   165→   165→
+   166→   166→  // Announcement Form
+   167→   167→  const [announceTitle, setAnnounceTitle] = useState('');
+   168→   168→  const [announceContent, setAnnounceContent] = useState('');
+   169→   169→  const [announceUrgency, setAnnounceUrgency] = useState<'info' | 'warning' | 'urgent'>('info');
+   170→   170→
+   171→   171→  // Super Admin States (only used when user.role === 'super_admin')
+   172→   172→  const [superAdminsList, setSuperAdminsList] = useState<AdminUser[]>([]);
+   173→   173→  const [superPromoteEmail, setSuperPromoteEmail] = useState('');
+   174→   174→  const [credsDialogOpen, setCredsDialogOpen] = useState(false);
+   175→   175→
+   176→   176→  const isMainOwner = isPlatformOwner(user?.email);
+   177→   177→  const isSuperAdmin = user?.role === 'super_admin';
+   178→   178→
+   179→   179→  // Helper notice handlers
+   180→   180→  const showSuccess = (msg: string) => {
+   181→   181→    setSuccessMsg(msg);
+   182→   182→    setTimeout(() => setSuccessMsg(null), 4500);
+   183→   183→  };
+   184→   184→
+   185→   185→  const showError = (msg: string) => {
+   186→   186→    setErrorMsg(msg);
+   187→   187→    setTimeout(() => setErrorMsg(null), 4500);
+   188→   188→  };
+   189→   189→
+   190→   190→  // Fetch Students & Commissions data on mount
+   191→   191→  useEffect(() => {
+   192→   192→    fetchStudents();
+   193→   193→    fetchCommissions();
+   194→   194→    fetchSuperAdmins();
+   195→   195→  }, []);
+   196→   196→
+   197→   197→  const fetchStudents = async () => {
+   198→   198→    try {
+   199→   199→      const res = await apiFetch('/api/users/students');
+   200→   200→      if (res.ok) {
+   201→   201→        const data = await res.json();
+   202→   202→        setStudentsList(Array.isArray(data) ? data : []);
+   203→   203→      }
+   204→   204→    } catch (e) {
+   205→   205→      console.error('Failed to fetch students:', e);
+   206→   206→    }
+   207→   207→  };
+   208→   208→
+   209→   209→  const fetchSuperAdmins = async () => {
+   210→   210→    try {
+   211→   211→      const res = await apiFetch('/api/users/super-admins');
+   212→   212→      if (res.ok) {
+   213→   213→        const data = await res.json();
+   214→   214→        setSuperAdminsList(Array.isArray(data) ? data : []);
+   215→   215→      }
+   216→   216→    } catch (e) {
+   217→   217→      console.error('Failed to fetch super admins:', e);
+   218→   218→    }
+   219→   219→  };
+   220→   220→
+   221→   221→  const fetchCommissions = async () => {
+   222→   222→    try {
+   223→   223→      const res = await apiFetch('/api/artists/bookings');
+   224→   224→      if (res.ok) {
+   225→   225→        const data = await res.json();
+   226→   226→        setCommissionsList(Array.isArray(data) ? data : []);
+   227→   227→      }
+   228→   228→    } catch (e) {
+   229→   229→      console.warn('Commissions endpoint not yet implemented in Next.js backend:', e);
+   230→   230→    }
+   231→   231→  };
+   232→   232→
+   233→   233→  // ===================================
+   234→   234→  // SUBJECT HANDLERS
+   235→   235→  // ===================================
+   236→   236→  const handleOpenSubjectModal = (subject?: Subject) => {
+   237→   237→    if (subject) {
+   238→   238→      setEditingSubject(subject);
+   239→   239→      setSubjectTitleInput(subject.title);
+   240→   240→      setSubjectDescInput(subject.description || '');
+   241→   241→    } else {
+   242→   242→      setEditingSubject(null);
+   243→   243→      setSubjectTitleInput('');
+   244→   244→      setSubjectDescInput('');
+   245→   245→    }
+   246→   246→    setIsSubjectModalOpen(true);
+   247→   247→  };
+   248→   248→
+   249→   249→  const handleSaveSubject = async (e: React.FormEvent) => {
+   250→   250→    e.preventDefault();
+   251→   251→    if (!subjectTitleInput.trim()) {
+   252→   252→      showError("Subject title is required.");
+   253→   253→      return;
+   254→   254→    }
+   255→   255→    setIsActionLoading(true);
+   256→   256→
+   257→   257→    try {
+   258→   258→      if (editingSubject) {
+   259→   259→        // Edit Subject
+   260→   260→        const res = await apiFetch(`/api/subjects/${editingSubject.id}`, {
+   261→   261→          method: 'PUT',
+   262→   262→          headers: { 'Content-Type': 'application/json' },
+   263→   263→          body: JSON.stringify({ title: subjectTitleInput, description: subjectDescInput })
+   264→   264→        });
+   265→   265→        if (res.ok) {
+   266→   266→          showSuccess(`Subject "${subjectTitleInput}" updated successfully!`);
+   267→   267→          setIsSubjectModalOpen(false);
+   268→   268→          refreshWorkspaceData();
+   269→   269→        } else {
+   270→   270→          const err = await res.json();
+   271→   271→          showError(err.error || "Failed to update subject.");
+   272→   272→        }
+   273→   273→      } else {
+   274→   274→        // Create Subject
+   275→   275→        const res = await apiFetch('/api/subjects', {
+   276→   276→          method: 'POST',
+   277→   277→          headers: { 'Content-Type': 'application/json' },
+   278→   278→          body: JSON.stringify({ title: subjectTitleInput, description: subjectDescInput })
+   279→   279→        });
+   280→   280→        if (res.ok) {
+   281→   281→          showSuccess(`Subject "${subjectTitleInput}" created successfully!`);
+   282→   282→          setIsSubjectModalOpen(false);
+   283→   283→          refreshWorkspaceData();
+   284→   284→        } else {
+   285→   285→          const err = await res.json();
+   286→   286→          showError(err.error || "Failed to create subject.");
+   287→   287→        }
+   288→   288→      }
+   289→   289→    } catch (e: any) {
+   290→   290→      showError("Network error while saving subject.");
+   291→   291→    } finally {
+   292→   292→      setIsActionLoading(false);
+   293→   293→    }
+   294→   294→  };
+   295→   295→
+   296→   296→  const handleDeleteSubject = async (subject: Subject) => {
+   297→   297→    if (!confirm(`Are you sure you want to delete subject "${subject.title}"?`)) return;
+   298→   298→    setIsActionLoading(true);
+   299→   299→    try {
+   300→   300→      const res = await apiFetch(`/api/subjects/${subject.id}`, { method: 'DELETE' });
+   301→   301→      if (res.ok) {
+   302→   302→        showSuccess(`Subject "${subject.title}" deleted successfully.`);
+   303→   303→        refreshWorkspaceData();
+   304→   304→      } else {
+   305→   305→        const err = await res.json();
+   306→   306→        showError(err.error || "Failed to delete subject.");
+   307→   307→      }
+   308→   308→    } catch (e) {
+   309→   309→      showError("Network error deleting subject.");
+   310→   310→    } finally {
+   311→   311→      setIsActionLoading(false);
+   312→   312→    }
+   313→   313→  };
+   314→   314→
+   315→   315→  // ===================================
+   316→   316→  // FOLDER HANDLERS
+   317→   317→  // ===================================
+   318→   318→  const handleOpenFolderModal = (folder?: PracticalFolder) => {
+   319→   319→    if (folder) {
+   320→   320→      setEditingFolder(folder);
+   321→   321→      setFolderSubjectIdInput(folder.subjectId);
+   322→   322→      setFolderTitleInput(folder.title);
+   323→   323→      setFolderDescInput(folder.description || '');
+   324→   324→    } else {
+   325→   325→      setEditingFolder(null);
+   326→   326→      setFolderSubjectIdInput(subjects[0]?.id || '');
+   327→   327→      setFolderTitleInput('');
+   328→   328→      setFolderDescInput('');
+   329→   329→    }
+   330→   330→    setIsFolderModalOpen(true);
+   331→   331→  };
+   332→   332→
+   333→   333→  const handleSaveFolder = async (e: React.FormEvent) => {
+   334→   334→    e.preventDefault();
+   335→   335→    if (!folderTitleInput.trim() || !folderSubjectIdInput) {
+   336→   336→      showError("Subject and folder title are required.");
+   337→   337→      return;
+   338→   338→    }
+   339→   339→    setIsActionLoading(true);
+   340→   340→
+   341→   341→    try {
+   342→   342→      if (editingFolder) {
+   343→   343→        const res = await apiFetch(`/api/folders/${editingFolder.id}`, {
+   344→   344→          method: 'PUT',
+   345→   345→          headers: { 'Content-Type': 'application/json' },
+   346→   346→          body: JSON.stringify({ title: folderTitleInput, description: folderDescInput })
+   347→   347→        });
+   348→   348→        if (res.ok) {
+   349→   349→          showSuccess(`Folder "${folderTitleInput}" updated successfully!`);
+   350→   350→          setIsFolderModalOpen(false);
+   351→   351→          refreshWorkspaceData();
+   352→   352→        } else {
+   353→   353→          const err = await res.json();
+   354→   354→          showError(err.error || "Failed to update folder.");
+   355→   355→        }
+   356→   356→      } else {
+   357→   357→        const res = await apiFetch('/api/folders', {
+   358→   358→          method: 'POST',
+   359→   359→          headers: { 'Content-Type': 'application/json' },
+   360→   360→          body: JSON.stringify({
+   361→   361→            subjectId: folderSubjectIdInput,
+   362→   362→            title: folderTitleInput,
+   363→   363→            description: folderDescInput
+   364→   364→          })
+   365→   365→        });
+   366→   366→        if (res.ok) {
+   367→   367→          showSuccess(`Practical folder "${folderTitleInput}" created!`);
+   368→   368→          setIsFolderModalOpen(false);
+   369→   369→          refreshWorkspaceData();
+   370→   370→        } else {
+   371→   371→          const err = await res.json();
+   372→   372→          showError(err.error || "Failed to create folder.");
+   373→   373→        }
+   374→   374→      }
+   375→   375→    } catch (e) {
+   376→   376→      showError("Network error saving folder.");
+   377→   377→    } finally {
+   378→   378→      setIsActionLoading(false);
+   379→   379→    }
+   380→   380→  };
+   381→   381→
+   382→   382→  const handleDeleteFolder = async (folder: PracticalFolder) => {
+   383→   383→    if (!confirm(`Are you sure you want to delete practical notebook folder "${folder.title}"?`)) return;
+   384→   384→    setIsActionLoading(true);
+   385→   385→    try {
+   386→   386→      const res = await apiFetch(`/api/folders/${folder.id}`, { method: 'DELETE' });
+   387→   387→      if (res.ok) {
+   388→   388→        showSuccess(`Practical folder "${folder.title}" deleted.`);
+   389→   389→        refreshWorkspaceData();
+   390→   390→      } else {
+   391→   391→        const err = await res.json();
+   392→   392→        showError(err.error || "Failed to delete folder.");
+   393→   393→      }
+   394→   394→    } catch (e) {
+   395→   395→      showError("Network error deleting folder.");
+   396→   396→    } finally {
+   397→   397→      setIsActionLoading(false);
+   398→   398→    }
+   399→   399→  };
+   400→   400→
+   401→   401→  // ===================================
+   402→   402→  // SCAN UPLOAD TO FOLDER
+   403→   403→  // ===================================
+   404→   404→  const handleUploadScanSubmit = async (e: React.FormEvent) => {
+   405→   405→    e.preventDefault();
+   406→   406→    if (!uploadScanFolder) return;
+   407→   407→
+   408→   408→    let finalImageUrl = scanUrlInput.trim();
+   409→   409→
+   410→   410→    if (scanFileInput) {
+   411→   411→      const formData = new FormData();
+   412→   412→      formData.append('image', scanFileInput);
+   413→   413→      setIsActionLoading(true);
+   414→   414→      try {
+   415→   415→        const uploadRes = await apiFetch('/api/images/upload-file', {
+   416→   416→          method: 'POST',
+   417→   417→          body: formData
+   418→   418→        });
+   419→   419→        if (uploadRes.ok) {
+   420→   420→          const uploadData = await uploadRes.json();
+   421→   421→          finalImageUrl = uploadData.url;
+   422→   422→        } else {
+   423→   423→          const err = await uploadRes.json();
+   424→   424→          showError(err.error || "Failed to upload file.");
+   425→   425→          setIsActionLoading(false);
+   426→   426→          return;
+   427→   427→        }
+   428→   428→      } catch (e) {
+   429→   429→        console.warn('Image file upload endpoint not yet implemented in Next.js backend:', e);
+   430→   430→        showError("File upload network error.");
+   431→   431→        setIsActionLoading(false);
+   432→   432→        return;
+   433→   433→      }
+   434→   434→    }
+   435→   435→
+   436→   436→    if (!finalImageUrl) {
+   437→   437→      showError("Please provide an image file or URL.");
+   438→   438→      return;
+   439→   439→    }
+   440→   440→
+   441→   441→    setIsActionLoading(true);
+   442→   442→    try {
+   443→   443→      const res = await apiFetch('/api/images', {
+   444→   444→        method: 'POST',
+   445→   445→        headers: { 'Content-Type': 'application/json' },
+   446→   446→        body: JSON.stringify({
+   447→   447→          folderId: uploadScanFolder.id,
+   448→   448→          imageUrl: finalImageUrl,
+   449→   449→          title: scanTitleInput.trim() || 'Practical Diagram Scan'
+   450→   450→        })
+   451→   451→      });
+   452→   452→
+   453→   453→      if (res.ok) {
+   454→   454→        showSuccess("Scan diagram added to practical folder!");
+   455→   455→        setUploadScanFolder(null);
+   456→   456→        setScanTitleInput('');
+   457→   457→        setScanFileInput(null);
+   458→   458→        setScanUrlInput('');
+   459→   459→        refreshWorkspaceData();
+   460→   460→      } else {
+   461→   461→        const err = await res.json();
+   462→   462→        showError(err.error || "Failed to attach image scan.");
+   463→   463→      }
+   464→   464→    } catch (e) {
+   465→   465→      showError("Network error attaching image scan.");
+   466→   466→    } finally {
+   467→   467→      setIsActionLoading(false);
+   468→   468→    }
+   469→   469→  };
+   470→   470→
+   471→   471→  const handleDeleteScan = async (folderId: string, imageIndex: number, scanTitle: string) => {
+   472→   472→    if (!confirm(`Delete scan page "${scanTitle}"?`)) return;
+   473→   473→    setIsActionLoading(true);
+   474→   474→    try {
+   475→   475→      const res = await apiFetch(`/api/images/${folderId}/${imageIndex}`, { method: 'DELETE' });
+   476→   476→      if (res.ok) {
+   477→   477→        showSuccess(`Scan page deleted.`);
+   478→   478→        refreshWorkspaceData();
+   479→   479→      } else {
+   480→   480→        const err = await res.json();
+   481→   481→        showError(err.error || "Failed to delete scan.");
+   482→   482→      }
+   483→   483→    } catch (e) {
+   484→   484→      showError("Network error deleting scan.");
+   485→   485→    } finally {
+   486→   486→      setIsActionLoading(false);
+   487→   487→    }
+   488→   488→  };
+   489→   489→
+   490→   490→  // ===================================
+   491→   491→  // USERS & ADMINS HANDLERS
+   492→   492→  // ===================================
+   493→   493→  const handlePromoteEmail = async (e: React.FormEvent) => {
+   494→   494→    e.preventDefault();
+   495→   495→    if (!promoteEmail.trim()) return;
+   496→   496→    setIsActionLoading(true);
+   497→   497→    try {
+   498→   498→      const res = await apiFetch('/api/users/promote', {
+   499→   499→        method: 'POST',
+   500→   500→        headers: { 'Content-Type': 'application/json' },
+   501→   501→        body: JSON.stringify({ email: promoteEmail.trim() })
+   502→   502→      });
+   503→   503→      if (res.ok) {
+   504→   504→        showSuccess(`Successfully promoted ${promoteEmail} to Administrator!`);
+   505→   505→        setPromoteEmail('');
+   506→   506→        refreshWorkspaceData();
+   507→   507→        fetchStudents();
+   508→   508→      } else {
+   509→   509→        const err = await res.json();
+   510→   510→        showError(err.error || "Failed to delegate administrator role.");
+   511→   511→      }
+   512→   512→    } catch (e) {
+   513→   513→      showError("Network error promoting user.");
+   514→   514→    } finally {
+   515→   515→      setIsActionLoading(false);
+   516→   516→    }
+   517→   517→  };
+   518→   518→
+   519→   519→  // ===================================
+   520→   520→  // SUPER ADMIN HANDLERS (super_admin only)
+   521→   521→  // ===================================
+   522→   522→  const handlePromoteSuperEmail = async (e: React.FormEvent) => {
+   523→   523→    e.preventDefault();
+   524→   524→    if (!superPromoteEmail.trim()) return;
+   525→   525→    setIsActionLoading(true);
+   526→   526→    try {
+   527→   527→      const res = await apiFetch('/api/users/promote-super', {
+   528→   528→        method: 'POST',
+   529→   529→        headers: { 'Content-Type': 'application/json' },
+   530→   530→        body: JSON.stringify({ email: superPromoteEmail.trim() })
+   531→   531→      });
+   532→   532→      if (res.ok) {
+   533→   533→        showSuccess(`Elevated ${superPromoteEmail} to Super Admin — full system access granted.`);
+   534→   534→        setSuperPromoteEmail('');
+   535→   535→        refreshWorkspaceData();
+   536→   536→        fetchStudents();
+   537→   537→        fetchSuperAdmins();
+   538→   538→      } else {
+   539→   539→        const err = await res.json();
+   540→   540→        showError(err.error || "Failed to elevate to super admin.");
+   541→   541→      }
+   542→   542→    } catch (e) {
+   543→   543→      showError("Network error elevating to super admin.");
+   544→   544→    } finally {
+   545→   545→      setIsActionLoading(false);
+   546→   546→    }
+   547→   547→  };
+   548→   548→
+   549→   549→  const handlePromoteAdminToSuper = async (adminEmail: string, adminName: string) => {
+   550→   550→    if (!confirm(`Elevate ${adminName} (${adminEmail}) to Super Admin?\n\nThis grants FULL SYSTEM ACCESS including the /creds view and the ability to demote other admins. Proceed only if you fully trust this user.`)) return;
+   551→   551→    setIsActionLoading(true);
+   552→   552→    try {
+   553→   553→      const res = await apiFetch('/api/users/promote-super', {
+   554→   554→        method: 'POST',
+   555→   555→        headers: { 'Content-Type': 'application/json' },
+   556→   556→        body: JSON.stringify({ email: adminEmail })
+   557→   557→      });
+   558→   558→      if (res.ok) {
+   559→   559→        showSuccess(`${adminName} elevated to Super Admin!`);
+   560→   560→        refreshWorkspaceData();
+   561→   561→        fetchStudents();
+   562→   562→        fetchSuperAdmins();
+   563→   563→      } else {
+   564→   564→        const err = await res.json();
+   565→   565→        showError(err.error || "Failed to elevate to super admin.");
+   566→   566→      }
+   567→   567→    } catch (e) {
+   568→   568→      showError("Network error elevating to super admin.");
+   569→   569→    } finally {
+   570→   570→      setIsActionLoading(false);
+   571→   571→    }
+   572→   572→  };
+   573→   573→
+   574→   574→  const handleOpenCredsView = () => {
+   575→   575→    if (onNavigateToCreds) {
+   576→   576→      onNavigateToCreds();
+   577→   577→    } else {
+   578→   578→      setCredsDialogOpen(true);
+   579→   579→    }
+   580→   580→  };
+   581→   581→
+   582→   582→  const handleUpdateCredits = async (e: React.FormEvent) => {
+   583→   583→    e.preventDefault();
+   584→   584→    if (!editingCreditsUser) return;
+   585→   585→    setIsActionLoading(true);
+   586→   586→    try {
+   587→   587→      const res = await apiFetch('/api/users/set-credits', {
+   588→   588→        method: 'POST',
+   589→   589→        headers: { 'Content-Type': 'application/json' },
+   590→   590→        body: JSON.stringify({ studentId: editingCreditsUser.id, credits: newCreditsValue })
+   591→   591→      });
+   592→   592→      if (res.ok) {
+   593→   593→        showSuccess(`Updated credits for ${editingCreditsUser.name} to ${newCreditsValue}!`);
+   594→   594→        setEditingCreditsUser(null);
+   595→   595→        fetchStudents();
+   596→   596→      } else {
+   597→   597→        const err = await res.json();
+   598→   598→        showError(err.error || "Failed to update student credits.");
+   599→   599→      }
+   600→   600→    } catch (e) {
+   601→   601→      console.warn('Set-credits endpoint not yet implemented in Next.js backend:', e);
+   602→   602→      showError("Network error setting credits.");
+   603→   603→    } finally {
+   604→   604→      setIsActionLoading(false);
+   605→   605→    }
+   606→   606→  };
+   607→   607→
+   608→   608→  // ===================================
+   609→   609→  // ANNOUNCEMENTS HANDLERS
+   610→   610→  // ===================================
+   611→   611→  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+   612→   612→    e.preventDefault();
+   613→   613→    if (!announceTitle.trim() || !announceContent.trim()) {
+   614→   614→      showError("Title and content are required for announcement.");
+   615→   615→      return;
+   616→   616→    }
+   617→   617→    setIsActionLoading(true);
+   618→   618→    try {
+   619→   619→      const res = await apiFetch('/api/announcements', {
+   620→   620→        method: 'POST',
+   621→   621→        headers: { 'Content-Type': 'application/json' },
+   622→   622→        body: JSON.stringify({
+   623→   623→          title: announceTitle.trim(),
+   624→   624→          content: announceContent.trim(),
+   625→   625→          urgency: announceUrgency
+   626→   626→        })
+   627→   627→      });
+   628→   628→      if (res.ok) {
+   629→   629→        showSuccess("Announcement published live to all student dashboards!");
+   630→   630→        setAnnounceTitle('');
+   631→   631→        setAnnounceContent('');
+   632→   632→        setAnnounceUrgency('info');
+   633→   633→        refreshWorkspaceData();
+   634→   634→      } else {
+   635→   635→        const err = await res.json();
+   636→   636→        showError(err.error || "Failed to publish announcement.");
+   637→   637→      }
+   638→   638→    } catch (e) {
+   639→   639→      showError("Network error creating announcement.");
+   640→   640→    } finally {
+   641→   641→      setIsActionLoading(false);
+   642→   642→    }
+   643→   643→  };
+   644→   644→
+   645→   645→  const handleDeleteAnnouncement = async (id: string, title: string) => {
+   646→   646→    if (!confirm(`Delete announcement "${title}"?`)) return;
+   647→   647→    setIsActionLoading(true);
+   648→   648→    try {
+   649→   649→      const res = await apiFetch(`/api/announcements/${id}`, { method: 'DELETE' });
+   650→   650→      if (res.ok) {
+   651→   651→        showSuccess(`Announcement deleted.`);
+   652→   652→        refreshWorkspaceData();
+   653→   653→      } else {
+   654→   654→        const err = await res.json();
+   655→   655→        showError(err.error || "Failed to delete announcement.");
+   656→   656→      }
+   657→   657→    } catch (e) {
+   658→   658→      showError("Network error deleting announcement.");
+   659→   659→    } finally {
+   660→   660→      setIsActionLoading(false);
+   661→   661→    }
+   662→   662→  };
+   663→   663→
+   664→   664→  // ===================================
+   665→   665→  // COMMISSION PAYMENT TOGGLE
+   666→   666→  // ===================================
+   667→   667→  const handleToggleCommissionPayment = async (bookingId: string) => {
+   668→   668→    setIsActionLoading(true);
+   669→   669→    try {
+   670→   670→      const res = await apiFetch(`/api/artists/bookings/${bookingId}/pay`, {
+   671→   671→        method: 'POST',
+   672→   672→        headers: { 'Content-Type': 'application/json' }
+   673→   673→      });
+   674→   674→      if (res.ok) {
+   675→   675→        showSuccess("Commission payment status updated!");
+   676→   676→        fetchCommissions();
+   677→   677→      } else {
+   678→   678→        const err = await res.json();
+   679→   679→        showError(err.error || "Failed to update payment.");
+   680→   680→      }
+   681→   681→    } catch (e) {
+   682→   682→      console.warn('Artist booking pay endpoint not yet implemented in Next.js backend:', e);
+   683→   683→      showError("Network error updating commission payment.");
+   684→   684→    } finally {
+   685→   685→      setIsActionLoading(false);
+   686→   686→    }
+   687→   687→  };
+   688→   688→
+   689→   689→  // Aggregated Asset Scans List
+   690→   690→  const allScans = folders.flatMap(f => {
+   691→   691→    const parentSub = subjects.find(s => s.id === f.subjectId);
+   692→   692→    return f.images.map((img, idx) => ({
+   693→   693→      ...img,
+   694→   694→      folderId: f.id,
+   695→   695→      folderTitle: f.title,
+   696→   696→      subjectId: f.subjectId,
+   697→   697→      subjectTitle: parentSub?.title || 'General',
+   698→   698→      imageIndex: idx
+   699→   699→    }));
+   700→   700→  });
+   701→   701→
+   702→   702→  // Filtered Folders
+   703→   703→  const filteredFolders = folders.filter(f => {
+   704→   704→    const matchesSub = selectedSubjectFilter === 'all' || f.subjectId === selectedSubjectFilter;
+   705→   705→    const matchesSearch = !folderSearchQuery.trim() ||
+   706→   706→      f.title.toLowerCase().includes(folderSearchQuery.toLowerCase()) ||
+   707→   707→      (f.description && f.description.toLowerCase().includes(folderSearchQuery.toLowerCase()));
+   708→   708→    return matchesSub && matchesSearch;
+   709→   709→  });
+   710→   710→
+   711→   711→  // Filtered Scans
+   712→   712→  const filteredScans = allScans.filter(s => {
+   713→   713→    const matchesSub = assetSubjectFilter === 'all' || s.subjectId === assetSubjectFilter;
+   714→   714→    const matchesSearch = !assetSearchQuery.trim() ||
+   715→   715→      s.title.toLowerCase().includes(assetSearchQuery.toLowerCase()) ||
+   716→   716→      s.folderTitle.toLowerCase().includes(assetSearchQuery.toLowerCase());
+   717→   717→    return matchesSub && matchesSearch;
+   718→   718→  });
+   719→   719→
+   720→   720→  // Filtered Users — adminsList is the union of admin + super_admin per the /api/users/admins route.
+   721→   721→  // Regular admins are shown in the existing Administrators Table; super admins are shown in a
+   722→   722→  // dedicated roster visible to super_admin viewers only.
+   723→   723→  const filteredAdmins = adminsList.filter(a => {
+   724→   724→    if (a.role === 'super_admin') return false;
+   725→   725→    return !userSearchQuery.trim() ||
+   726→   726→      a.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+   727→   727→      a.email.toLowerCase().includes(userSearchQuery.toLowerCase());
+   728→   728→  });
+   729→   729→
+   730→   730→  const filteredSuperAdmins = superAdminsList.filter(a => {
+   731→   731→    return !userSearchQuery.trim() ||
+   732→   732→      a.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+   733→   733→      a.email.toLowerCase().includes(userSearchQuery.toLowerCase());
+   734→   734→  });
+   735→   735→
+   736→   736→  const filteredStudents = studentsList.filter(s => {
+   737→   737→    return !userSearchQuery.trim() ||
+   738→   738→      s.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+   739→   739→      s.email.toLowerCase().includes(userSearchQuery.toLowerCase());
+   740→   740→  });
+   741→   741→
+   742→   742→  // Filtered Commissions
+   743→   743→  const filteredCommissions = commissionsList.filter(c => {
+   744→   744→    return commissionStatusFilter === 'all' || c.status === commissionStatusFilter;
+   745→   745→  });
+   746→   746→
+   747→   747→  // Stats Counters
+   748→   748→  const totalScansCount = allScans.length;
+   749→   749→  const totalStudentsCount = studentsList.length;
+   750→   750→  const totalAdminsCount = adminsList.length;
+   751→   751→  const totalCommissionsCount = commissionsList.length;
+   752→   752→
+   753→   753→  return (
+   754→   754→    <div className="space-y-6 animate-in fade-in duration-300 min-w-0 overflow-x-hidden pb-12">
+   755→   755→
+   756→   756→      {/* ==============================================
+   757→   757→          HEADER BANNER - INDUSTRY GRADE CMS CONTROL ENGINE
+   758→   758→          ============================================== */}
+   759→   759→      <div className="p-5 sm:p-7 rounded-3xl relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#0c1324] to-slate-950 border border-cyan-500/20 shadow-2xl">
+   760→   760→        <div className="absolute right-0 top-0 w-80 h-80 rounded-full bg-cyan-500/5 blur-3xl pointer-events-none" />
+   761→   761→        <div className="absolute left-1/3 bottom-0 w-64 h-64 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
+   762→   762→
+   763→   763→        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+   764→   764→          <div className="space-y-2 min-w-0">
+   765→   765→            <div className="flex items-center gap-2 flex-wrap">
+   766→   766→              <button
+   767→   767→                onClick={() => setView('dashboard')}
+   768→   768→                className="px-3 py-1 bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-white/10 transition-all cursor-pointer shadow-sm min-h-[32px]"
+   769→   769→              >
+   770→   770→                <ArrowLeft className="w-3.5 h-3.5" />
+   771→   771→                <span>Exit CMS</span>
+   772→   772→              </button>
+   773→   773→
+   774→   774→              <span className="px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+   775→   775→                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+   776→   776→                PracPedia CMS v2.4 Enterprise
+   777→   777→              </span>
+   778→   778→              {isSuperAdmin ? (
+   779→   779→                <span className="px-2.5 py-1 rounded-full bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+   780→   780→                  <Crown className="w-3 h-3" />
+   781→   781→                  Super Admin
+   782→   782→                </span>
+   783→   783→              ) : (
+   784→   784→                <span className="px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+   785→   785→                  <ShieldCheck className="w-3 h-3" />
+   786→   786→                  Admin
+   787→   787→                </span>
+   788→   788→              )}
+   789→   789→            </div>
+   790→   790→
+   791→   791→            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5 flex-wrap">
+   792→   792→              <Database className="w-7 h-7 text-cyan-400 shrink-0" />
+   793→   793→              <span>{isSuperAdmin ? 'Super Admin Control Center' : 'Administrator Control Center'}</span>
+   794→   794→            </h1>
+   795→   795→            <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
+   796→   796→              Full CRUD system to curate subjects, practical notebook scan repositories, student credit balances, drawing commissions, and real-time portal broadcasts.
+   797→   797→            </p>
+   798→   798→          </div>
+   799→   799→
+   800→   800→          {/* Quick CMS Action Header Buttons */}
+   801→   801→          <div className="flex items-center gap-2 flex-wrap self-start md:self-auto">
+   802→   802→            {isSuperAdmin && (
+   803→   803→              <button
+   804→   804→                onClick={handleOpenCredsView}
+   805→   805→                title="Open the Super Admin /creds view (system credentials, role lists, API surface, demo accounts)"
+   806→   806→                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white border border-fuchsia-400/30 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-fuchsia-500/20 min-h-[44px]"
+   807→   807→              >
+   808→   808→                <Key className="w-4 h-4" />
+   809→   809→                <span>View System Credentials</span>
+   810→   810→              </button>
+   811→   811→            )}
+   812→   812→            <button
+   813→   813→              onClick={() => handleOpenSubjectModal()}
+   814→   814→              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/10 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:border-cyan-500/30 min-h-[44px]"
+   815→   815→            >
+   816→   816→              <Plus className="w-4 h-4 text-cyan-400" />
+   817→   817→              <span>Add Subject</span>
+   818→   818→            </button>
+   819→   819→            <button
+   820→   820→              onClick={() => handleOpenFolderModal()}
+   821→   821→              className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-cyan-500/20 min-h-[44px]"
+   822→   822→            >
+   823→   823→              <FolderPlus className="w-4 h-4" />
+   824→   824→              <span>New Practical Folder</span>
+   825→   825→            </button>
+   826→   826→          </div>
+   827→   827→        </div>
+   828→   828→      </div>
+   829→   829→
+   830→   830→      {/* Global Alerts / Toasts */}
+   831→   831→      {(successMsg || errorMsg) && (
+   832→   832→        <div className="animate-in slide-in-from-top-2 duration-200">
+   833→   833→          {successMsg && (
+   834→   834→            <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-300 text-xs font-semibold flex items-center justify-between gap-3 shadow-lg">
+   835→   835→              <div className="flex items-center gap-2.5 min-w-0">
+   836→   836→                <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+   837→   837→                <span className="break-words">{successMsg}</span>
+   838→   838→              </div>
+   839→   839→              <button onClick={() => setSuccessMsg(null)} className="text-slate-400 hover:text-white shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center">
+   840→   840→                <X className="w-4 h-4" />
+   841→   841→              </button>
+   842→   842→            </div>
+   843→   843→          )}
+   844→   844→          {errorMsg && (
+   845→   845→            <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-300 text-xs font-semibold flex items-center justify-between gap-3 shadow-lg">
+   846→   846→              <div className="flex items-center gap-2.5 min-w-0">
+   847→   847→                <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+   848→   848→                <span className="break-words">{errorMsg}</span>
+   849→   849→              </div>
+   850→   850→              <button onClick={() => setErrorMsg(null)} className="text-slate-400 hover:text-white shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center">
+   851→   851→                <X className="w-4 h-4" />
+   852→   852→              </button>
+   853→   853→            </div>
+   854→   854→          )}
+   855→   855→        </div>
+   856→   856→      )}
+   857→   857→
+   858→   858→      {/* ==============================================
+   859→   859→          CMS NAVIGATION TAB SYSTEM
+   860→   860→          ============================================== */}
+   861→   861→      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-white/10 -mx-1 px-1">
+   862→   862→        <button
+   863→   863→          onClick={() => setActiveTab('overview')}
+   864→   864→          className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer min-h-[44px] ${
+   865→   865→            activeTab === 'overview'
+   866→   866→              ? 'bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+   867→   867→              : 'bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-white/5'
+   868→   868→          }`}
+   869→   869→        >
+   870→   870→          <BarChart3 className="w-4 h-4" />
+   871→   871→          <span>Dashboard Overview</span>
+   872→   872→        </button>
+   873→   873→
+   874→   874→        <button
+   875→   875→          onClick={() => setActiveTab('content')}
+   876→   876→          className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer min-h-[44px] ${
+   877→   877→            activeTab === 'content'
+   878→   878→              ? 'bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+   879→   879→              : 'bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-white/5'
+   880→   880→          }`}
+   881→   881→        >
+   882→   882→          <BookOpen className="w-4 h-4" />
+   883→   883→          <span>Subjects & Practical Folders</span>
+   884→   884→          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/80 font-mono">
+   885→   885→            {folders.length}
+   886→   886→          </span>
+   887→   887→        </button>
+   888→   888→
+   889→   889→        <button
+   890→   890→          onClick={() => setActiveTab('assets')}
+   891→   891→          className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer min-h-[44px] ${
+   892→   892→            activeTab === 'assets'
+   893→   893→              ? 'bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+   894→   894→              : 'bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-white/5'
+   895→   895→          }`}
+   896→   896→        >
+   897→   897→          <ImageIcon className="w-4 h-4" />
+   898→   898→          <span>Diagram Asset Library</span>
+   899→   899→          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/80 font-mono">
+   900→   900→            {totalScansCount}
+   901→   901→          </span>
+   902→   902→        </button>
+   903→   903→
+   904→   904→        <button
+   905→   905→          onClick={() => setActiveTab('users')}
+   906→   906→          className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer min-h-[44px] ${
+   907→   907→            activeTab === 'users'
+   908→   908→              ? 'bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+   909→   909→              : 'bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-white/5'
+   910→   910→          }`}
+   911→   911→        >
+   912→   912→          <Users className="w-4 h-4" />
+   913→   913→          <span>Users & Access Control</span>
+   914→   914→          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/80 font-mono">
+   915→   915→            {totalAdminsCount + totalStudentsCount}
+   916→   916→          </span>
+   917→   917→        </button>
+   918→   918→
+   919→   919→        <button
+   920→   920→          onClick={() => setActiveTab('commissions')}
+   921→   921→          className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer min-h-[44px] ${
+   922→   922→            activeTab === 'commissions'
+   923→   923→              ? 'bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+   924→   924→              : 'bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-white/5'
+   925→   925→          }`}
+   926→   926→        >
+   927→   927→          <Palette className="w-4 h-4" />
+   928→   928→          <span>Commissions Escrow</span>
+   929→   929→          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/80 font-mono">
+   930→   930→            {totalCommissionsCount}
+   931→   931→          </span>
+   932→   932→        </button>
+   933→   933→
+   934→   934→        <button
+   935→   935→          onClick={() => setActiveTab('announcements')}
+   936→   936→          className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer min-h-[44px] ${
+   937→   937→            activeTab === 'announcements'
+   938→   938→              ? 'bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+   939→   939→              : 'bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-white/5'
+   940→   940→          }`}
+   941→   941→        >
+   942→   942→          <Bell className="w-4 h-4" />
+   943→   943→          <span>Notice Broadcasts</span>
+   944→   944→          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/80 font-mono">
+   945→   945→            {announcements.length}
+   946→   946→          </span>
+   947→   947→        </button>
+   948→   948→      </div>
+   949→   949→
+   950→   950→      {/* =========================================================================
+   951→   951→          TAB 1: OVERVIEW & SYSTEM METRICS
+   952→   952→          ========================================================================= */}
+   953→   953→      {activeTab === 'overview' && (
+   954→   954→        <div className="space-y-6">
+   955→   955→          {/* Executive Metrics Grid */}
+   956→   956→          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+   957→   957→            {[
+   958→   958→              {
+   959→   959→                title: "Subjects",
+   960→   960→                count: subjects.length,
+   961→   961→                desc: "Faculties",
+   962→   962→                icon: BookOpen,
+   963→   963→                color: "text-indigo-400",
+   964→   964→                bg: "bg-indigo-500/10 border-indigo-500/20",
+   965→   965→                laser: "via-indigo-400/50"
+   966→   966→              },
+   967→   967→              {
+   968→   968→                title: "Notebook Folders",
+   969→   969→                count: folders.length,
+   970→   970→                desc: "Lab Notebooks",
+   971→   971→                icon: Layers,
+   972→   972→                color: "text-cyan-400",
+   973→   973→                bg: "bg-cyan-500/10 border-cyan-500/20",
+   974→   974→                laser: "via-cyan-400/50"
+   975→   975→              },
+   976→   976→              {
+   977→   977→                title: "Diagram Scans",
+   978→   978→                count: totalScansCount,
+   979→   979→                desc: "HD Worksheets",
+   980→   980→                icon: ImageIcon,
+   981→   981→                color: "text-emerald-400",
+   982→   982→                bg: "bg-emerald-500/10 border-emerald-500/20",
+   983→   983→                laser: "via-emerald-400/50"
+   984→   984→              },
+   985→   985→              {
+   986→   986→                title: "Administrators",
+   987→   987→                count: totalAdminsCount,
+   988→   988→                desc: "Supervisors",
+   989→   989→                icon: ShieldCheck,
+   990→   990→                color: "text-amber-400",
+   991→   991→                bg: "bg-amber-500/10 border-amber-500/20",
+   992→   992→                laser: "via-amber-400/50"
+   993→   993→              },
+   994→   994→              {
+   995→   995→                title: "Active Scholars",
+   996→   996→                count: totalStudentsCount,
+   997→   997→                desc: "Registered",
+   998→   998→                icon: Users,
+   999→   999→                color: "text-sky-400",
+  1000→  1000→                bg: "bg-sky-500/10 border-sky-500/20",
+  1001→  1001→                laser: "via-sky-400/50"
+  1002→  1002→              },
+  1003→  1003→              {
+  1004→  1004→                title: "Commissions",
+  1005→  1005→                count: totalCommissionsCount,
+  1006→  1006→                desc: "Orders Active",
+  1007→  1007→                icon: Palette,
+  1008→  1008→                color: "text-purple-400",
+  1009→  1009→                bg: "bg-purple-500/10 border-purple-500/20",
+  1010→  1010→                laser: "via-purple-400/50"
+  1011→  1011→              }
+  1012→  1012→            ].map((metric, mIdx) => {
+  1013→  1013→              const MetricIcon = metric.icon;
+  1014→  1014→              return (
+  1015→  1015→                <div
+  1016→  1016→                  key={mIdx}
+  1017→  1017→                  className="p-4 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-white/20 transition-all duration-300 relative group overflow-hidden shadow-xl flex flex-col justify-between"
+  1018→  1018→                >
+  1019→  1019→                  <div className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent ${metric.laser} to-transparent opacity-70 group-hover:opacity-100 transition-opacity`} />
+  1020→  1020→
+  1021→  1021→                  <div className="flex items-start justify-between gap-1">
+  1022→  1022→                    <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider truncate">
+  1023→  1023→                      {metric.title}
+  1024→  1024→                    </span>
+  1025→  1025→                    <div className={`p-1.5 rounded-lg border ${metric.bg} ${metric.color} transition-transform group-hover:scale-110 shrink-0`}>
+  1026→  1026→                      <MetricIcon className="w-3.5 h-3.5" />
+  1027→  1027→                    </div>
+  1028→  1028→                  </div>
+  1029→  1029→
+  1030→  1030→                  <div className="mt-3">
+  1031→  1031→                    <div className="text-2xl font-black text-white tracking-tight font-sans">
+  1032→  1032→                      {metric.count}
+  1033→  1033→                    </div>
+  1034→  1034→                    <p className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+  1035→  1035→                      {metric.desc}
+  1036→  1036→                    </p>
+  1037→  1037→                  </div>
+  1038→  1038→                </div>
+  1039→  1039→              );
+  1040→  1040→            })}
+  1041→  1041→          </div>
+  1042→  1042→
+  1043→  1043→          {/* CMS Quick Actions & Audit Stream Grid */}
+  1044→  1044→          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  1045→  1045→
+  1046→  1046→            {/* Quick Management Dock */}
+  1047→  1047→            <div className="p-5 sm:p-6 rounded-3xl bg-slate-950/80 border border-white/10 space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden">
+  1048→  1048→              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent" />
+  1049→  1049→
+  1050→  1050→              <div className="flex items-center justify-between pb-3 border-b border-white/10 gap-2">
+  1051→  1051→                <h3 className="text-sm font-extrabold text-white flex items-center gap-2 min-w-0">
+  1052→  1052→                  <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+  1053→  1053→                  <span className="truncate">CMS Executive Controls</span>
+  1054→  1054→                </h3>
+  1055→  1055→              </div>
+  1056→  1056→
+  1057→  1057→              <div className="space-y-2.5">
+  1058→  1058→                <button
+  1059→  1059→                  onClick={() => { setActiveTab('content'); handleOpenSubjectModal(); }}
+  1060→  1060→                  className="w-full p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-white/5 hover:border-cyan-500/30 text-left transition-all flex items-center justify-between text-xs cursor-pointer group shadow-sm hover:-translate-y-0.5 min-h-[64px]"
+  1061→  1061→                >
+  1062→  1062→                  <div className="flex items-center gap-3 min-w-0">
+  1063→  1063→                    <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 group-hover:scale-110 transition-transform shrink-0">
+  1064→  1064→                      <BookOpen className="w-4 h-4" />
+  1065→  1065→                    </div>
+  1066→  1066→                    <div className="min-w-0">
+  1067→  1067→                      <strong className="text-slate-100 block group-hover:text-cyan-300 transition-colors truncate">Create Subject Category</strong>
+  1068→  1068→                      <span className="text-[10px] text-slate-400 truncate block">Physics, Biology, Higher Math, ICT</span>
+  1069→  1069→                    </div>
+  1070→  1070→                  </div>
+  1071→  1071→                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+  1072→  1072→                </button>
+  1073→  1073→
+  1074→  1074→                <button
+  1075→  1075→                  onClick={() => { setActiveTab('content'); handleOpenFolderModal(); }}
+  1076→  1076→                  className="w-full p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-white/5 hover:border-indigo-500/30 text-left transition-all flex items-center justify-between text-xs cursor-pointer group shadow-sm hover:-translate-y-0.5 min-h-[64px]"
+  1077→  1077→                >
+  1078→  1078→                  <div className="flex items-center gap-3 min-w-0">
+  1079→  1079→                    <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:scale-110 transition-transform shrink-0">
+  1080→  1080→                      <FolderPlus className="w-4 h-4" />
+  1081→  1081→                    </div>
+  1082→  1082→                    <div className="min-w-0">
+  1083→  1083→                      <strong className="text-slate-100 block group-hover:text-indigo-300 transition-colors truncate">Create Practical Folder</strong>
+  1084→  1084→                      <span className="text-[10px] text-slate-400 truncate block">Vernier Caliper, Screw Gauge, Titration</span>
+  1085→  1085→                    </div>
+  1086→  1086→                  </div>
+  1087→  1087→                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+  1088→  1088→                </button>
+  1089→  1089→
+  1090→  1090→                <button
+  1091→  1091→                  onClick={() => setActiveTab('announcements')}
+  1092→  1092→                  className="w-full p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-white/5 hover:border-amber-500/30 text-left transition-all flex items-center justify-between text-xs cursor-pointer group shadow-sm hover:-translate-y-0.5 min-h-[64px]"
+  1093→  1093→                >
+  1094→  1094→                  <div className="flex items-center gap-3 min-w-0">
+  1095→  1095→                    <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 group-hover:scale-110 transition-transform shrink-0">
+  1096→  1096→                      <Bell className="w-4 h-4" />
+  1097→  1097→                    </div>
+  1098→  1098→                    <div className="min-w-0">
+  1099→  1099→                      <strong className="text-slate-100 block group-hover:text-amber-300 transition-colors truncate">Issue Deadline Broadcast</strong>
+  1100→  1100→                      <span className="text-[10px] text-slate-400 truncate block">Push live alerts to student dashboards</span>
+  1101→  1101→                    </div>
+  1102→  1102→                  </div>
+  1103→  1103→                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+  1104→  1104→                </button>
+  1105→  1105→
+  1106→  1106→                <button
+  1107→  1107→                  onClick={() => setActiveTab('users')}
+  1108→  1108→                  className="w-full p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-white/5 hover:border-emerald-500/30 text-left transition-all flex items-center justify-between text-xs cursor-pointer group shadow-sm hover:-translate-y-0.5 min-h-[64px]"
+  1109→  1109→                >
+  1110→  1110→                  <div className="flex items-center gap-3 min-w-0">
+  1111→  1111→                    <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
+  1112→  1112→                      <ShieldCheck className="w-4 h-4" />
+  1113→  1113→                    </div>
+  1114→  1114→                    <div className="min-w-0">
+  1115→  1115→                      <strong className="text-slate-100 block group-hover:text-emerald-300 transition-colors truncate">Delegate Admin Privileges</strong>
+  1116→  1116→                      <span className="text-[10px] text-slate-400 truncate block">Promote verified lab supervisors</span>
+  1117→  1117→                    </div>
+  1118→  1118→                  </div>
+  1119→  1119→                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+  1120→  1120→                </button>
+  1121→  1121→              </div>
+  1122→  1122→            </div>
+  1123→  1123→
+  1124→  1124→            {/* Subject Breakdown & Content Summary */}
+  1125→  1125→            <div className="p-5 sm:p-6 rounded-3xl bg-slate-950/80 border border-white/10 space-y-4 lg:col-span-2 shadow-xl backdrop-blur-md relative overflow-hidden">
+  1126→  1126→              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+  1127→  1127→
+  1128→  1128→              <div className="flex items-center justify-between pb-3 border-b border-white/10 gap-2">
+  1129→  1129→                <h3 className="text-sm font-extrabold text-white flex items-center gap-2 min-w-0">
+  1130→  1130→                  <BookOpen className="w-4 h-4 text-indigo-400 shrink-0" />
+  1131→  1131→                  <span className="truncate">Subject Content Distribution</span>
+  1132→  1132→                </h3>
+  1133→  1133→                <span className="text-[10px] font-mono text-slate-400 font-bold bg-slate-900 px-2.5 py-0.5 rounded-full border border-white/5 shrink-0">
+  1134→  1134→                  {subjects.length} Active Categories
+  1135→  1135→                </span>
+  1136→  1136→              </div>
+  1137→  1137→
+  1138→  1138→              <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
+  1139→  1139→                {subjects.map(sub => {
+  1140→  1140→                  const subFolders = folders.filter(f => f.subjectId === sub.id);
+  1141→  1141→                  const subScansCount = subFolders.reduce((acc, f) => acc + (f.images?.length || 0), 0);
+  1142→  1142→
+  1143→  1143→                  return (
+  1144→  1144→                    <div
+  1145→  1145→                      key={sub.id}
+  1146→  1146→                      className="p-3 sm:p-4 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/5 space-y-2 hover:border-indigo-500/30 transition-all shadow-md group relative overflow-hidden flex flex-col justify-between"
+  1147→  1147→                    >
+  1148→  1148→                      <div className="space-y-1.5 min-w-0">
+  1149→  1149→                        <div className="flex items-center justify-between gap-1">
+  1150→  1150→                          <strong className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors truncate min-w-0">{sub.title}</strong>
+  1151→  1151→                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-bold border border-cyan-500/20 shrink-0">
+  1152→  1152→                            {subFolders.length} F
+  1153→  1153→                          </span>
+  1154→  1154→                        </div>
+  1155→  1155→                        <p className="text-[10px] text-slate-400 line-clamp-1 font-sans break-words">{sub.description || 'Standard practical category'}</p>
+  1156→  1156→                      </div>
+  1157→  1157→
+  1158→  1158→                      <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] sm:text-[10px] text-slate-400 font-mono gap-1">
+  1159→  1159→                        <span className="truncate">Scans: <strong className="text-emerald-400 font-bold">{subScansCount}</strong></span>
+  1160→  1160→                        <button
+  1161→  1161→                          onClick={() => { setSelectedSubjectFilter(sub.id); setActiveTab('content'); }}
+  1162→  1162→                          className="text-cyan-400 hover:text-cyan-300 font-bold hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
+  1163→  1163→                        >
+  1164→  1164→                          <span>Manage</span>
+  1165→  1165→                          <span>→</span>
+  1166→  1166→                        </button>
+  1167→  1167→                      </div>
+  1168→  1168→                    </div>
+  1169→  1169→                  );
+  1170→  1170→                })}
+  1171→  1171→              </div>
+  1172→  1172→            </div>
+  1173→  1173→
+  1174→  1174→          </div>
+  1175→  1175→        </div>
+  1176→  1176→      )}
+  1177→  1177→
+  1178→  1178→      {/* =========================================================================
+  1179→  1179→          TAB 2: SUBJECTS & PRACTICAL FOLDERS MANAGEMENT (CMS CRUD)
+  1180→  1180→          ========================================================================= */}
+  1181→  1181→      {activeTab === 'content' && (
+  1182→  1182→        <div className="space-y-6">
+  1183→  1183→
+  1184→  1184→          {/* Action Bar & Filters */}
+  1185→  1185→          <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+  1186→  1186→
+  1187→  1187→            {/* Search and subject select */}
+  1188→  1188→            <div className="flex items-center gap-2.5 w-full sm:w-auto flex-1 max-w-xl flex-wrap sm:flex-nowrap">
+  1189→  1189→              <div className="relative flex-1 min-w-[160px]">
+  1190→  1190→                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+  1191→  1191→                <input
+  1192→  1192→                  type="text"
+  1193→  1193→                  placeholder="Search practical folders..."
+  1194→  1194→                  value={folderSearchQuery}
+  1195→  1195→                  onChange={(e) => setFolderSearchQuery(e.target.value)}
+  1196→  1196→                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-cyan-500/50 min-h-[44px]"
+  1197→  1197→                />
+  1198→  1198→                {folderSearchQuery && (
+  1199→  1199→                  <button onClick={() => setFolderSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white min-w-[24px] min-h-[24px] flex items-center justify-center">
+  1200→  1200→                    <X className="w-3.5 h-3.5" />
+  1201→  1201→                  </button>
+  1202→  1202→                )}
+  1203→  1203→              </div>
+  1204→  1204→
+  1205→  1205→              <select
+  1206→  1206→                value={selectedSubjectFilter}
+  1207→  1207→                onChange={(e) => setSelectedSubjectFilter(e.target.value)}
+  1208→  1208→                className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 outline-none cursor-pointer focus:border-cyan-500/50 shrink-0 w-full sm:w-auto min-h-[44px]"
+  1209→  1209→              >
+  1210→  1210→                <option value="all">All Subjects ({subjects.length})</option>
+  1211→  1211→                {subjects.map(s => (
+  1212→  1212→                  <option key={s.id} value={s.id}>{s.title}</option>
+  1213→  1213→                ))}
+  1214→  1214→              </select>
+  1215→  1215→            </div>
+  1216→  1216→
+  1217→  1217→            {/* Buttons */}
+  1218→  1218→            <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+  1219→  1219→              <button
+  1220→  1220→                onClick={() => handleOpenSubjectModal()}
+  1221→  1221→                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/10 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer min-h-[44px]"
+  1222→  1222→              >
+  1223→  1223→                <Plus className="w-3.5 h-3.5 text-cyan-400" />
+  1224→  1224→                <span>Subject</span>
+  1225→  1225→              </button>
+  1226→  1226→              <button
+  1227→  1227→                onClick={() => handleOpenFolderModal()}
+  1228→  1228→                className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer min-h-[44px]"
+  1229→  1229→              >
+  1230→  1230→                <FolderPlus className="w-3.5 h-3.5" />
+  1231→  1231→                <span>Add Practical Folder</span>
+  1232→  1232→              </button>
+  1233→  1233→            </div>
+  1234→  1234→          </div>
+  1235→  1235→
+  1236→  1236→          {/* Subjects Cards List */}
+  1237→  1237→          <div className="space-y-4">
+  1238→  1238→            <div className="flex items-center justify-between gap-2">
+  1239→  1239→              <h3 className="text-xs font-mono uppercase text-slate-400 font-bold tracking-wider truncate">
+  1240→  1240→                Subject Categories ({subjects.length})
+  1241→  1241→              </h3>
+  1242→  1242→              <span className="text-[11px] font-mono text-slate-500 shrink-0">Core Curricula</span>
+  1243→  1243→            </div>
+  1244→  1244→
+  1245→  1245→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+  1246→  1246→              {subjects.map(sub => {
+  1247→  1247→                const isSelected = selectedSubjectFilter === sub.id;
+  1248→  1248→                const folderCount = folders.filter(f => f.subjectId === sub.id).length;
+  1249→  1249→
+  1250→  1250→                return (
+  1251→  1251→                  <div
+  1252→  1252→                    key={sub.id}
+  1253→  1253→                    className={`p-3.5 sm:p-5 rounded-2xl border transition-all duration-300 flex flex-col justify-between space-y-3 sm:space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden group ${
+  1254→  1254→                      isSelected
+  1255→  1255→                        ? 'bg-gradient-to-b from-cyan-950/40 to-slate-950/90 border-cyan-500/50 shadow-cyan-500/10'
+  1256→  1256→                        : 'bg-gradient-to-b from-slate-900/80 to-slate-950/90 border-white/10 hover:border-white/20'
+  1257→  1257→                    }`}
+  1258→  1258→                  >
+  1259→  1259→                    <div className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent ${isSelected ? 'via-cyan-400' : 'via-indigo-400/40 group-hover:via-indigo-400'} to-transparent transition-all`} />
+  1260→  1260→
+  1261→  1261→                    <div className="space-y-1.5 sm:space-y-2">
+  1262→  1262→                      <div className="flex items-start justify-between gap-1.5">
+  1263→  1263→                        <strong className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5 group-hover:text-cyan-300 transition-colors truncate min-w-0">
+  1264→  1264→                          <div className="p-1 sm:p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
+  1265→  1265→                            <BookOpen className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+  1266→  1266→                          </div>
+  1267→  1267→                          <span className="truncate">{sub.title}</span>
+  1268→  1268→                        </strong>
+  1269→  1269→                        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+  1270→  1270→                          <button
+  1271→  1271→                            onClick={() => handleOpenSubjectModal(sub)}
+  1272→  1272→                            className="p-1 sm:p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+  1273→  1273→                            title="Edit Subject"
+  1274→  1274→                          >
+  1275→  1275→                            <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+  1276→  1276→                          </button>
+  1277→  1277→                          <button
+  1278→  1278→                            onClick={() => handleDeleteSubject(sub)}
+  1279→  1279→                            className="p-1 sm:p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+  1280→  1280→                            title="Delete Subject"
+  1281→  1281→                          >
+  1282→  1282→                            <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+  1283→  1283→                          </button>
+  1284→  1284→                        </div>
+  1285→  1285→                      </div>
+  1286→  1286→                      <p className="text-[10px] sm:text-xs text-slate-400 line-clamp-2 leading-relaxed font-sans break-words">{sub.description || 'Standard verified academic discipline curriculum.'}</p>
+  1287→  1287→                    </div>
+  1288→  1288→
+  1289→  1289→                    <div className="flex items-center justify-between pt-2.5 sm:pt-3 border-t border-white/5 text-[9px] sm:text-[10px] gap-1">
+  1290→  1290→                      <span className="font-mono px-1.5 sm:px-2 py-0.5 rounded-md bg-slate-900 border border-white/5 text-slate-300 font-bold shrink-0">
+  1291→  1291→                        {folderCount} Folders
+  1292→  1292→                      </span>
+  1293→  1293→                      <button
+  1294→  1294→                        onClick={() => setSelectedSubjectFilter(selectedSubjectFilter === sub.id ? 'all' : sub.id)}
+  1295→  1295→                        className={`font-mono font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg transition-all cursor-pointer text-[10px] sm:text-xs min-h-[28px] ${
+  1296→  1296→                          isSelected ? 'bg-cyan-500 text-slate-950 font-black' : 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20'
+  1297→  1297→                        }`}
+  1298→  1298→                      >
+  1299→  1299→                        {isSelected ? '✓ Active' : 'Filter'}
+  1300→  1300→                      </button>
+  1301→  1301→                    </div>
+  1302→  1302→                  </div>
+  1303→  1303→                );
+  1304→  1304→              })}
+  1305→  1305→            </div>
+  1306→  1306→          </div>
+  1307→  1307→
+  1308→  1308→          {/* Practical Folders Directory Grid */}
+  1309→  1309→          <div className="space-y-4 pt-2">
+  1310→  1310→            <div className="flex items-center justify-between gap-2">
+  1311→  1311→              <h3 className="text-xs font-mono uppercase text-slate-400 font-bold tracking-wider truncate">
+  1312→  1312→                Practical Notebook Folders ({filteredFolders.length})
+  1313→  1313→              </h3>
+  1314→  1314→              <span className="text-[11px] font-mono text-slate-500 shrink-0">Curated Lab Experiments</span>
+  1315→  1315→            </div>
+  1316→  1316→
+  1317→  1317→            {filteredFolders.length === 0 ? (
+  1318→  1318→              <div className="p-10 rounded-3xl bg-slate-950/60 border border-white/5 text-center space-y-3 shadow-xl">
+  1319→  1319→                <Layers className="w-10 h-10 text-slate-600 mx-auto" />
+  1320→  1320→                <p className="text-xs text-slate-400 font-medium">No practical folders found for current filter criteria.</p>
+  1321→  1321→                <button
+  1322→  1322→                  onClick={() => handleOpenFolderModal()}
+  1323→  1323→                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black rounded-xl cursor-pointer shadow-lg shadow-cyan-500/20 min-h-[44px]"
+  1324→  1324→                >
+  1325→  1325→                  Create First Practical Folder
+  1326→  1326→                </button>
+  1327→  1327→              </div>
+  1328→  1328→            ) : (
+  1329→  1329→              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+  1330→  1330→                {filteredFolders.map(folder => {
+  1331→  1331→                  const parentSubject = subjects.find(s => s.id === folder.subjectId);
+  1332→  1332→
+  1333→  1333→                  return (
+  1334→  1334→                    <div
+  1335→  1335→                      key={folder.id}
+  1336→  1336→                      className="p-3.5 sm:p-5 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-white/20 transition-all duration-300 space-y-3 sm:space-y-4 flex flex-col justify-between shadow-xl backdrop-blur-md relative overflow-hidden group"
+  1337→  1337→                    >
+  1338→  1338→                      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+  1339→  1339→
+  1340→  1340→                      <div className="space-y-2.5 sm:space-y-3 min-w-0">
+  1341→  1341→                        <div className="flex items-start justify-between gap-1.5">
+  1342→  1342→                          <div className="min-w-0">
+  1343→  1343→                            <span className="text-[8px] sm:text-[9px] font-mono text-cyan-400 uppercase font-bold tracking-wider bg-cyan-500/10 px-1.5 sm:px-2 py-0.5 rounded-full border border-cyan-500/20 truncate block">
+  1344→  1344→                              {parentSubject?.title || 'General'}
+  1345→  1345→                            </span>
+  1346→  1346→                            <h4 className="text-xs sm:text-sm font-black text-white mt-1 sm:mt-1.5 group-hover:text-cyan-300 transition-colors line-clamp-1 break-words">{folder.title}</h4>
+  1347→  1347→                          </div>
+  1348→  1348→
+  1349→  1349→                          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+  1350→  1350→                            <button
+  1351→  1351→                              onClick={() => handleOpenFolderModal(folder)}
+  1352→  1352→                              className="p-1 sm:p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+  1353→  1353→                              title="Edit Folder"
+  1354→  1354→                            >
+  1355→  1355→                              <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+  1356→  1356→                            </button>
+  1357→  1357→                            <button
+  1358→  1358→                              onClick={() => handleDeleteFolder(folder)}
+  1359→  1359→                              className="p-1 sm:p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+  1360→  1360→                              title="Delete Folder"
+  1361→  1361→                            >
+  1362→  1362→                              <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+  1363→  1363→                            </button>
+  1364→  1364→                          </div>
+  1365→  1365→                        </div>
+  1366→  1366→
+  1367→  1367→                        <p className="text-[10px] sm:text-xs text-slate-400 line-clamp-2 leading-relaxed font-sans break-words">{folder.description || 'Experimental worksheets and reading protocols.'}</p>
+  1368→  1368→
+  1369→  1369→                        {/* Scans Grid Thumbnails Preview */}
+  1370→  1370→                        <div className="space-y-1.5 sm:space-y-2 pt-2 sm:pt-3 border-t border-white/5">
+  1371→  1371→                          <div className="flex items-center justify-between text-[9px] sm:text-[10px] text-slate-400 font-mono gap-1">
+  1372→  1372→                            <span className="truncate">Scans ({folder.images?.length || 0})</span>
+  1373→  1373→                            <button
+  1374→  1374→                              onClick={() => setUploadScanFolder(folder)}
+  1375→  1375→                              className="text-cyan-400 hover:text-cyan-300 hover:underline flex items-center gap-0.5 cursor-pointer font-bold shrink-0 min-h-[24px]"
+  1376→  1376→                            >
+  1377→  1377→                              <Upload className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+  1378→  1378→                              <span>Attach</span>
+  1379→  1379→                            </button>
+  1380→  1380→                          </div>
+  1381→  1381→
+  1382→  1382→                          {folder.images && folder.images.length > 0 ? (
+  1383→  1383→                            <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
+  1384→  1384→                              {folder.images.slice(0, 4).map((img, idx) => (
+  1385→  1385→                                <div key={idx} className="group/img relative aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-slate-900 border border-white/10 shadow-inner">
+  1386→  1386→                                  <img
+  1387→  1387→                                    src={img.url}
+  1388→  1388→                                    alt={img.title}
+  1389→  1389→                                    referrerPolicy="no-referrer"
+  1390→  1390→                                    className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+  1391→  1391→                                  />
+  1392→  1392→                                  <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1">
+  1393→  1393→                                    <button
+  1394→  1394→                                      onClick={() => setPreviewAssetUrl(img.url)}
+  1395→  1395→                                      className="p-1 text-white hover:text-cyan-400 cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+  1396→  1396→                                      title="Preview"
+  1397→  1397→                                    >
+  1398→  1398→                                      <Eye className="w-3.5 h-3.5" />
+  1399→  1399→                                    </button>
+  1400→  1400→                                    <button
+  1401→  1401→                                      onClick={() => handleDeleteScan(folder.id, idx, img.title)}
+  1402→  1402→                                      className="p-1 text-rose-400 hover:text-rose-300 cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+  1403→  1403→                                      title="Delete"
+  1404→  1404→                                    >
+  1405→  1405→                                      <Trash2 className="w-3.5 h-3.5" />
+  1406→  1406→                                    </button>
+  1407→  1407→                                  </div>
+  1408→  1408→                                </div>
+  1409→  1409→                              ))}
+  1410→  1410→                            </div>
+  1411→  1411→                          ) : (
+  1412→  1412→                            <div className="p-3 bg-slate-900/40 rounded-xl text-center text-[10px] text-slate-500 font-mono border border-white/5">
+  1413→  1413→                              No diagram scans uploaded yet.
+  1414→  1414→                            </div>
+  1415→  1415→                          )}
+  1416→  1416→                        </div>
+  1417→  1417→                      </div>
+  1418→  1418→
+  1419→  1419→                      <div className="pt-3 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400 font-mono gap-1 flex-wrap">
+  1420→  1420→                        <span className="truncate">{folder.createdAt ? new Date(folder.createdAt).toLocaleDateString() : 'System'}</span>
+  1421→  1421→                        <div className="flex items-center gap-2 shrink-0">
+  1422→  1422→                          <button
+  1423→  1423→                            onClick={() => setView('folder', undefined, folder.id)}
+  1424→  1424→                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold font-sans cursor-pointer transition-all text-[10px] shadow-sm min-h-[28px]"
+  1425→  1425→                          >
+  1426→  1426→                            Open Vault →
+  1427→  1427→                          </button>
+  1428→  1428→                          <button
+  1429→  1429→                            onClick={() => setUploadScanFolder(folder)}
+  1430→  1430→                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-bold font-sans cursor-pointer transition-colors text-[10px] border border-white/5 min-h-[28px]"
+  1431→  1431→                          >
+  1432→  1432→                            + Upload Scan
+  1433→  1433→                          </button>
+  1434→  1434→                        </div>
+  1435→  1435→                      </div>
+  1436→  1436→                    </div>
+  1437→  1437→                  );
+  1438→  1438→                })}
+  1439→  1439→              </div>
+  1440→  1440→            )}
+  1441→  1441→          </div>
+  1442→  1442→        </div>
+  1443→  1443→      )}
+  1444→  1444→
+  1445→  1445→      {/* =========================================================================
+  1446→  1446→          TAB 3: GLOBAL DIAGRAM ASSET LIBRARY
+  1447→  1447→          ========================================================================= */}
+  1448→  1448→      {activeTab === 'assets' && (
+  1449→  1449→        <div className="space-y-6">
+  1450→  1450→          {/* Asset search & filters */}
+  1451→  1451→          <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl backdrop-blur-md">
+  1452→  1452→            <div className="relative flex-1 w-full sm:w-auto max-w-xl">
+  1453→  1453→              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+  1454→  1454→              <input
+  1455→  1455→                type="text"
+  1456→  1456→                placeholder="Search scans across all subjects and folders..."
+  1457→  1457→                value={assetSearchQuery}
+  1458→  1458→                onChange={(e) => setAssetSearchQuery(e.target.value)}
+  1459→  1459→                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-cyan-500/50 min-h-[44px]"
+  1460→  1460→              />
+  1461→  1461→            </div>
+  1462→  1462→
+  1463→  1463→            <select
+  1464→  1464→              value={assetSubjectFilter}
+  1465→  1465→              onChange={(e) => setAssetSubjectFilter(e.target.value)}
+  1466→  1466→              className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 outline-none cursor-pointer focus:border-cyan-500/50 w-full sm:w-auto min-h-[44px]"
+  1467→  1467→            >
+  1468→  1468→              <option value="all">All Subjects Scans ({allScans.length})</option>
+  1469→  1469→              {subjects.map(s => (
+  1470→  1470→                <option key={s.id} value={s.id}>{s.title}</option>
+  1471→  1471→              ))}
+  1472→  1472→            </select>
+  1473→  1473→          </div>
+  1474→  1474→
+  1475→  1475→          {/* Asset Grid View */}
+  1476→  1476→          {filteredScans.length === 0 ? (
+  1477→  1477→            <div className="p-12 text-center rounded-3xl bg-slate-950/60 border border-white/5 space-y-2 shadow-xl">
+  1478→  1478→              <ImageIcon className="w-10 h-10 text-slate-600 mx-auto" />
+  1479→  1479→              <p className="text-xs text-slate-400 font-medium">No diagram scans match your search criteria.</p>
+  1480→  1480→            </div>
+  1481→  1481→          ) : (
+  1482→  1482→            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+  1483→  1483→              {filteredScans.map((scan, i) => (
+  1484→  1484→                <div key={i} className="group relative rounded-2xl overflow-hidden bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-cyan-500/40 transition-all duration-300 flex flex-col justify-between shadow-xl">
+  1485→  1485→                  <div className="aspect-square relative overflow-hidden bg-slate-900">
+  1486→  1486→                    <img
+  1487→  1487→                      src={scan.url}
+  1488→  1488→                      alt={scan.title}
+  1489→  1489→                      referrerPolicy="no-referrer"
+  1490→  1490→                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+  1491→  1491→                    />
+  1492→  1492→                    <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+  1493→  1493→                      <button
+  1494→  1494→                        onClick={() => setPreviewAssetUrl(scan.url)}
+  1495→  1495→                        className="p-2 rounded-xl bg-cyan-500 text-slate-950 font-bold hover:bg-cyan-400 transition-all cursor-pointer shadow-lg min-h-[40px] min-w-[40px] flex items-center justify-center"
+  1496→  1496→                        title="View Fullscreen Scan"
+  1497→  1497→                      >
+  1498→  1498→                        <Eye className="w-4 h-4" />
+  1499→  1499→                      </button>
+  1500→  1500→                      <button
+  1501→  1501→                        onClick={() => handleDeleteScan(scan.folderId, scan.imageIndex, scan.title)}
+  1502→  1502→                        className="p-2 rounded-xl bg-rose-500/80 text-white font-bold hover:bg-rose-500 transition-all cursor-pointer shadow-lg min-h-[40px] min-w-[40px] flex items-center justify-center"
+  1503→  1503→                        title="Delete Asset"
+  1504→  1504→                      >
+  1505→  1505→                        <Trash2 className="w-4 h-4" />
+  1506→  1506→                      </button>
+  1507→  1507→                    </div>
+  1508→  1508→                  </div>
+  1509→  1509→
+  1510→  1510→                  <div className="p-3 space-y-1 bg-slate-950/90 border-t border-white/5 min-w-0">
+  1511→  1511→                    <strong className="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">{scan.title}</strong>
+  1512→  1512→                    <div className="flex items-center justify-between text-[9px] text-slate-400 font-mono gap-1">
+  1513→  1513→                      <span className="truncate text-cyan-400 font-bold">{scan.subjectTitle}</span>
+  1514→  1514→                      <span className="truncate text-slate-500">{scan.folderTitle}</span>
+  1515→  1515→                    </div>
+  1516→  1516→                  </div>
+  1517→  1517→                </div>
+  1518→  1518→              ))}
+  1519→  1519→            </div>
+  1520→  1520→          )}
+  1521→  1521→        </div>
+  1522→  1522→      )}
+  1523→  1523→
+  1524→  1524→      {/* =========================================================================
+  1525→  1525→          TAB 4: USER ACCOUNTS & ACCESS CONTROL
+  1526→  1526→          ========================================================================= */}
+  1527→  1527→      {activeTab === 'users' && (
+  1528→  1528→        <div className="space-y-6">
+  1529→  1529→
+  1530→  1530→          {/* Super Admins Roster — visible to super_admin viewers only */}
+  1531→  1531→          {isSuperAdmin && (
+  1532→  1532→            <div className="p-5 sm:p-6 rounded-3xl bg-slate-950/80 border border-fuchsia-500/20 space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden">
+  1533→  1533→              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-fuchsia-500/50 to-transparent" />
+  1534→  1534→
+  1535→  1535→              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+  1536→  1536→                <div className="min-w-0">
+  1537→  1537→                  <h3 className="text-sm font-extrabold text-white flex items-center gap-2 min-w-0">
+  1538→  1538→                    <div className="p-1.5 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 shrink-0">
+  1539→  1539→                      <Crown className="w-4 h-4" />
+  1540→  1540→                    </div>
+  1541→  1541→                    <span className="truncate">Super Admins Roster</span>
+  1542→  1542→                  </h3>
+  1543→  1543→                  <p className="text-xs text-slate-400 mt-1 break-words">Platform owners with full system access. Fetched live from /api/users/super-admins.</p>
+  1544→  1544→                </div>
+  1545→  1545→                <span className="text-[10px] font-mono text-fuchsia-300 shrink-0 px-2.5 py-0.5 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/20">
+  1546→  1546→                  {filteredSuperAdmins.length} {filteredSuperAdmins.length === 1 ? 'member' : 'members'}
+  1547→  1547→                </span>
+  1548→  1548→              </div>
+  1549→  1549→
+  1550→  1550→              {filteredSuperAdmins.length === 0 ? (
+  1551→  1551→                <div className="p-6 text-center rounded-2xl bg-slate-900/40 border border-white/5 text-xs text-slate-400">
+  1552→  1552→                  Loading super admins roster…
+  1553→  1553→                </div>
+  1554→  1554→              ) : (
+  1555→  1555→                <div className="space-y-2.5">
+  1556→  1556→                  {filteredSuperAdmins.map((sa, idx) => {
+  1557→  1557→                    const isMainSuperAdmin = idx === 0; // The first super admin (Professor Akash) is the platform owner
+  1558→  1558→                    return (
+  1559→  1559→                      <div
+  1560→  1560→                        key={sa.id || `sa-${idx}`}
+  1561→  1561→                        className="p-3 sm:p-4 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-fuchsia-500/20 hover:border-fuchsia-500/40 transition-all duration-300 flex items-center gap-2.5 sm:gap-3.5 shadow-md relative overflow-hidden group"
+  1562→  1562→                      >
+  1563→  1563→                        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-fuchsia-400/40 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+  1564→  1564→
+  1565→  1565→                        <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
+  1566→  1566→                          {sa.profilePic ? (
+  1567→  1567→                            <img src={sa.profilePic} alt={sa.name} referrerPolicy="no-referrer" className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl object-cover border border-fuchsia-500/30 shadow-md shrink-0" />
+  1568→  1568→                          ) : (
+  1569→  1569→                            <div className="w-8 h-8 sm:w-11 sm:h-11 bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 rounded-xl flex items-center justify-center shrink-0">
+  1570→  1570→                              <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
+  1571→  1571→                            </div>
+  1572→  1572→                          )}
+  1573→  1573→                          <div className="min-w-0 flex-1">
+  1574→  1574→                            <h4 className="text-xs font-bold text-white truncate flex items-center gap-1.5 flex-wrap">
+  1575→  1575→                              <span className="truncate">{sa.name}</span>
+  1576→  1576→                              {isMainSuperAdmin && (
+  1577→  1577→                                <span className="px-1 py-0.2 rounded text-[7px] sm:text-[8px] font-mono bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 shrink-0">
+  1578→  1578→                                  OWNER
+  1579→  1579→                                </span>
+  1580→  1580→                              )}
+  1581→  1581→                            </h4>
+  1582→  1582→                            <p className="text-[9px] sm:text-[10px] text-slate-400 truncate font-mono mt-0.5">{sa.email}</p>
+  1583→  1583→                          </div>
+  1584→  1584→                        </div>
+  1585→  1585→
+  1586→  1586→                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end">
+  1587→  1587→                          <span className="inline-block px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30">
+  1588→  1588→                            Super Admin
+  1589→  1589→                          </span>
+  1590→  1590→                          <span
+  1591→  1591→                            title="Super admins are protected and cannot be demoted except by another super admin"
+  1592→  1592→                            className="text-[9px] font-mono text-slate-500 italic px-1.5 py-0.5 hidden sm:inline"
+  1593→  1593→                          >
+  1594→  1594→                            Protected
+  1595→  1595→                          </span>
+  1596→  1596→                        </div>
+  1597→  1597→                      </div>
+  1598→  1598→                    );
+  1599→  1599→                  })}
+  1600→  1600→
+  1601→  1601→                  <p className="text-[10px] text-slate-500 italic mt-2 px-1 flex items-center gap-1.5">
+  1602→  1602→                    <ShieldCheck className="w-3 h-3 shrink-0 text-fuchsia-400" />
+  1603→  1603→                    Super admins are protected and cannot be demoted except by another super admin.
+  1604→  1604→                  </p>
+  1605→  1605→                </div>
+  1606→  1606→              )}
+  1607→  1607→            </div>
+  1608→  1608→          )}
+  1609→  1609→
+  1610→  1610→          {/* Promote to Super Admin form — super_admin only */}
+  1611→  1611→          {isSuperAdmin && (
+  1612→  1612→            <div className="p-5 sm:p-6 rounded-3xl bg-slate-950/80 border border-fuchsia-500/20 space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden">
+  1613→  1613→              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-fuchsia-500/50 to-transparent" />
+  1614→  1614→
+  1615→  1615→              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+  1616→  1616→                <div className="min-w-0">
+  1617→  1617→                  <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+  1618→  1618→                    <div className="p-1.5 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 shrink-0">
+  1619→  1619→                      <Crown className="w-4 h-4" />
+  1620→  1620→                    </div>
+  1621→  1621→                    <span className="truncate">Elevate to Super Admin</span>
+  1622→  1622→                  </h3>
+  1623→  1623→                  <p className="text-xs text-slate-400 mt-1 break-words">Promote an existing user to Super Admin — grants full system access including the /creds view.</p>
+  1624→  1624→                </div>
+  1625→  1625→              </div>
+  1626→  1626→
+  1627→  1627→              <form onSubmit={handlePromoteSuperEmail} className="flex flex-col sm:flex-row gap-2.5 max-w-xl">
+  1628→  1628→                <input
+  1629→  1629→                  type="email"
+  1630→  1630→                  placeholder="existing.user@gallery.com"
+  1631→  1631→                  required
+  1632→  1632→                  value={superPromoteEmail}
+  1633→  1633→                  onChange={(e) => setSuperPromoteEmail(e.target.value)}
+  1634→  1634→                  className="flex-1 px-4 py-2.5 bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-500 rounded-xl outline-none focus:border-fuchsia-500/50 font-mono min-h-[44px] w-full"
+  1635→  1635→                />
+  1636→  1636→                <button
+  1637→  1637→                  type="submit"
+  1638→  1638→                  disabled={isActionLoading}
+  1639→  1639→                  className="px-5 py-2.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950 font-black rounded-xl text-xs transition-all shrink-0 cursor-pointer shadow-lg shadow-fuchsia-500/20 flex items-center justify-center gap-1.5 min-h-[44px]"
+  1640→  1640→                >
+  1641→  1641→                  <Crown className="w-3.5 h-3.5" />
+  1642→  1642→                  <span>Promote to Super</span>
+  1643→  1643→                </button>
+  1644→  1644→              </form>
+  1645→  1645→            </div>
+  1646→  1646→          )}
+  1647→  1647→
+  1648→  1648→          {/* User Search & Elevate Privileges */}
+  1649→  1649→          <div className="p-5 sm:p-6 rounded-3xl bg-slate-950/80 border border-white/10 space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden">
+  1650→  1650→            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
+  1651→  1651→
+  1652→  1652→            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+  1653→  1653→              <div className="min-w-0">
+  1654→  1654→                <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+  1655→  1655→                  <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+  1656→  1656→                    <ShieldCheck className="w-4 h-4" />
+  1657→  1657→                  </div>
+  1658→  1658→                  <span className="truncate">Delegate Administrator Privileges</span>
+  1659→  1659→                </h3>
+  1660→  1660→                <p className="text-xs text-slate-400 mt-1 break-words">Elevate registered university experiment supervisors or lab teaching assistants.</p>
+  1661→  1661→              </div>
+  1662→  1662→            </div>
+  1663→  1663→
+  1664→  1664→            <form onSubmit={handlePromoteEmail} className="flex flex-col sm:flex-row gap-2.5 max-w-xl">
+  1665→  1665→              <input
+  1666→  1666→                type="email"
+  1667→  1667→                placeholder="vetted.supervisor@university.edu"
+  1668→  1668→                required
+  1669→  1669→                value={promoteEmail}
+  1670→  1670→                onChange={(e) => setPromoteEmail(e.target.value)}
+  1671→  1671→                className="flex-1 px-4 py-2.5 bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-500 rounded-xl outline-none focus:border-amber-500/50 font-mono min-h-[44px] w-full"
+  1672→  1672→              />
+  1673→  1673→              <button
+  1674→  1674→                type="submit"
+  1675→  1675→                disabled={isActionLoading}
+  1676→  1676→                className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-xs transition-all shrink-0 cursor-pointer shadow-lg shadow-amber-400/20 flex items-center justify-center gap-1.5 min-h-[44px]"
+  1677→  1677→              >
+  1678→  1678→                <ShieldCheck className="w-3.5 h-3.5" />
+  1679→  1679→                <span>Promote to Admin</span>
+  1680→  1680→              </button>
+  1681→  1681→            </form>
+  1682→  1682→          </div>
+  1683→  1683→
+  1684→  1684→          {/* Search bar & filter */}
+  1685→  1685→          <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl backdrop-blur-md">
+  1686→  1686→            <div className="relative flex-1 w-full max-w-xl">
+  1687→  1687→              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+  1688→  1688→              <input
+  1689→  1689→                type="text"
+  1690→  1690→                placeholder="Search users by name or email..."
+  1691→  1691→                value={userSearchQuery}
+  1692→  1692→                onChange={(e) => setUserSearchQuery(e.target.value)}
+  1693→  1693→                className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-cyan-500/50 min-h-[44px]"
+  1694→  1694→              />
+  1695→  1695→            </div>
+  1696→  1696→
+  1697→  1697→            <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-white/5 w-full sm:w-auto justify-center sm:justify-start flex-wrap">
+  1698→  1698→              <button
+  1699→  1699→                onClick={() => setUserRoleFilter('all')}
+  1700→  1700→                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer min-h-[36px] ${userRoleFilter === 'all' ? 'bg-cyan-500 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+  1701→  1701→              >
+  1702→  1702→                All Users
+  1703→  1703→              </button>
+  1704→  1704→              <button
+  1705→  1705→                onClick={() => setUserRoleFilter('admin')}
+  1706→  1706→                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer min-h-[36px] ${userRoleFilter === 'admin' ? 'bg-amber-400 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+  1707→  1707→              >
+  1708→  1708→                Admins ({filteredAdmins.length})
+  1709→  1709→              </button>
+  1710→  1710→              <button
+  1711→  1711→                onClick={() => setUserRoleFilter('student')}
+  1712→  1712→                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer min-h-[36px] ${userRoleFilter === 'student' ? 'bg-sky-400 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+  1713→  1713→              >
+  1714→  1714→                Students ({filteredStudents.length})
+  1715→  1715→              </button>
+  1716→  1716→            </div>
+  1717→  1717→          </div>
+  1718→  1718→
+  1719→  1719→          {/* Administrators Table / List */}
+  1720→  1720→          {(userRoleFilter === 'all' || userRoleFilter === 'admin') && (
+  1721→  1721→            <div className="space-y-3">
+  1722→  1722→              <div className="flex items-center justify-between gap-2">
+  1723→  1723→                <h3 className="text-xs font-mono uppercase text-slate-400 font-bold tracking-wider truncate">
+  1724→  1724→                  Vetted Administrators & Supervisors ({filteredAdmins.length})
+  1725→  1725→                </h3>
+  1726→  1726→                <span className="text-[11px] font-mono text-amber-400/80 shrink-0 hidden sm:inline">Full Permission Keyholders</span>
+  1727→  1727→              </div>
+  1728→  1728→
+  1729→  1729→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+  1730→  1730→                {filteredAdmins.map(adm => {
+  1731→  1731→                  const isRowMainOwner = isPlatformOwner(adm.email);
+  1732→  1732→                  const isRowSuperAdmin = adm.role === 'super_admin';
+  1733→  1733→                  const canDemoteRow = !isRowSuperAdmin && !isRowMainOwner && (isSuperAdmin || isMainOwner);
+  1734→  1734→
+  1735→  1735→                  return (
+  1736→  1736→                    <div
+  1737→  1737→                      key={adm.id}
+  1738→  1738→                      className="p-3 sm:p-4 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-amber-500/20 hover:border-amber-500/40 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3.5 shadow-xl relative overflow-hidden group"
+  1739→  1739→                    >
+  1740→  1740→                      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400/40 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+  1741→  1741→
+  1742→  1742→                      <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
+  1743→  1743→                        {adm.profilePic ? (
+  1744→  1744→                          <img src={adm.profilePic} alt={adm.name} referrerPolicy="no-referrer" className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl object-cover border border-amber-500/30 shadow-md shrink-0" />
+  1745→  1745→                        ) : (
+  1746→  1746→                          <div className="w-8 h-8 sm:w-11 sm:h-11 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center shrink-0">
+  1747→  1747→                            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
+  1748→  1748→                          </div>
+  1749→  1749→                        )}
+  1750→  1750→                        <div className="min-w-0 flex-1">
+  1751→  1751→                          <h4 className="text-xs font-bold text-white truncate flex items-center gap-1">
+  1752→  1752→                            <span className="truncate">{adm.name}</span>
+  1753→  1753→                            {isRowMainOwner && <span className="px-1 py-0.2 rounded text-[7px] sm:text-[8px] font-mono bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 shrink-0">OWNER</span>}
+  1754→  1754→                          </h4>
+  1755→  1755→                          <p className="text-[9px] sm:text-[10px] text-slate-400 truncate font-mono mt-0.5">{adm.email}</p>
+  1756→  1756→                          <div className="mt-0.5 sm:mt-1 flex items-center gap-1">
+  1757→  1757→                            <span className={`inline-block px-1.5 sm:px-2 py-0.5 rounded text-[7.5px] sm:text-[8px] font-mono font-bold uppercase truncate ${adm.isAdminStudent ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20' : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'}`}>
+  1758→  1758→                              {adm.isAdminStudent ? 'Admin+Student' : 'Supervisor'}
+  1759→  1759→                            </span>
+  1760→  1760→                          </div>
+  1761→  1761→                        </div>
+  1762→  1762→                      </div>
+  1763→  1763→
+  1764→  1764→                      {/* Controls */}
+  1765→  1765→                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end">
+  1766→  1766→                        {isSuperAdmin && !isRowSuperAdmin && (
+  1767→  1767→                          <button
+  1768→  1768→                            onClick={() => handlePromoteAdminToSuper(adm.email, adm.name)}
+  1769→  1769→                            disabled={isActionLoading}
+  1770→  1770→                            title="Elevate this admin to Super Admin (grants full system access)"
+  1771→  1771→                            className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border text-[9px] sm:text-[10px] font-bold cursor-pointer transition-all min-h-[32px] bg-fuchsia-500/15 border-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-500/25 hover:border-fuchsia-500/50 flex items-center gap-1"
+  1772→  1772→                          >
+  1773→  1773→                            <Crown className="w-3 h-3" />
+  1774→  1774→                            <span>To Super</span>
+  1775→  1775→                          </button>
+  1776→  1776→                        )}
+  1777→  1777→                        {canDemoteRow && (
+  1778→  1778→                          <button
+  1779→  1779→                            onClick={async () => {
+  1780→  1780→                              if (confirmDemoteId !== adm.id) {
+  1781→  1781→                                setConfirmDemoteId(adm.id);
+  1782→  1782→                                setTimeout(() => setConfirmDemoteId(null), 4000);
+  1783→  1783→                                return;
+  1784→  1784→                              }
+  1785→  1785→                              setIsActionLoading(true);
+  1786→  1786→                              try {
+  1787→  1787→                                const res = await apiFetch('/api/users/demote', {
+  1788→  1788→                                  method: 'POST',
+  1789→  1789→                                  headers: { 'Content-Type': 'application/json' },
+  1790→  1790→                                  body: JSON.stringify({ targetAdminId: adm.id })
+  1791→  1791→                                });
+  1792→  1792→                                if (res.ok) {
+  1793→  1793→                                  showSuccess(`Demoted ${adm.name}.`);
+  1794→  1794→                                  refreshWorkspaceData();
+  1795→  1795→                                  fetchStudents();
+  1796→  1796→                                } else {
+  1797→  1797→                                  const err = await res.json();
+  1798→  1798→                                  showError(err.error || "Demotion failed.");
+  1799→  1799→                                }
+  1800→  1800→                              } catch (e) {
+  1801→  1801→                                showError("Demotion network error.");
+  1802→  1802→                              } finally {
+  1803→  1803→                                setIsActionLoading(false);
+  1804→  1804→                                setConfirmDemoteId(null);
+  1805→  1805→                              }
+  1806→  1806→                            }}
+  1807→  1807→                            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border text-[9px] sm:text-[10px] font-bold cursor-pointer transition-all min-h-[32px] ${
+  1808→  1808→                              confirmDemoteId === adm.id
+  1809→  1809→                                ? 'bg-rose-500 text-white border-rose-400 animate-pulse font-black'
+  1810→  1810→                                : 'bg-slate-900 border-white/10 text-slate-400 hover:text-rose-400 hover:border-rose-500/30'
+  1811→  1811→                            }`}
+  1812→  1812→                          >
+  1813→  1813→                            {confirmDemoteId === adm.id ? 'Confirm' : 'Demote'}
+  1814→  1814→                          </button>
+  1815→  1815→                        )}
+  1816→  1816→                        {!canDemoteRow && isRowMainOwner && (
+  1817→  1817→                          <span
+  1818→  1818→                            title="The platform owner cannot be demoted"
+  1819→  1819→                            className="text-[9px] font-mono text-slate-500 italic px-1.5 py-0.5"
+  1820→  1820→                          >
+  1821→  1821→                            Protected
+  1822→  1822→                          </span>
+  1823→  1823→                        )}
+  1824→  1824→                      </div>
+  1825→  1825→                    </div>
+  1826→  1826→                  );
+  1827→  1827→                })}
+  1828→  1828→              </div>
+  1829→  1829→            </div>
+  1830→  1830→          )}
+  1831→  1831→
+  1832→  1832→          {/* Students Directory */}
+  1833→  1833→          {(userRoleFilter === 'all' || userRoleFilter === 'student') && (
+  1834→  1834→            <div className="space-y-3 pt-2">
+  1835→  1835→              <div className="flex items-center justify-between gap-2">
+  1836→  1836→                <h3 className="text-xs font-mono uppercase text-slate-400 font-bold tracking-wider truncate">
+  1837→  1837→                  Registered Student Accounts ({filteredStudents.length})
+  1838→  1838→                </h3>
+  1839→  1839→                <span className="text-[11px] font-mono text-sky-400/80 shrink-0 hidden sm:inline">Active Scholars</span>
+  1840→  1840→              </div>
+  1841→  1841→
+  1842→  1842→              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+  1843→  1843→                {filteredStudents.map(student => (
+  1844→  1844→                  <div
+  1845→  1845→                    key={student.id}
+  1846→  1846→                    className="p-3 sm:p-4 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-white/20 transition-all duration-300 flex flex-col justify-between gap-2.5 shadow-xl relative overflow-hidden group"
+  1847→  1847→                  >
+  1848→  1848→                    <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-sky-400/40 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+  1849→  1849→
+  1850→  1850→                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+  1851→  1851→                      {student.profilePic ? (
+  1852→  1852→                        <img src={student.profilePic} alt={student.name} referrerPolicy="no-referrer" className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl object-cover border border-white/10 shrink-0" />
+  1853→  1853→                      ) : (
+  1854→  1854→                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-indigo-600/30 to-sky-600/30 border border-sky-500/20 flex items-center justify-center text-sky-300 font-bold text-[10px] sm:text-xs shrink-0 font-mono">
+  1855→  1855→                          {student.name ? student.name.substring(0, 2).toUpperCase() : 'ST'}
+  1856→  1856→                        </div>
+  1857→  1857→                      )}
+  1858→  1858→                      <div className="min-w-0 flex-1">
+  1859→  1859→                        <strong className="text-[11px] sm:text-xs font-bold text-white block truncate group-hover:text-sky-300 transition-colors">{student.name}</strong>
+  1860→  1860→                        <span className="text-[9px] sm:text-[10px] text-slate-400 block truncate font-mono">{student.email}</span>
+  1861→  1861→                        <div className="flex items-center gap-1.5 mt-0.5">
+  1862→  1862→                          <span className="text-[8px] sm:text-[9px] font-mono px-1.5 sm:px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-bold border border-cyan-500/20 truncate">
+  1863→  1863→                            Cr: {student.credits !== undefined ? student.credits : 10}
+  1864→  1864→                          </span>
+  1865→  1865→                        </div>
+  1866→  1866→                      </div>
+  1867→  1867→                    </div>
+  1868→  1868→
+  1869→  1869→                    <button
+  1870→  1870→                      onClick={() => {
+  1871→  1871→                        setEditingCreditsUser(student);
+  1872→  1872→                        setNewCreditsValue(student.credits !== undefined ? student.credits : 10);
+  1873→  1873→                      }}
+  1874→  1874→                      className="w-full py-1.5 sm:py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-[9px] sm:text-[10px] font-bold border border-white/10 cursor-pointer transition-colors shadow-sm text-center min-h-[36px]"
+  1875→  1875→                    >
+  1876→  1876→                      Set Credits
+  1877→  1877→                    </button>
+  1878→  1878→                  </div>
+  1879→  1879→                ))}
+  1880→  1880→              </div>
+  1881→  1881→            </div>
+  1882→  1882→          )}
+  1883→  1883→        </div>
+  1884→  1884→      )}
+  1885→  1885→
+  1886→  1886→      {/* =========================================================================
+  1887→  1887→          TAB 5: COMMISSIONS & ESCROW ORDERS MANAGEMENT
+  1888→  1888→          ========================================================================= */}
+  1889→  1889→      {activeTab === 'commissions' && (
+  1890→  1890→        <div className="space-y-6">
+  1891→  1891→          {/* Status Filter */}
+  1892→  1892→          <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/10 flex items-center justify-between gap-3 flex-wrap shadow-xl backdrop-blur-md">
+  1893→  1893→            <div className="flex items-center gap-2 min-w-0">
+  1894→  1894→              <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 shrink-0">
+  1895→  1895→                <Palette className="w-4 h-4" />
+  1896→  1896→              </div>
+  1897→  1897→              <h3 className="text-xs font-mono text-slate-300 uppercase font-bold tracking-wider truncate">
+  1898→  1898→                Drawing Sheet Commissions Ledger ({filteredCommissions.length})
+  1899→  1899→              </h3>
+  1900→  1900→            </div>
+  1901→  1901→
+  1902→  1902→            <select
+  1903→  1903→              value={commissionStatusFilter}
+  1904→  1904→              onChange={(e) => setCommissionStatusFilter(e.target.value)}
+  1905→  1905→              className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 outline-none cursor-pointer focus:border-purple-500/50 w-full sm:w-auto min-h-[44px]"
+  1906→  1906→            >
+  1907→  1907→              <option value="all">All Statuses ({commissionsList.length})</option>
+  1908→  1908→              <option value="pending">Pending</option>
+  1909→  1909→              <option value="in_progress">Sketching (In Progress)</option>
+  1910→  1910→              <option value="delivered">Delivered</option>
+  1911→  1911→              <option value="completed">Completed</option>
+  1912→  1912→              <option value="cancelled">Cancelled</option>
+  1913→  1913→            </select>
+  1914→  1914→          </div>
+  1915→  1915→
+  1916→  1916→          {filteredCommissions.length === 0 ? (
+  1917→  1917→            <div className="p-12 text-center rounded-3xl bg-slate-950/60 border border-white/5 space-y-2 shadow-xl">
+  1918→  1918→              <Palette className="w-10 h-10 text-slate-600 mx-auto" />
+  1919→  1919→              <p className="text-xs text-slate-400 font-medium">No commission orders resolved for this view.</p>
+  1920→  1920→            </div>
+  1921→  1921→          ) : (
+  1922→  1922→            <div className="space-y-4">
+  1923→  1923→              {filteredCommissions.map(comm => (
+  1924→  1924→                <div
+  1925→  1925→                  key={comm.id}
+  1926→  1926→                  className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-white/20 transition-all duration-300 space-y-3.5 shadow-xl backdrop-blur-md relative overflow-hidden group"
+  1927→  1927→                >
+  1928→  1928→                  <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-purple-500/40 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+  1929→  1929→
+  1930→  1930→                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+  1931→  1931→                    <div className="min-w-0">
+  1932→  1932→                      <div className="flex items-center gap-2 flex-wrap">
+  1933→  1933→                        <span className="text-sm font-black text-white truncate">{comm.subject}</span>
+  1934→  1934→                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border ${
+  1935→  1935→                          comm.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+  1936→  1936→                          comm.status === 'delivered' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+  1937→  1937→                          comm.status === 'in_progress' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+  1938→  1938→                        }`}>
+  1939→  1939→                          {comm.status}
+  1940→  1940→                        </span>
+  1941→  1941→                      </div>
+  1942→  1942→                      <p className="text-xs text-slate-400 mt-1 break-words">
+  1943→  1943→                        Student: <strong className="text-slate-200">{comm.studentName}</strong> | Artist: <strong className="text-slate-200">{comm.artistName}</strong>
+  1944→  1944→                      </p>
+  1945→  1945→                    </div>
+  1946→  1946→
+  1947→  1947→                    <div className="flex items-center gap-4 flex-wrap">
+  1948→  1948→                      <div className="text-right font-mono">
+  1949→  1949→                        <span className="text-sm font-black text-emerald-400">৳{comm.totalPrice}</span>
+  1950→  1950→                        <span className="block text-[10px] text-slate-500">{comm.numPages} Diagram Pages</span>
+  1951→  1951→                      </div>
+  1952→  1952→
+  1953→  1953→                      <button
+  1954→  1954→                        onClick={() => handleToggleCommissionPayment(comm.id)}
+  1955→  1955→                        className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold cursor-pointer transition-all shadow-sm min-h-[36px] ${
+  1956→  1956→                          comm.paymentStatus === 'paid'
+  1957→  1957→                            ? 'bg-emerald-500 text-slate-950 font-black'
+  1958→  1958→                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+  1959→  1959→                        }`}
+  1960→  1960→                      >
+  1961→  1961→                        {comm.paymentStatus === 'paid' ? '✓ Paid' : 'Mark Paid'}
+  1962→  1962→                      </button>
+  1963→  1963→                    </div>
+  1964→  1964→                  </div>
+  1965→  1965→
+  1966→  1966→                  {comm.specialInstructions && (
+  1967→  1967→                    <div className="p-3 bg-slate-900/60 rounded-xl text-xs text-slate-300 italic border border-white/5 leading-relaxed break-words">
+  1968→  1968→                      &ldquo;{comm.specialInstructions}&rdquo;
+  1969→  1969→                    </div>
+  1970→  1970→                  )}
+  1971→  1971→                </div>
+  1972→  1972→              ))}
+  1973→  1973→            </div>
+  1974→  1974→          )}
+  1975→  1975→        </div>
+  1976→  1976→      )}
+  1977→  1977→
+  1978→  1978→      {/* =========================================================================
+  1979→  1979→          TAB 6: NOTICE BROADCASTS & ANNOUNCEMENTS
+  1980→  1980→          ========================================================================= */}
+  1981→  1981→      {activeTab === 'announcements' && (
+  1982→  1982→        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+  1983→  1983→
+  1984→  1984→          {/* Issue Announcement Form */}
+  1985→  1985→          <div className="p-4 sm:p-6 rounded-3xl bg-slate-950/80 border border-white/10 space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden">
+  1986→  1986→            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+  1987→  1987→
+  1988→  1988→            <div className="flex items-center gap-2 min-w-0">
+  1989→  1989→              <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
+  1990→  1990→                <Bell className="w-4 h-4" />
+  1991→  1991→              </div>
+  1992→  1992→              <h3 className="text-sm font-extrabold text-white truncate">Publish Portal Announcement</h3>
+  1993→  1993→            </div>
+  1994→  1994→            <p className="text-xs text-slate-400 break-words">Broadcast submission deadlines or practical lab guidelines live to all active student portals.</p>
+  1995→  1995→
+  1996→  1996→            <form onSubmit={handleCreateAnnouncement} className="space-y-4 pt-2">
+  1997→  1997→              <div className="space-y-1">
+  1998→  1998→                <label className="text-[10px] text-slate-400 font-mono font-bold uppercase">Header Title</label>
+  1999→  1999→                <input
+  2000→  2000→                  type="text"
+
+[showing lines 1-2000 of 2002; use offset=2001 with limit to continue reading]

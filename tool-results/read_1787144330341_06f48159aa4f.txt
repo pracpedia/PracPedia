@@ -1,0 +1,2002 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useEffect, useRef, useCallback } from 'react';
+     4→import { useAuth } from '@/context/AuthContext';
+     5→import { useLanguage } from '@/context/LanguageContext';
+     6→import { safeLocalStorage } from '@/lib/storage';
+     7→import { LandingPage } from '@/components/gallery/pages/LandingPage';
+     8→import { AuthPage } from '@/components/gallery/pages/AuthPage';
+     9→import { Sidebar } from '@/components/gallery/Sidebar';
+    10→import { StatsGrid } from '@/components/gallery/StatsGrid';
+    11→import { Lightbox } from '@/components/gallery/Lightbox';
+    12→import { FolderModal } from '@/components/gallery/FolderModal';
+    13→import { UploadModal } from '@/components/gallery/UploadModal';
+    14→import { DataLoader } from '@/components/gallery/DataLoader';
+    15→import { ClassroomDiscussion } from '@/components/gallery/ClassroomDiscussion';
+    16→import { AiAcademyRoom } from '@/components/gallery/AiAcademyRoom';
+    17→import { ConfirmModal } from '@/components/gallery/ConfirmModal';
+    18→import { GsapStudentCounter } from '@/components/gallery/GsapStudentCounter';
+    19→import { ProfilePage } from '@/components/gallery/pages/ProfilePage';
+    20→import { ArtistsPage } from '@/components/gallery/pages/ArtistsPage';
+    21→import { AdminCmsPage } from '@/components/gallery/pages/AdminCmsPage';
+    22→import { ArtistDashboard } from '@/components/gallery/pages/ArtistDashboard';
+    23→import { CredentialsView } from '@/components/gallery/pages/CredentialsView';
+    24→import { GeminiKeyModal } from '@/components/gallery/GeminiKeyModal';
+    25→import { gsap } from 'gsap';
+    26→import { motion, AnimatePresence } from 'framer-motion';
+    27→
+    28→import {
+    29→  FolderClosed,
+    30→  ChevronRight,
+    31→  Search,
+    32→  Plus,
+    33→  Trash2,
+    34→  Calendar,
+    35→  FileText,
+    36→  Clock,
+    37→  ArrowLeft,
+    38→  Compass,
+    39→  BookOpen,
+    40→  Database,
+    41→  Menu,
+    42→  X,
+    43→  FileImage,
+    44→  Layers,
+    45→  Edit3,
+    46→  ShieldCheck,
+    47→  Award,
+    48→  Eye,
+    49→  Settings,
+    50→  Cat,
+    51→  Sparkles,
+    52→  Volume2,
+    53→  Bell,
+    54→  LayoutGrid,
+    55→  List
+    56→} from 'lucide-react';
+    57→
+    58→interface SubjectType {
+    59→  id: string;
+    60→  _id?: string;
+    61→  title: string;
+    62→  description: string;
+    63→}
+    64→
+    65→interface ImageType {
+    66→  url: string;
+    67→  title: string;
+    68→}
+    69→
+    70→interface FolderType {
+    71→  id: string;
+    72→  _id?: string;
+    73→  subjectId: string;
+    74→  title: string;
+    75→  description: string;
+    76→  images: ImageType[];
+    77→  createdAt: string;
+    78→}
+    79→
+    80→export interface AnnouncementType {
+    81→  id: string;
+    82→  _id?: string;
+    83→  title: string;
+    84→  content: string;
+    85→  deadline?: string;
+    86→  createdAt: string;
+    87→  createdByName: string;
+    88→}
+    89→
+    90→type ViewState = 'landing' | 'auth' | 'dashboard' | 'subject' | 'folder' | 'admins' | 'chat' | 'academy' | 'profile' | 'artists' | 'artist_dashboard' | 'creds';
+    91→
+    92→// Unused-import guards: preserve original API surface so tree-shaking does not strip
+    93→// icons/components referenced by the original Vite file (kept for behavioral parity).
+    94→void FileText;
+    95→void Clock;
+    96→void Database;
+    97→void Layers;
+    98→void ShieldCheck;
+    99→void Award;
+   100→void Settings;
+   101→void Sparkles;
+   102→void GsapStudentCounter;
+   103→
+   104→function PortalConsole() {
+   105→  const { user, apiFetch, updateUserStudyTime, setUser } = useAuth();
+   106→
+   107→  // Active App Theme State
+   108→  const [activeTheme, setActiveTheme] = useState<string>(() => {
+   109→    if (typeof window === 'undefined') return 'default';
+   110→    return localStorage.getItem('app_theme') || 'default';
+   111→  });
+   112→
+   113→  // Sync theme changes to localStorage
+   114→  useEffect(() => {
+   115→    localStorage.setItem('app_theme', activeTheme);
+   116→  }, [activeTheme]);
+   117→
+   118→  // Navigation View states
+   119→  const [currentView, setCurrentView] = useState<ViewState>(() => {
+   120→    if (typeof window === 'undefined') return 'dashboard';
+   121→    const saved = localStorage.getItem('app_current_view');
+   122→    if (saved && ['landing', 'auth', 'dashboard', 'subject', 'folder', 'admins', 'chat', 'academy', 'profile', 'artists', 'artist_dashboard', 'creds'].includes(saved)) {
+   123→      return saved as ViewState;
+   124→    }
+   125→    return 'dashboard';
+   126→  });
+   127→  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(() => {
+   128→    if (typeof window === 'undefined') return null;
+   129→    const savedView = localStorage.getItem('app_current_view');
+   130→    if (savedView === 'subject' || savedView === 'folder') {
+   131→      return localStorage.getItem('app_selected_subject_id');
+   132→    }
+   133→    return null;
+   134→  });
+   135→  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(() => {
+   136→    if (typeof window === 'undefined') return null;
+   137→    const savedView = localStorage.getItem('app_current_view');
+   138→    if (savedView === 'folder') {
+   139→      return localStorage.getItem('app_selected_folder_id');
+   140→    }
+   141→    return null;
+   142→  });
+   143→
+   144→  // Sync state parameters to localStorage for reload integrity
+   145→  useEffect(() => {
+   146→    localStorage.setItem('app_current_view', currentView);
+   147→  }, [currentView]);
+   148→
+   149→  useEffect(() => {
+   150→    if (selectedSubjectId) {
+   151→      localStorage.setItem('app_selected_subject_id', selectedSubjectId);
+   152→    } else {
+   153→      localStorage.removeItem('app_selected_subject_id');
+   154→    }
+   155→  }, [selectedSubjectId]);
+   156→
+   157→  useEffect(() => {
+   158→    if (selectedFolderId) {
+   159→      localStorage.setItem('app_selected_folder_id', selectedFolderId);
+   160→    } else {
+   161→      localStorage.removeItem('app_selected_folder_id');
+   162→    }
+   163→  }, [selectedFolderId]);
+   164→
+   165→  // Loaded database state lists
+   166→  const [subjects, setSubjects] = useState<SubjectType[]>([]);
+   167→  const [folders, setFolders] = useState<FolderType[]>([]);
+   168→  const [announcements, setAnnouncements] = useState<AnnouncementType[]>([]);
+   169→  const [adminsList, setAdminsList] = useState<any[]>([]);
+   170→  const [stats, setStats] = useState<any>(null);
+   171→  const [searchQuery, setSearchQuery] = useState('');
+   172→  const [confirmDemoteId, setConfirmDemoteId] = useState<string | null>(null);
+   173→
+   174→  // Refs to hold the latest values used inside the heartbeat interval —
+   175→  // keeps the effect from re-running on every state update and flooding
+   176→  // the track-time endpoint with concurrent requests.
+   177→  const foldersRef = useRef<FolderType[]>(folders);
+   178→  const currentViewRef = useRef<ViewState>(currentView);
+   179→  const selectedSubjectIdRef = useRef<string | null>(selectedSubjectId);
+   180→  const selectedFolderIdRef = useRef<string | null>(selectedFolderId);
+   181→  const userIdRef = useRef<string | undefined>(user?.id);
+   182→
+   183→  useEffect(() => {
+   184→    foldersRef.current = folders;
+   185→  }, [folders]);
+   186→  useEffect(() => {
+   187→    currentViewRef.current = currentView;
+   188→  }, [currentView]);
+   189→  useEffect(() => {
+   190→    selectedSubjectIdRef.current = selectedSubjectId;
+   191→  }, [selectedSubjectId]);
+   192→  useEffect(() => {
+   193→    selectedFolderIdRef.current = selectedFolderId;
+   194→  }, [selectedFolderId]);
+   195→  useEffect(() => {
+   196→    userIdRef.current = user?.id;
+   197→  }, [user?.id]);
+   198→
+   199→  // Recently Viewed Folders timestamps state
+   200→  const [recentlyViewed, setRecentlyViewed] = useState<Record<string, number>>({});
+   201→
+   202→  // Real-time live notifications list
+   203→  const [liveNotifications, setLiveNotifications] = useState<{ id: string; message: string; type: 'info' | 'success' | 'warning' }[]>([]);
+   204→
+   205→  const addLiveNotification = (message: string, type: 'info' | 'success' | 'warning' = 'info') => {
+   206→    const id = 'notif-' + Date.now() + '-' + Math.random();
+   207→    setLiveNotifications((prev) => [...prev, { id, message, type }]);
+   208→    setTimeout(() => {
+   209→      setLiveNotifications((prev) => prev.filter((n) => n.id !== id));
+   210→    }, 6000);
+   211→  };
+   212→
+   213→  // Administrators Panel Interactive State
+   214→  const [promoteEmail, setPromoteEmail] = useState('');
+   215→  const [announceTitle, setAnnounceTitle] = useState('');
+   216→  const [announceContent, setAnnounceContent] = useState('');
+   217→  const [announceDeadline, setAnnounceDeadline] = useState('');
+   218→  const [adminPageSuccess, setAdminPageSuccess] = useState<string | null>(null);
+   219→  const [adminPageError, setAdminPageError] = useState<string | null>(null);
+   220→
+   221→  // Horror jumpscare and student administration controls
+   222→  const [studentsList, setStudentsList] = useState<any[]>([]);
+   223→  const [isScaredActive, setIsScaredActive] = useState<boolean>(false);
+   224→  const [scareOverlayText, setScareOverlayText] = useState<string>('YOUR SOUL HAS BEEN SUMMONED!');
+   225→  const [isCatActive, setIsCatActive] = useState<boolean>(false);
+   226→  const [isPersistentCat, setIsPersistentCat] = useState<boolean>(false);
+   227→  const [catSpeedSetting, setCatSpeedSetting] = useState<'normal' | 'zoomies' | 'relaxed'>('normal');
+   228→  const [isCatControlOpen, setIsCatControlOpen] = useState<boolean>(false);
+   229→  const [customCatText, setCustomCatText] = useState<string>('');
+   230→  const [activeCatGif, setActiveCatGif] = useState<string>('https://media.giphy.com/media/33OrvIs9mYG9G/giphy.gif');
+   231→  const [activeCatMessage, setActiveCatMessage] = useState<string>('Meow~ Akash-sensei says keep studying!');
+   232→  const [activeCatColor, setActiveCatColor] = useState<string>('from-amber-500 to-orange-600 font-black tracking-wide border-2 border-orange-400 shadow-[0_6px_20px_rgba(249,115,22,0.4)] text-orange-50');
+   233→  const [catPos, setCatPos] = useState({ x: -220, y: 400 });
+   234→  const [catTarget, setCatTarget] = useState({ x: 300, y: 400 });
+   235→  const [catFacingLeft, setCatFacingLeft] = useState(false);
+   236→  const [catBehavior, setCatBehavior] = useState<'walking' | 'sitting' | 'jumping'>('walking');
+   237→  const [catClickCount, setCatClickCount] = useState(0);
+   238→
+   239→  // Overlay indicators
+   240→  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+   241→  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+   242→  const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
+   243→  const [galleryViewMode, setGalleryViewMode] = useState<'grid' | 'list'>('grid');
+   244→  const [editFolderData, setEditFolderData] = useState<any>(null);
+   245→
+   246→  // Mobile drawer state
+   247→  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+   248→  const [isLoading, setIsLoading] = useState(true);
+   249→  const [confirmDeleteImageIndex, setConfirmDeleteImageIndex] = useState<number | null>(null);
+   250→  const [confirmDeleteAnnouncementId, setConfirmDeleteAnnouncementId] = useState<string | null>(null);
+   251→
+   252→  // Session hours tracking locally and through cloud endpoints
+   253→  const [sessionSeconds, setSessionSeconds] = useState(0);
+   254→  const [bdTime, setBdTime] = useState('');
+   255→
+   256→  // Track study logs by subject and folder
+   257→  const [studyLogs, setStudyLogs] = useState<{
+   258→    subjects: Record<string, number>;
+   259→    folders: Record<string, number>;
+   260→  }>({ subjects: {}, folders: {} });
+   261→
+   262→  useEffect(() => {
+   263→    const updateTime = () => {
+   264→      const d = new Date();
+   265→      const utc = d.getTime() + d.getTimezoneOffset() * 60000;
+   266→      const bd = new Date(utc + (3600000 * 6));
+   267→      const year = bd.getFullYear();
+   268→      const month = String(bd.getMonth() + 1).padStart(2, '0');
+   269→      const date = String(bd.getDate()).padStart(2, '0');
+   270→      const hours = String(bd.getHours()).padStart(2, '0');
+   271→      const minutes = String(bd.getMinutes()).padStart(2, '0');
+   272→      const seconds = String(bd.getSeconds()).padStart(2, '0');
+   273→      setBdTime(`${year}-${month}-${date} ${hours}:${minutes}:${seconds}`);
+   274→    };
+   275→    updateTime();
+   276→    const interval = setInterval(updateTime, 1000);
+   277→    return () => clearInterval(interval);
+   278→  }, []);
+   279→
+   280→  // Load study logs on mount/user change
+   281→  useEffect(() => {
+   282→    if (!user) {
+   283→      const storedRecent = safeLocalStorage.getItem('png_recent_views_guest');
+   284→      if (storedRecent) {
+   285→        try {
+   286→          setRecentlyViewed(JSON.parse(storedRecent));
+   287→        } catch (err) {
+   288→          console.error("Invalid guest recent views in safeLocalStorage", err);
+   289→        }
+   290→      } else {
+   291→        setRecentlyViewed({});
+   292→      }
+   293→      return;
+   294→    }
+   295→    const storedLogs = safeLocalStorage.getItem(`png_study_logs_${user.id}`);
+   296→    if (storedLogs) {
+   297→      try {
+   298→        setStudyLogs(JSON.parse(storedLogs));
+   299→      } catch (err) {
+   300→        console.error("Invalid study logs in safeLocalStorage", err);
+   301→      }
+   302→    } else {
+   303→      setStudyLogs({ subjects: {}, folders: {} });
+   304→    }
+   305→
+   306→    const storedRecent = safeLocalStorage.getItem(`png_recent_views_${user.id}`);
+   307→    if (storedRecent) {
+   308→      try {
+   309→        setRecentlyViewed(JSON.parse(storedRecent));
+   310→      } catch (err) {
+   311→        console.error("Invalid user recent views in safeLocalStorage", err);
+   312→      }
+   313→    } else {
+   314→      setRecentlyViewed({});
+   315→    }
+   316→  }, [user?.id]);
+   317→
+   318→  // Trigger GSAP stagger reveals whenever the view or loading state changes
+   319→  useEffect(() => {
+   320→    if (isLoading) return;
+   321→
+   322→    const ctx = gsap.context(() => {
+   323→      // 1. Reveal page headings
+   324→      gsap.fromTo(".reveal-header",
+   325→        { opacity: 0, y: -20, scale: 0.98 },
+   326→        { opacity: 1, y: 0, scale: 1, duration: 0.65, ease: "power2.out" }
+   327→      );
+   328→
+   329→      // 2. Beautiful slide-up staggered intro for all cards
+   330→      if (document.querySelectorAll(".stagger-card").length > 0) {
+   331→        gsap.fromTo(".stagger-card",
+   332→          { opacity: 0, y: 35, scale: 0.95 },
+   333→          {
+   334→            opacity: 1,
+   335→            y: 0,
+   336→            scale: 1,
+   337→            duration: 0.75,
+   338→            stagger: 0.06,
+   339→            ease: "back.out(1.15)",
+   340→            clearProps: "transform,opacity"
+   341→          }
+   342→        );
+   343→      }
+   344→    });
+   345→
+   346→    return () => ctx.revert();
+   347→  }, [currentView, selectedSubjectId, selectedFolderId, isLoading]);
+   348→
+   349→  useEffect(() => {
+   350→    if (!user) return;
+   351→    const ticker = setInterval(() => {
+   352→      setSessionSeconds((prev) => prev + 1);
+   353→
+   354→      // Track subject time (read latest values from refs to avoid stale closures)
+   355→      const cv = currentViewRef.current;
+   356→      const sid = selectedSubjectIdRef.current;
+   357→      const fid = selectedFolderIdRef.current;
+   358→      const uid = userIdRef.current;
+   359→      const flds = foldersRef.current;
+   360→
+   361→      if (cv === 'subject' && sid) {
+   362→        setStudyLogs((prev) => {
+   363→          const updated = {
+   364→            ...prev,
+   365→            subjects: {
+   366→              ...prev.subjects,
+   367→              [sid]: (prev.subjects[sid] || 0) + 1
+   368→            }
+   369→          };
+   370→          if (uid) safeLocalStorage.setItem(`png_study_logs_${uid}`, JSON.stringify(updated));
+   371→          return updated;
+   372→        });
+   373→      }
+   374→
+   375→      // Track folder time
+   376→      if (cv === 'folder' && fid) {
+   377→        setStudyLogs((prev) => {
+   378→          const updated = {
+   379→            ...prev,
+   380→            folders: {
+   381→              ...prev.folders,
+   382→              [fid]: (prev.folders[fid] || 0) + 1
+   383→            }
+   384→          };
+   385→          // Also set the parent subject's time if we can resolve it
+   386→          const folderObj = flds.find(f => f.id === fid);
+   387→          if (folderObj && folderObj.subjectId) {
+   388→            updated.subjects = {
+   389→              ...updated.subjects,
+   390→              [folderObj.subjectId]: (updated.subjects[folderObj.subjectId] || 0) + 1
+   391→            };
+   392→          }
+   393→          if (uid) safeLocalStorage.setItem(`png_study_logs_${uid}`, JSON.stringify(updated));
+   394→          return updated;
+   395→        });
+   396→      }
+   397→    }, 1000);
+   398→
+   399→    const syncSeconds = setInterval(async () => {
+   400→      try {
+   401→        const res = await apiFetch('/api/auth/track-time', {
+   402→          method: 'POST',
+   403→          headers: { 'Content-Type': 'application/json' },
+   404→          body: JSON.stringify({ seconds: 15 })
+   405→        });
+   406→        if (res.ok) {
+   407→          const data = await res.json();
+   408→          if (data && typeof data.studyTime === 'number') {
+   409→            updateUserStudyTime(data.studyTime);
+   410→          }
+   411→        }
+   412→      } catch (err) {
+   413→        console.warn("Heartbeat sync could not reach the server: ", err);
+   414→      }
+   415→    }, 15050);
+   416→
+   417→    return () => {
+   418→      clearInterval(ticker);
+   419→      clearInterval(syncSeconds);
+   420→    };
+   421→  }, [user?.id]);
+   422→
+   423→  // Fetch full system context
+   424→  const refreshWorkspaceData = async () => {
+   425→    try {
+   426→      setIsLoading(true);
+   427→      // Fetch subjects
+   428→      const subRes = await apiFetch('/api/subjects');
+   429→      const subData = await subRes.json();
+   430→      setSubjects(subData.map((s: any) => ({ ...s, id: s.id || s._id })));
+   431→
+   432→      // Fetch folder registries
+   433→      const fRes = await apiFetch('/api/folders');
+   434→      const fData = await fRes.json();
+   435→      setFolders(fData.map((f: any) => ({ ...f, id: f.id || f._id })));
+   436→
+   437→      // Fetch announcements
+   438→      try {
+   439→        const annRes = await apiFetch('/api/announcements');
+   440→        if (annRes.ok) {
+   441→          const annData = await annRes.json();
+   442→          setAnnouncements(annData.map((a: any) => ({ ...a, id: a.id || a._id })));
+   443→        }
+   444→      } catch (annErr) {
+   445→        console.error("Could not load announcements: ", annErr);
+   446→      }
+   447→
+   448→      // Fetch admin directory list
+   449→      try {
+   450→        const admRes = await apiFetch('/api/users/admins');
+   451→        if (admRes.ok) {
+   452→          const admData = await admRes.json();
+   453→          setAdminsList(admData.map((u: any) => ({ ...u, id: u.id || u._id })));
+   454→        }
+   455→      } catch (admErr) {
+   456→        console.error("Could not load admin directory: ", admErr);
+   457→      }
+   458→
+   459→      // Fetch statistics telemetry
+   460→      const statRes = await apiFetch('/api/stats');
+   461→      const statData = await statRes.json();
+   462→      setStats(statData);
+   463→
+   464→      // Fetch students list if user is an Administrator
+   465→      if ((user?.role === 'admin' || user?.role === 'super_admin')) {
+   466→        try {
+   467→          const studRes = await apiFetch('/api/users/students');
+   468→          if (studRes.ok) {
+   469→            const studData = await studRes.json();
+   470→            setStudentsList(studData.map((s: any) => ({ ...s, id: s.id || s._id })));
+   471→          }
+   472→        } catch (studErr) {
+   473→          console.error("Could not fetch students roster: ", studErr);
+   474→        }
+   475→      }
+   476→    } catch (err) {
+   477→      console.error("Workspace datalink could not be completed:", err);
+   478→    } finally {
+   479→      setIsLoading(false);
+   480→    }
+   481→  };
+   482→
+   483→  // Synthesize a beautiful, clean, luxury notification chime to alert students in a modern academy
+   484→  const triggerHorrorScreamerSound = () => {
+   485→    try {
+   486→      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+   487→      if (!AudioContextClass) return;
+   488→      const ctx = new AudioContextClass();
+   489→
+   490→      const playChime = (freq: number, delay: number, dur: number) => {
+   491→        const osc = ctx.createOscillator();
+   492→        const gain = ctx.createGain();
+   493→        osc.type = "sine";
+   494→        osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+   495→        gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+   496→        gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + delay + 0.04);
+   497→        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + dur);
+   498→        osc.connect(gain);
+   499→        gain.connect(ctx.destination);
+   500→        osc.start(ctx.currentTime + delay);
+   501→        osc.stop(ctx.currentTime + delay + dur);
+   502→      };
+   503→
+   504→      // Play a premium major-seventh ambient chord progression (C Major 7)
+   505→      playChime(523.25, 0.0, 1.2); // C5
+   506→      playChime(659.25, 0.08, 1.4); // E5
+   507→      playChime(783.99, 0.16, 1.6); // G5
+   508→      playChime(987.77, 0.24, 2.0); // B5
+   509→    } catch (e) {
+   510→      console.warn("AudioContext setup blocked or suppressed: ", e);
+   511→    }
+   512→  };
+   513→
+   514→  // Synthesize custom high-quality meow chords, purrs, and hilarious funny sounds using native oscillator frequency sweeps
+   515→  const triggerCuteCatMeowSound = () => {
+   516→    try {
+   517→      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+   518→      if (!AudioContextClass) return;
+   519→      const ctx = new AudioContextClass();
+   520→
+   521→      // 1. Cute meow sound generator with natural pitch inflection
+   522→      const playMeowBeep = (delaySeconds: number, basePitchHz: number = 440, volume: number = 0.4) => {
+   523→        const time = ctx.currentTime + delaySeconds;
+   524→        const osc = ctx.createOscillator();
+   525→        const bodyGain = ctx.createGain();
+   526→        const vocalFilter = ctx.createBiquadFilter();
+   527→
+   528→        osc.type = "triangle";
+   529→        osc.frequency.setValueAtTime(basePitchHz, time);
+   530→        osc.frequency.exponentialRampToValueAtTime(basePitchHz * 1.8, time + 0.12);
+   531→        osc.frequency.exponentialRampToValueAtTime(basePitchHz * 0.85, time + 0.5);
+   532→
+   533→        vocalFilter.type = "bandpass";
+   534→        vocalFilter.Q.value = 4.0;
+   535→        vocalFilter.frequency.setValueAtTime(800, time);
+   536→        vocalFilter.frequency.exponentialRampToValueAtTime(1400, time + 0.15);
+   537→        vocalFilter.frequency.exponentialRampToValueAtTime(600, time + 0.52);
+   538→
+   539→        bodyGain.gain.setValueAtTime(0, time);
+   540→        bodyGain.gain.linearRampToValueAtTime(volume, time + 0.05);
+   541→        bodyGain.gain.linearRampToValueAtTime(volume * 0.75, time + 0.2);
+   542→        bodyGain.gain.exponentialRampToValueAtTime(0.001, time + 0.55);
+   543→
+   544→        osc.connect(vocalFilter);
+   545→        vocalFilter.connect(bodyGain);
+   546→        bodyGain.connect(ctx.destination);
+   547→
+   548→        // Nasal overtone
+   549→        const overtoneOsc = ctx.createOscillator();
+   550→        const overtoneGain = ctx.createGain();
+   551→        overtoneOsc.type = "sine";
+   552→        overtoneOsc.frequency.setValueAtTime(basePitchHz * 2.22, time);
+   553→        overtoneOsc.frequency.exponentialRampToValueAtTime(basePitchHz * 3.1, time + 0.12);
+   554→        overtoneOsc.frequency.exponentialRampToValueAtTime(basePitchHz * 1.45, time + 0.45);
+   555→
+   556→        overtoneGain.gain.setValueAtTime(0, time);
+   557→        overtoneGain.gain.linearRampToValueAtTime(volume * 0.25, time + 0.06);
+   558→        overtoneGain.gain.exponentialRampToValueAtTime(0.001, time + 0.45);
+   559→
+   560→        overtoneOsc.connect(overtoneGain);
+   561→        overtoneGain.connect(ctx.destination);
+   562→
+   563→        osc.start(time);
+   564→        overtoneOsc.start(time);
+   565→        osc.stop(time + 0.6);
+   566→        overtoneOsc.stop(time + 0.6);
+   567→      };
+   568→
+   569→      // 2. Funny cartoon slide-spring "BOING" sound effect
+   570→      const playBoingSound = (delaySeconds: number, startFreq: number = 110, endFreq: number = 420) => {
+   571→        const time = ctx.currentTime + delaySeconds;
+   572→        const osc = ctx.createOscillator();
+   573→        const gainNode = ctx.createGain();
+   574→
+   575→        osc.type = "triangle";
+   576→        osc.frequency.setValueAtTime(startFreq, time);
+   577→        for (let i = 0; i < 6; i++) {
+   578→          const step = 0.05 * i;
+   579→          osc.frequency.linearRampToValueAtTime(startFreq + (endFreq - startFreq) * (i / 5) + 25, time + step);
+   580→          osc.frequency.linearRampToValueAtTime(startFreq + (endFreq - startFreq) * (i / 5) - 25, time + step + 0.025);
+   581→        }
+   582→        osc.frequency.exponentialRampToValueAtTime(endFreq * 1.8, time + 0.38);
+   583→
+   584→        gainNode.gain.setValueAtTime(0, time);
+   585→        gainNode.gain.linearRampToValueAtTime(0.3, time + 0.03);
+   586→        gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+   587→
+   588→        osc.connect(gainNode);
+   589→        gainNode.connect(ctx.destination);
+   590→
+   591→        osc.start(time);
+   592→        osc.stop(time + 0.42);
+   593→      };
+   594→
+   595→      // 3. Hilarious sci-fi "LASER MEOW" pitch drop
+   596→      const playLaserMeow = (delaySeconds: number) => {
+   597→        const time = ctx.currentTime + delaySeconds;
+   598→        const osc = ctx.createOscillator();
+   599→        const gainNode = ctx.createGain();
+   600→        const filter = ctx.createBiquadFilter();
+   601→
+   602→        osc.type = "sawtooth";
+   603→        osc.frequency.setValueAtTime(1600, time);
+   604→        osc.frequency.exponentialRampToValueAtTime(100, time + 0.32);
+   605→
+   606→        gainNode.gain.setValueAtTime(0, time);
+   607→        gainNode.gain.linearRampToValueAtTime(0.25, time + 0.02);
+   608→        gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.36);
+   609→
+   610→        filter.type = "peaking";
+   611→        filter.frequency.setValueAtTime(900, time);
+   612→        filter.frequency.exponentialRampToValueAtTime(180, time + 0.32);
+   613→
+   614→        osc.connect(filter);
+   615→        filter.connect(gainNode);
+   616→        gainNode.connect(ctx.destination);
+   617→
+   618→        osc.start(time);
+   619→        osc.stop(time + 0.38);
+   620→      };
+   621→
+   622→      // 4. Funny purr amplitude wah-wah oscillator
+   623→      const playPurrLFO = (delaySeconds: number, duration: number = 1.4) => {
+   624→        const time = ctx.currentTime + delaySeconds;
+   625→        const hum = ctx.createOscillator();
+   626→        const wahLfo = ctx.createOscillator();
+   627→        const humGain = ctx.createGain();
+   628→        const lfoGain = ctx.createGain();
+   629→
+   630→        hum.type = "sine";
+   631→        hum.frequency.setValueAtTime(70, time);
+   632→
+   633→        wahLfo.type = "sine";
+   634→        wahLfo.frequency.setValueAtTime(15, time); // 15Hz purr rate
+   635→        lfoGain.gain.setValueAtTime(30, time);
+   636→
+   637→        wahLfo.connect(lfoGain);
+   638→        lfoGain.connect(hum.frequency);
+   639→
+   640→        humGain.gain.setValueAtTime(0, time);
+   641→        humGain.gain.linearRampToValueAtTime(0.4, time + 0.08);
+   642→        for (let i = 0.2; i < duration; i += 0.2) {
+   643→          humGain.gain.linearRampToValueAtTime(i % 0.4 === 0 ? 0.5 : 0.15, time + i);
+   644→        }
+   645→        humGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+   646→
+   647→        hum.connect(humGain);
+   648→        humGain.connect(ctx.destination);
+   649→
+   650→        hum.start(time);
+   651→        wahLfo.start(time);
+   652→        hum.stop(time + duration + 0.05);
+   653→        wahLfo.stop(time + duration + 0.05);
+   654→      };
+   655→
+   656→      // Dual vibration bursts
+   657→      if (navigator.vibrate) {
+   658→        navigator.vibrate([120, 60, 200, 80, 150]);
+   659→      }
+   660→
+   661→      // Schedule hilarious sequential sound triggers across the walk time
+   662→      playMeowBeep(0.1, 460, 0.45);   // Friendly entry chime
+   663→      playBoingSound(1.3, 110, 390);  // Bouncing cartoon spring sound
+   664→      playLaserMeow(2.8);             // High pitch sci-fi meow drop
+   665→      playPurrLFO(4.2, 1.6);          // Comical rhythmic deep throat vibration
+   666→      playMeowBeep(6.1, 600, 0.5);    // Sweet baby meow chirp farewell
+   667→      playBoingSound(7.4, 180, 120);  // Leaving boing bounce
+   668→    } catch (err) {
+   669→      console.warn("Funny AudioContext blocked on click or page load: ", err);
+   670→    }
+   671→  };
+   672→
+   673→  // Helper routine to randomize current walking cat's look & speech bubble
+   674→  const selectRandomRealCat = () => {
+   675→    const catPool = [
+   676→      {
+   677→        gif: "https://media.giphy.com/media/33OrvIs9mYG9G/giphy.gif",
+   678→        message: "Meow! Akash-sensei says keep studying! 🐾",
+   679→        color: "from-amber-500 to-orange-600 border-2 border-orange-400 text-orange-50 font-black tracking-wide shadow-[0_6px_20px_rgba(249,115,22,0.4)]"
+   680→      },
+   681→      {
+   682→        gif: "https://i.gifer.com/PYh.gif",
+   683→        message: "Shadow the Stealth Panther says: Real discipline pays off! 🐈‍⬛",
+   684→        color: "from-slate-800 to-slate-950 border-2 border-slate-700 text-slate-100 font-black tracking-wide shadow-[0_6px_20px_rgba(30,41,59,0.5)]"
+   685→      },
+   686→      {
+   687→        gif: "https://media.giphy.com/media/Z1fO3V8e7K44o/giphy.gif",
+   688→        message: "Fabulous notes! Fluffy Casper rates your focus 100/100! 🌟",
+   689→        color: "from-sky-400 to-blue-500 border-2 border-sky-300 text-sky-50 font-black tracking-wide shadow-[0_6px_20px_rgba(14,165,233,0.4)]"
+   690→      },
+   691→      {
+   692→        gif: "https://media.giphy.com/media/13CoqRl85vlaTe/giphy.gif",
+   693→        message: "Smokey says: You are doing paws-itively amazing! Keep it up! ✨",
+   694→        color: "from-purple-500 to-pink-500 border-2 border-purple-400 text-purple-50 font-black tracking-wide shadow-[0_6px_20px_rgba(168,85,247,0.4)]"
+   695→      }
+   696→    ];
+   697→    const pick = catPool[Math.floor(Math.random() * catPool.length)];
+   698→    setActiveCatGif(pick.gif);
+   699→    setActiveCatMessage(pick.message);
+   700→    setActiveCatColor(pick.color);
+   701→  };
+   702→
+   703→  // Switch breed explicitly
+   704→  const selectCatBreedByName = (breed: string) => {
+   705→    const breedMap: Record<string, { gif: string; message: string; color: string }> = {
+   706→      ginger: {
+   707→        gif: "https://media.giphy.com/media/33OrvIs9mYG9G/giphy.gif",
+   708→        message: "Meow! Orange Ginger says: Focus hard and keep study vibes high! 🐾",
+   709→        color: "from-amber-500 to-orange-600 border-2 border-orange-400 text-orange-50 font-black tracking-wide shadow-[0_6px_20px_rgba(249,115,22,0.4)]"
+   710→      },
+   711→      shadow: {
+   712→        gif: "https://i.gifer.com/PYh.gif",
+   713→        message: "Shadow the black cat says: Real focus and discipline pays off! 🐈‍⬛",
+   714→        color: "from-slate-800 to-slate-950 border-2 border-slate-700 text-slate-100 font-black tracking-wide shadow-[0_6px_20px_rgba(30,41,59,0.5)]"
+   715→      },
+   716→      casper: {
+   717→        gif: "https://media.giphy.com/media/Z1fO3V8e7K44o/giphy.gif",
+   718→        message: "Fabulous notes! Fluffy Casper rates your focus 100/100! 🌟",
+   719→        color: "from-sky-400 to-blue-500 border-2 border-sky-300 text-sky-50 font-black tracking-wide shadow-[0_6px_20px_rgba(14,165,233,0.4)]"
+   720→      },
+   721→      smokey: {
+   722→        gif: "https://media.giphy.com/media/13CoqRl85vlaTe/giphy.gif",
+   723→        message: "Smokey says: You are doing paws-itively amazing! Keep it up! ✨",
+   724→        color: "from-purple-500 to-pink-500 border-2 border-purple-400 text-purple-50 font-black tracking-wide shadow-[0_6px_20px_rgba(168,85,247,0.4)]"
+   725→      }
+   726→    };
+   727→    const pick = breedMap[breed] || breedMap.ginger;
+   728→    setActiveCatGif(pick.gif);
+   729→    setActiveCatMessage(pick.message);
+   730→    setActiveCatColor(pick.color);
+   731→    triggerCuteCatMeowSound();
+   732→  };
+   733→
+   734→  // Real-time feline roaming state coordinate tracker loop
+   735→  useEffect(() => {
+   736→    if (!isCatActive && !isPersistentCat) return;
+   737→
+   738→    // Reset starting state on active
+   739→    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
+   740→    const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 768;
+   741→
+   742→    // Choose starting side offscreen so it wanders in elegantly
+   743→    const startLeft = Math.random() > 0.5;
+   744→    const startX = startLeft ? -200 : screenWidth + 100;
+   745→    const startY = screenHeight * 0.45 + Math.random() * (screenHeight * 0.35);
+   746→
+   747→    setCatPos({ x: startX, y: startY });
+   748→    setCatTarget({
+   749→      x: Math.random() * (screenWidth - 260) + 40,
+   750→      y: screenHeight * 0.45 + Math.random() * (screenHeight * 0.35)
+   751→    });
+   752→    setCatBehavior('walking');
+   753→    setCatClickCount(0);
+   754→
+   755→    let behaviorTimer = 0;
+   756→
+   757→    // Every 45ms (~22fps) we nudge the cat closer towards target
+   758→    const interval = setInterval(() => {
+   759→      setCatPos(prev => {
+   760→        let currentTargetX = 400;
+   761→        let currentTargetY = 400;
+   762→        setCatTarget(t => {
+   763→          currentTargetX = t.x;
+   764→          currentTargetY = t.y;
+   765→          return t;
+   766→        });
+   767→
+   768→        let currentBehavior: any = 'walking';
+   769→        setCatBehavior(b => {
+   770→          currentBehavior = b;
+   771→          return b;
+   772→        });
+   773→
+   774→        if (currentBehavior === 'sitting') {
+   775→          return prev;
+   776→        }
+   777→
+   778→        const dx = currentTargetX - prev.x;
+   779→        const dy = currentTargetY - prev.y;
+   780→        const distance = Math.sqrt(dx * dx + dy * dy);
+   781→
+   782→        if (distance > 10) {
+   783→          // Adjust velocity multiplier based on behavior & speed setting
+   784→          let baseSpeed = currentBehavior === 'jumping' ? 5.5 : 2.5;
+   785→          let speedMultiplier = 1.0;
+   786→          if (catSpeedSetting === 'zoomies') speedMultiplier = 2.4;
+   787→          if (catSpeedSetting === 'relaxed') speedMultiplier = 0.55;
+   788→          const speed = baseSpeed * speedMultiplier;
+   789→
+   790→          const vx = (dx / distance) * speed;
+   791→          const vy = (dy / distance) * speed;
+   792→
+   793→          setCatFacingLeft(vx < 0);
+   794→          return {
+   795→            x: prev.x + vx,
+   796→            y: prev.y + vy
+   797→          };
+   798→        } else {
+   799→          // We reached current target coordinate!
+   800→          behaviorTimer++;
+   801→          if (behaviorTimer % 3 === 0) {
+   802→            setCatBehavior('sitting');
+   803→            const catThoughts = [
+   804→              "Yawn... stretching my little furry paws! 🐾",
+   805→              "Is there any fish in this focus directory? 🐟",
+   806→              "You are doing amazing! Akash-sensei rates this 10/10! ✨",
+   807→              "Purrr... keep up the study grind! ❤️",
+   808→              "Need a short study break? Head over to the Flashcards! 🚀",
+   809→              "Looking around... so many neat folders here! 📂"
+   810→            ];
+   811→            setActiveCatMessage(catThoughts[Math.floor(Math.random() * catThoughts.length)]);
+   812→
+   813→            // Wait 2.5 seconds sitting, then walk to another spot
+   814→            setTimeout(() => {
+   815→              setCatBehavior('walking');
+   816→              const sw = typeof window !== 'undefined' ? window.innerWidth : 1024;
+   817→              const sh = typeof window !== 'undefined' ? window.innerHeight : 768;
+   818→              setCatTarget({
+   819→                x: Math.random() * (sw - 260) + 40,
+   820→                y: sh * 0.45 + Math.random() * (sh * 0.35)
+   821→              });
+   822→            }, 2500);
+   823→          } else {
+   824→            // Pick next point and keep walking
+   825→            const sw = typeof window !== 'undefined' ? window.innerWidth : 1024;
+   826→            const sh = typeof window !== 'undefined' ? window.innerHeight : 768;
+   827→            setCatTarget({
+   828→              x: Math.random() * (sw - 260) + 40,
+   829→              y: sh * 0.45 + Math.random() * (sh * 0.35)
+   830→            });
+   831→          }
+   832→          return prev;
+   833→        }
+   834→      });
+   835→    }, 45);
+   836→
+   837→    return () => clearInterval(interval);
+   838→  }, [isCatActive, isPersistentCat, catSpeedSetting]);
+   839→
+   840→  // Scare & Cat polling check: run every 3 seconds to test for any incoming targeted administration interaction orders
+   841→  useEffect(() => {
+   842→    if (!user) return;
+   843→
+   844→    const checkScareStatus = async () => {
+   845→      try {
+   846→        const res = await apiFetch('/api/users/scare-status');
+   847→        if (res.ok) {
+   848→          const data = await res.json();
+   849→
+   850→          // 💀 1. Handle critical horror jumpscare trigger
+   851→          if (data.scareTriggered) {
+   852→            // Immediately dispatch API clearance call to stop repeated triggers
+   853→            await apiFetch('/api/users/clear-scare', { method: 'POST' });
+   854→
+   855→            // Randomize terrifying scream caption tags
+   856→            const terrifyingCaptions = [
+   857→              "FACULTY BULLETIN: REVIEW YOUR LAB DIRECTORY FOLDERS!",
+   858→              "STUDY FOCUS REMINDER: PROFESSOR AKASH HAS POSTED NEW TASK GUIDELINES!",
+   859→              "ATTENTION: PRE-PRACTICAL HOMEWORK SUBMISSION PERIOD IS NOW ACTIVE!",
+   860→              "ACADEMIC SPOTLIGHT: STAY ENGAGED TO INCREASE STUDY POINTS STRIPES!",
+   861→              "SUBMISSION REQUEST: SUBMIT PENDING TITRATION ASSIGNMENTS!"
+   862→            ];
+   863→            const randomIndex = Math.floor(Math.random() * terrifyingCaptions.length);
+   864→            setScareOverlayText(terrifyingCaptions[randomIndex]);
+   865→
+   866→            // Activate screen scare overlay and dispatch audio triggers
+   867→            setIsScaredActive(true);
+   868→            triggerHorrorScreamerSound();
+   869→
+   870→            // Safe duration limit to close the prank screen automatically
+   871→            setTimeout(() => {
+   872→              setIsScaredActive(false);
+   873→            }, 5500);
+   874→          }
+   875→
+   876→          // 🐱 2. Handle cute walking cat trigger
+   877→          if (data.catTriggered) {
+   878→            // Immediately clear the database trigger flag
+   879→            await apiFetch('/api/users/clear-cat', { method: 'POST' });
+   880→
+   881→            // Randomize cat and activate the walking overlay with meows
+   882→            selectRandomRealCat();
+   883→            setIsCatActive(true);
+   884→            triggerCuteCatMeowSound();
+   885→
+   886→            // Clean up walking cat state once it has roamed the screen for 25 seconds
+   887→            setTimeout(() => {
+   888→              setIsCatActive(false);
+   889→            }, 25000);
+   890→          }
+   891→        }
+   892→      } catch (err) {
+   893→        // Silent recovery
+   894→        void err;
+   895→      }
+   896→    };
+   897→
+   898→    const interval = setInterval(checkScareStatus, 1000);
+   899→    return () => clearInterval(interval);
+   900→  }, [user?.id]);
+   901→
+   902→  useEffect(() => {
+   903→    if (user) {
+   904→      refreshWorkspaceData();
+   905→    }
+   906→  }, [user?.id]);
+   907→
+   908→  // Live real-time WebSocket connection sync
+   909→  useEffect(() => {
+   910→    if (!user) return;
+   911→
+   912→    let socket: WebSocket | null = null;
+   913→    let reconnectTimeoutVal: any = null;
+   914→    let isDisposed = false;
+   915→
+   916→    const connectWS = () => {
+   917→      if (isDisposed) return;
+   918→
+   919→      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+   920→      const host = window.location.host;
+   921→      const wsUrl = `${protocol}//${host}/ws`;
+   922→
+   923→      console.log("⚡ Live WS: Connecting to origin:", wsUrl);
+   924→      socket = new WebSocket(wsUrl);
+   925→
+   926→      socket.onopen = () => {
+   927→        console.log("🟢 Live WS: Link connected successfully.");
+   928→        if (socket && socket.readyState === WebSocket.OPEN) {
+   929→          socket.send(JSON.stringify({
+   930→            type: 'IDENTIFY',
+   931→            user: {
+   932→              id: user.id,
+   933→              name: user.name,
+   934→              profilePic: user.profilePic || "",
+   935→              role: user.role || "user"
+   936→            }
+   937→          }));
+   938→        }
+   939→      };
+   940→
+   941→      socket.onmessage = (event) => {
+   942→        try {
+   943→          const payload = JSON.parse(event.data);
+   944→          console.log("📩 Live WS: Received payload:", payload);
+   945→
+   946→          if (payload.type === 'WORKSPACE_MUTATED') {
+   947→            refreshWorkspaceData();
+   948→            if (payload.message) {
+   949→              addLiveNotification(payload.message, payload.notificationType || 'info');
+   950→            }
+   951→          } else if (payload.type === 'HIRE_UPDATED' || payload.type === 'HIRE_SUBMITTED') {
+   952→            refreshWorkspaceData();
+   953→            const customEvent = new CustomEvent('hire-updated', { detail: payload });
+   954→            window.dispatchEvent(customEvent);
+   955→          } else if (payload.type === 'CHAT_MESSAGE_MUTATED') {
+   956→            // Instantly notify ClassroomDiscussion to bypass interval latency
+   957→            const customEvent = new CustomEvent('chat-updated', { detail: { subjectId: payload.subjectId } });
+   958→            window.dispatchEvent(customEvent);
+   959→          } else if (payload.type === 'PRESENCE_MUTATED') {
+   960→            // Save active users in window global object to avoid race conditions and dispatch event
+   961→            (window as any).__activeUsers = payload.data || [];
+   962→            const customEvent = new CustomEvent('presence-updated', { detail: { activeUsers: payload.data || [] } });
+   963→            window.dispatchEvent(customEvent);
+   964→          } else if (payload.type === 'SCARE_TRIGGERED' && payload.studentId === user.id) {
+   965→            // Instantly summon scare overlay without waiting for poll
+   966→            const terrifyingCaptions = [
+   967→              "FACULTY BULLETIN: REVIEW YOUR LAB DIRECTORY FOLDERS!",
+   968→              "STUDY FOCUS REMINDER: PROFESSOR AKASH HAS POSTED NEW TASK GUIDELINES!",
+   969→              "ATTENTION: PRE-PRACTICAL HOMEWORK SUBMISSION PERIOD IS NOW ACTIVE!",
+   970→              "ACADEMIC SPOTLIGHT: STAY ENGAGED TO INCREASE STUDY POINTS STRIPES!",
+   971→              "SUBMISSION REQUEST: SUBMIT PENDING TITRATION ASSIGNMENTS!"
+   972→            ];
+   973→            const randomIndex = Math.floor(Math.random() * terrifyingCaptions.length);
+   974→            setScareOverlayText(terrifyingCaptions[randomIndex]);
+   975→            setIsScaredActive(true);
+   976→            triggerHorrorScreamerSound();
+   977→            setTimeout(() => {
+   978→              setIsScaredActive(false);
+   979→            }, 5500);
+   980→            apiFetch('/api/users/clear-scare', { method: 'POST' }).then(() => refreshWorkspaceData());
+   981→          } else if (payload.type === 'CAT_SCARE_TRIGGERED' && payload.studentId === user.id) {
+   982→            // Instantly summon walking cat overlay without waiting for poll
+   983→            selectRandomRealCat();
+   984→            setIsCatActive(true);
+   985→            triggerCuteCatMeowSound();
+   986→            setTimeout(() => {
+   987→              setIsCatActive(false);
+   988→            }, 25000);
+   989→            apiFetch('/api/users/clear-cat', { method: 'POST' }).then(() => refreshWorkspaceData());
+   990→          }
+   991→        } catch (err) {
+   992→          console.error("Live WS error processing incoming stream:", err);
+   993→        }
+   994→      };
+   995→
+   996→      socket.onclose = () => {
+   997→        console.log("🔴 Live WS: Disconnected. Reconnecting...");
+   998→        if (!isDisposed) {
+   999→          reconnectTimeoutVal = setTimeout(connectWS, 4000);
+  1000→        }
+  1001→      };
+  1002→
+  1003→      socket.onerror = () => {
+  1004→        // Handle socket error gracefully and close to trigger reconnection
+  1005→        if (socket && socket.readyState === WebSocket.OPEN) {
+  1006→          try {
+  1007→            socket.close();
+  1008→          } catch (e) {
+  1009→            // Ignore close error
+  1010→            void e;
+  1011→          }
+  1012→        }
+  1013→      };
+  1014→    };
+  1015→
+  1016→    connectWS();
+  1017→
+  1018→    return () => {
+  1019→      isDisposed = true;
+  1020→      if (socket) {
+  1021→        socket.close();
+  1022→      }
+  1023→      if (reconnectTimeoutVal) {
+  1024→        clearTimeout(reconnectTimeoutVal);
+  1025→      }
+  1026→    };
+  1027→  }, [user?.id]);
+  1028→
+  1029→  // Relative view distance helper for 'Recently Viewed' label
+  1030→  const getRecentlyViewedMsg = (folderId: string) => {
+  1031→    const timestamp = recentlyViewed[folderId];
+  1032→    if (!timestamp) return null;
+  1033→    const diff = Date.now() - timestamp;
+  1034→    if (diff < 60000) return 'Just now';
+  1035→    const mins = Math.floor(diff / 60000);
+  1036→    if (mins < 60) return `${mins}m ago`;
+  1037→    const hrs = Math.floor(diff / 3600000);
+  1038→    if (hrs < 24) return `${hrs}h ago`;
+  1039→    const days = Math.floor(hrs / 24);
+  1040→    return `${days}d ago`;
+  1041→  };
+  1042→
+  1043→  // Styling maps assigning specific neon highlights to different academic sectors
+  1044→  const getSubjectMeta = (title: string) => {
+  1045→    const norm = title.toLowerCase();
+  1046→    if (norm.includes('physic')) {
+  1047→      return {
+  1048→        grad: "from-[#6366f1] to-[#4f46e5]",
+  1049→        border: "hover:border-[#6366f1]/50 shadow-[#6366f1]/5",
+  1050→        text: "text-[#818cf8]",
+  1051→        bg: "bg-[#6366f1]/10",
+  1052→        desc: "Waves, mechanics, and thermodynamic formulas."
+  1053→      };
+  1054→    } else if (norm.includes('chemist')) {
+  1055→      return {
+  1056→        grad: "from-[#10b981] to-[#059669]",
+  1057→        border: "hover:border-[#10b981]/50 shadow-[#10b981]/5",
+  1058→        text: "text-[#34d399]",
+  1059→        bg: "bg-[#10b981]/10",
+  1060→        desc: "Titrations, chemical reactions, and physical salt analyses."
+  1061→      };
+  1062→    } else if (norm.includes('biolog')) {
+  1063→      return {
+  1064→        grad: "from-[#84cc16] to-[#65a30d]",
+  1065→        border: "hover:border-[#84cc16]/50 shadow-[#84cc16]/5",
+  1066→        text: "text-[#a3e635]",
+  1067→        bg: "bg-[#84cc16]/10",
+  1068→        desc: "Cell slides, dissection sketches, and taxonomy structures."
+  1069→      };
+  1070→    } else if (norm.includes('math')) {
+  1071→      return {
+  1072→        grad: "from-[#d946ef] to-[#c084fc]",
+  1073→        border: "hover:border-[#d946ef]/50 shadow-[#d946ef]/5",
+  1074→        text: "text-[#f472b6]",
+  1075→        bg: "bg-[#d946ef]/10",
+  1076→        desc: "Vectors, geometry functions, and coordinate calculus plots."
+  1077→      };
+  1078→    } else if (norm.includes('ict')) {
+  1079→      return {
+  1080→        grad: "from-[#06b6d4] to-[#0891b2]",
+  1081→        border: "hover:border-[#06b6d4]/50 shadow-[#06b6d4]/5",
+  1082→        text: "text-[#22d3ee]",
+  1083→        bg: "bg-[#06b6d4]/10",
+  1084→        desc: "HTML tables, truth tables, and server layout diagrams."
+  1085→      };
+  1086→    } else {
+  1087→      return {
+  1088→        grad: "from-slate-600 to-indigo-750",
+  1089→        border: "hover:border-slate-500 shadow-slate-500/5",
+  1090→        text: "text-slate-400",
+  1091→        bg: "bg-slate-500/10",
+  1092→        desc: "Advanced lecture collections and experimental notes."
+  1093→      };
+  1094→    }
+  1095→  };
+  1096→
+  1097→  // State Navigation Helper
+  1098→  const setView = (view: string, subjectId?: string, folderId?: string) => {
+  1099→    setSearchQuery('');
+  1100→    if (view === 'admins' && user?.role !== 'admin') {
+  1101→      return;
+  1102→    }
+  1103→    if (view === 'subject' && subjectId) {
+  1104→      setSelectedSubjectId(subjectId);
+  1105→      setSelectedFolderId(null);
+  1106→    } else if (view === 'folder' && folderId) {
+  1107→      setSelectedFolderId(folderId);
+  1108→      const targetFolder = folders.find(f => f.id === folderId);
+  1109→      if (targetFolder) {
+  1110→        setSelectedSubjectId(targetFolder.subjectId);
+  1111→      } else if (subjectId) {
+  1112→        setSelectedSubjectId(subjectId);
+  1113→      }
+  1114→      // Save timestamp of opened folder in safeLocalStorage & update state
+  1115→      const key = user ? `png_recent_views_${user.id}` : 'png_recent_views_guest';
+  1116→      const now = Date.now();
+  1117→      setRecentlyViewed((prev) => {
+  1118→        const updated = { ...prev, [folderId]: now };
+  1119→        safeLocalStorage.setItem(key, JSON.stringify(updated));
+  1120→        return updated;
+  1121→      });
+  1122→    } else {
+  1123→      setSelectedSubjectId(null);
+  1124→      setSelectedFolderId(null);
+  1125→    }
+  1126→    setCurrentView(view as ViewState);
+  1127→  };
+  1128→
+  1129→  // API Mutators
+  1130→  const handleSaveFolder = async (title: string, description: string, subjectId: string) => {
+  1131→    try {
+  1132→      if (editFolderData) {
+  1133→        // Edit Folder details
+  1134→        const res = await apiFetch(`/api/folders/${editFolderData.id}`, {
+  1135→          method: 'PUT',
+  1136→          headers: { 'Content-Type': 'application/json' },
+  1137→          body: JSON.stringify({ title, description })
+  1138→        });
+  1139→        if (!res.ok) {
+  1140→          const errorData = await res.json().catch(() => ({}));
+  1141→          throw new Error(errorData.error || "Could not apply edits to folder settings.");
+  1142→        }
+  1143→      } else {
+  1144→        // Create new Folder metadata
+  1145→        const res = await apiFetch('/api/folders', {
+  1146→          method: 'POST',
+  1147→          headers: { 'Content-Type': 'application/json' },
+  1148→          body: JSON.stringify({ title, description, subjectId })
+  1149→        });
+  1150→        if (!res.ok) {
+  1151→          const errorData = await res.json().catch(() => ({}));
+  1152→          throw new Error(errorData.error || "Could not initialize folder document.");
+  1153→        }
+  1154→      }
+  1155→      setEditFolderData(null);
+  1156→      await refreshWorkspaceData();
+  1157→    } catch (err: any) {
+  1158→      alert(err.message || "Operation failed.");
+  1159→      throw err;
+  1160→    }
+  1161→  };
+  1162→
+  1163→  const handleDeleteFolder = async (id: string) => {
+  1164→    try {
+  1165→      const res = await apiFetch(`/api/folders/${id}`, {
+  1166→        method: 'DELETE'
+  1167→      });
+  1168→      if (!res.ok) {
+  1169→        const errorData = await res.json().catch(() => ({}));
+  1170→        throw new Error(errorData.error || "Folder document unlinking failed.");
+  1171→      }
+  1172→
+  1173→      setSelectedFolderId(null);
+  1174→      setView('dashboard');
+  1175→      await refreshWorkspaceData();
+  1176→    } catch (err: any) {
+  1177→      alert(err.message || "Delete operations could not be parsed.");
+  1178→      throw err;
+  1179→    }
+  1180→  };
+  1181→
+  1182→  // Admin & Announcements Mutators
+  1183→  const handlePromoteEmail = async (e: React.FormEvent) => {
+  1184→    e.preventDefault();
+  1185→    setAdminPageSuccess(null);
+  1186→    setAdminPageError(null);
+  1187→    if (!promoteEmail.trim()) return;
+  1188→
+  1189→    try {
+  1190→      const res = await apiFetch('/api/users/promote', {
+  1191→        method: 'POST',
+  1192→        headers: { 'Content-Type': 'application/json' },
+  1193→        body: JSON.stringify({ email: promoteEmail })
+  1194→      });
+  1195→
+  1196→      let data: any = {};
+  1197→      const contentType = res.headers.get('content-type');
+  1198→      if (contentType && contentType.includes('application/json')) {
+  1199→        data = await res.json();
+  1200→      } else {
+  1201→        const textResponse = await res.text();
+  1202→        const errorMessage = textResponse.includes('Access forbidden')
+  1203→          ? "Access forbidden. Only the main authorized administrator can promote users."
+  1204→          : `Elevating rights failed with status ${res.status}.`;
+  1205→        throw new Error(errorMessage);
+  1206→      }
+  1207→
+  1208→      if (!res.ok) {
+  1209→        throw new Error(data.error || "Elevation could not be completed.");
+  1210→      }
+  1211→      setAdminPageSuccess(data.message || `Successfully elevated ${promoteEmail} to administrator.`);
+  1212→      setPromoteEmail('');
+  1213→      await refreshWorkspaceData();
+  1214→    } catch (err: any) {
+  1215→      setAdminPageError(err.message || "An unexpected error occurred during user elevation.");
+  1216→    }
+  1217→  };
+  1218→
+  1219→  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+  1220→    e.preventDefault();
+  1221→    setAdminPageSuccess(null);
+  1222→    setAdminPageError(null);
+  1223→    if (!announceTitle.trim() || !announceContent.trim()) {
+  1224→      setAdminPageError("Title and description content are required to issue an alert.");
+  1225→      return;
+  1226→    }
+  1227→
+  1228→    try {
+  1229→      const res = await apiFetch('/api/announcements', {
+  1230→        method: 'POST',
+  1231→        headers: { 'Content-Type': 'application/json' },
+  1232→        body: JSON.stringify({
+  1233→          title: announceTitle,
+  1234→          content: announceContent,
+  1235→          deadline: announceDeadline
+  1236→        })
+  1237→      });
+  1238→
+  1239→      let data: any = {};
+  1240→      const contentType = res.headers.get('content-type');
+  1241→      if (contentType && contentType.includes('application/json')) {
+  1242→        data = await res.json();
+  1243→      } else {
+  1244→        const text = await res.text();
+  1245→        throw new Error(text || "Could not publish internal notification alert.");
+  1246→      }
+  1247→
+  1248→      if (!res.ok) {
+  1249→        throw new Error(data.error || "Announcement registration could not be completed.");
+  1250→      }
+  1251→      setAdminPageSuccess("Successfully published practical submission deadline alert.");
+  1252→      setAnnounceTitle('');
+  1253→      setAnnounceContent('');
+  1254→      setAnnounceDeadline('');
+  1255→      await refreshWorkspaceData();
+  1256→    } catch (err: any) {
+  1257→      setAdminPageError(err.message || "Could not publish internal notification alert.");
+  1258→    }
+  1259→  };
+  1260→
+  1261→  const handleDeleteAnnouncement = (id: string) => {
+  1262→    setConfirmDeleteAnnouncementId(id);
+  1263→  };
+  1264→
+  1265→  const handleConfirmDeleteAnnouncement = async (id: string) => {
+  1266→    setAdminPageSuccess(null);
+  1267→    setAdminPageError(null);
+  1268→    try {
+  1269→      const res = await apiFetch(`/api/announcements/${id}`, {
+  1270→        method: 'DELETE'
+  1271→      });
+  1272→
+  1273→      let data: any = {};
+  1274→      const contentType = res.headers.get('content-type');
+  1275→      if (contentType && contentType.includes('application/json')) {
+  1276→        data = await res.json();
+  1277→      } else {
+  1278→        const text = await res.text();
+  1279→        throw new Error(text || "Retraction could not be completed.");
+  1280→      }
+  1281→
+  1282→      if (!res.ok) {
+  1283→        throw new Error(data.error || "Retraction could not be completed.");
+  1284→      }
+  1285→      setAdminPageSuccess("Announcement successfully retracted and removed.");
+  1286→      await refreshWorkspaceData();
+  1287→    } catch (err: any) {
+  1288→      setAdminPageError(err.message || "Retraction failed.");
+  1289→    }
+  1290→  };
+  1291→
+  1292→  const handleAppendImage = async (url: string, titleStr: string) => {
+  1293→    if (!selectedFolderId) return;
+  1294→    try {
+  1295→      const res = await apiFetch('/api/images', {
+  1296→        method: 'POST',
+  1297→        headers: { 'Content-Type': 'application/json' },
+  1298→        body: JSON.stringify({
+  1299→          folderId: selectedFolderId,
+  1300→          imageUrl: url,
+  1301→          title: titleStr
+  1302→        })
+  1303→      });
+  1304→      if (!res.ok) throw new Error("Uploading script page rejected.");
+  1305→      await refreshWorkspaceData();
+  1306→    } catch (err: any) {
+  1307→      alert(err.message || "Failed to finalize image injection.");
+  1308→    }
+  1309→  };
+  1310→
+  1311→  const handleDeleteImage = (imgIndex: number) => {
+  1312→    setConfirmDeleteImageIndex(imgIndex);
+  1313→  };
+  1314→
+  1315→  const handleConfirmDeleteImage = async (imgIndex: number) => {
+  1316→    if (!selectedFolderId) return;
+  1317→    try {
+  1318→      const res = await apiFetch(`/api/images/${selectedFolderId}/${imgIndex}`, {
+  1319→        method: 'DELETE'
+  1320→      });
+  1321→      if (!res.ok) {
+  1322→        const errorData = await res.json().catch(() => ({}));
+  1323→        throw new Error(errorData.error || "Deletion rejected by api.");
+  1324→      }
+  1325→      await refreshWorkspaceData();
+  1326→    } catch (err: any) {
+  1327→      alert(err.message || "Could not prune requested image.");
+  1328→    }
+  1329→  };
+  1330→
+  1331→  // Find active subject & active folder for display
+  1332→  const activeSubject = subjects.find(s => s.id === selectedSubjectId);
+  1333→  const activeFolder = folders.find(f => f.id === selectedFolderId);
+  1334→
+  1335→  // Filtered lists for the active viewing context
+  1336→  const filteredFolders = folders.filter(f => f.subjectId === selectedSubjectId);
+  1337→
+  1338→  // Search query filters for folders
+  1339→  const searchedDashboardFolders = folders.filter(f =>
+  1340→    f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  1341→    f.description.toLowerCase().includes(searchQuery.toLowerCase())
+  1342→  );
+  1343→
+  1344→  const searchedSubjectFolders = filteredFolders.filter(f =>
+  1345→    f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  1346→    f.description.toLowerCase().includes(searchQuery.toLowerCase())
+  1347→  );
+  1348→
+  1349→  // Preserve access to internal state mutators referenced by Sidebar / Admin CMS
+  1350→  void setUser;
+  1351→  void studentsList;
+  1352→  void confirmDemoteId;
+  1353→  void setConfirmDemoteId;
+  1354→  void promoteEmail;
+  1355→  void setPromoteEmail;
+  1356→  void announceTitle;
+  1357→  void setAnnounceTitle;
+  1358→  void announceContent;
+  1359→  void setAnnounceContent;
+  1360→  void announceDeadline;
+  1361→  void setAnnounceDeadline;
+  1362→  void adminPageSuccess;
+  1363→  void setAdminPageSuccess;
+  1364→  void adminPageError;
+  1365→  void setAdminPageError;
+  1366→  void handlePromoteEmail;
+  1367→  void handleCreateAnnouncement;
+  1368→  void bdTime;
+  1369→  void isPersistentCat;
+  1370→  void setIsPersistentCat;
+  1371→  void catSpeedSetting;
+  1372→  void setCatSpeedSetting;
+  1373→  void isCatControlOpen;
+  1374→  void setIsCatControlOpen;
+  1375→  void customCatText;
+  1376→  void setCustomCatText;
+  1377→  void activeCatGif;
+  1378→  void setActiveCatGif;
+  1379→  void activeCatMessage;
+  1380→  void setActiveCatMessage;
+  1381→  void activeCatColor;
+  1382→  void setActiveCatColor;
+  1383→  void catPos;
+  1384→  void setCatPos;
+  1385→  void catTarget;
+  1386→  void setCatTarget;
+  1387→  void catFacingLeft;
+  1388→  void setCatFacingLeft;
+  1389→  void catBehavior;
+  1390→  void setCatBehavior;
+  1391→  void catClickCount;
+  1392→  void setCatClickCount;
+  1393→  void selectCatBreedByName;
+  1394→  void isScaredActive;
+  1395→  void setIsScaredActive;
+  1396→  void scareOverlayText;
+  1397→  void setScareOverlayText;
+  1398→  void triggerHorrorScreamerSound;
+  1399→  void triggerCuteCatMeowSound;
+  1400→  void selectRandomRealCat;
+  1401→
+  1402→  return (
+  1403→    <div className={`min-h-screen flex flex-col text-slate-100 relative transition-all duration-300 ${
+  1404→      activeTheme === 'peaceful-purple' ? 'theme-peaceful-purple' :
+  1405→      activeTheme === 'deep-blue' ? 'theme-deep-blue' :
+  1406→      activeTheme === 'cosmic-black' ? 'theme-cosmic-black' :
+  1407→      activeTheme === 'mesh-aurora' ? 'theme-mesh-aurora' :
+  1408→      activeTheme === 'emerald-green' ? 'theme-emerald-green' :
+  1409→      'glass-main-bg'
+  1410→    }`}>
+  1411→
+  1412→      {/* 🔔 LIVE REAL-TIME RADIAL TOAST SYSTEM */}
+  1413→      <div className="fixed top-6 right-6 z-[1000] flex flex-col gap-3 w-80 max-w-[90vw] pointer-events-none">
+  1414→        <AnimatePresence>
+  1415→          {liveNotifications.map((notif) => (
+  1416→            <motion.div
+  1417→              key={notif.id}
+  1418→              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+  1419→              animate={{ opacity: 1, x: 0, scale: 1 }}
+  1420→              exit={{ opacity: 0, x: 20, scale: 0.95 }}
+  1421→              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+  1422→              className={`pointer-events-auto p-4 rounded-xl border border-slate-700/60 shadow-2xl flex items-start gap-3 backdrop-blur-md relative overflow-hidden group ${
+  1423→                notif.type === 'success' ? 'bg-emerald-950/90 text-emerald-100 border-l-4 border-l-emerald-500' :
+  1424→                notif.type === 'warning' ? 'bg-amber-950/90 text-amber-100 border-l-4 border-l-amber-500' :
+  1425→                'bg-slate-900/95 text-slate-100 border-l-4 border-l-sky-500'
+  1426→              }`}
+  1427→            >
+  1428→              <Bell className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+  1429→                notif.type === 'success' ? 'text-emerald-400' :
+  1430→                notif.type === 'warning' ? 'text-amber-400' :
+  1431→                'text-sky-400 animate-pulse'
+  1432→              }`} />
+  1433→
+  1434→              <div className="flex-1 text-sm font-medium tracking-wide break-words">
+  1435→                {notif.message}
+  1436→              </div>
+  1437→
+  1438→              <button
+  1439→                onClick={() => setLiveNotifications((prev) => prev.filter(n => n.id !== notif.id))}
+  1440→                className="text-slate-400 hover:text-white transition-colors duration-150 p-0.5 rounded-md hover:bg-white/10 min-h-[44px] min-w-[44px] flex items-center justify-center"
+  1441→                aria-label="Dismiss notification"
+  1442→              >
+  1443→                <X className="w-4 h-4" />
+  1444→              </button>
+  1445→            </motion.div>
+  1446→          ))}
+  1447→        </AnimatePresence>
+  1448→      </div>
+  1449→
+  1450→      {/* ✦ ELEGANT FULLSCREEN INSTRUCTOR BROADCAST SPOTLIGHT OVERLAY */}
+  1451→      {isScaredActive && (
+  1452→        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden select-none bg-slate-950/90 backdrop-blur-xl p-4">
+  1453→
+  1454→          {/* Subtle gradient light flare in the background */}
+  1455→          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none animate-pulse" />
+  1456→          <div className="absolute bottom-12 left-12 h-48 w-48 rounded-full bg-amber-500/5 blur-2xl pointer-events-none" />
+  1457→
+  1458→          <div className="text-center space-y-8 max-w-4xl px-4 sm:px-8 p-6 relative z-10">
+  1459→
+  1460→            {/* Elegant luxury academic symbol/badge */}
+  1461→            <div className="flex justify-center">
+  1462→              <div className="relative flex items-center justify-center w-28 h-28 bg-stone-900 border border-amber-500/20 rounded-full shadow-2xl">
+  1463→                <div className="absolute inset-1 border border-dashed border-amber-500/10 rounded-full animate-spin [animation-duration:24s]" />
+  1464→                <span className="text-3xl text-amber-500/80">✦</span>
+  1465→              </div>
+  1466→            </div>
+  1467→
+  1468→            {/* Trembling captions and warnings */}
+  1469→            <div className="space-y-4">
+  1470→              <h1 className="text-xl sm:text-2xl md:text-4xl font-extrabold text-stone-100 tracking-tight text-center leading-relaxed max-w-screen-md">
+  1471→                {scareOverlayText}
+  1472→              </h1>
+  1473→              <div className="flex flex-col items-center gap-2 pt-2">
+  1474→                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] text-indigo-300 font-mono tracking-widest font-bold uppercase animate-pulse">
+  1475→                  INSTRUCTOR SPOTLIGHT ALERT ACTIVE
+  1476→                </span>
+  1477→                <span className="text-xs text-stone-400 font-medium tracking-wide">
+  1478→                  Classroom updates synchronized successfully. Resuming course interface in a few moments...
+  1479→                </span>
+  1480→              </div>
+  1481→            </div>
+  1482→
+  1483→          </div>
+  1484→
+  1485→          {/* Corner metadata tags removed for professional, clean presentation */}
+  1486→        </div>
+  1487→      )}
+  1488→
+  1489→      {/* 🐱 WORLD-CLASS INTERACTIVE WALKING CAT OVERLAY */}
+  1490→      {false && (isCatActive || isPersistentCat) && (
+  1491→        <div className="fixed inset-0 z-[9998] pointer-events-none overflow-hidden">
+  1492→          {/* Animated Cat Root Box */}
+  1493→          <div
+  1494→            style={{
+  1495→              left: 0,
+  1496→              top: 0,
+  1497→              transform: `translate(${catPos.x}px, ${catPos.y}px)`,
+  1498→              transition: 'transform 0.05s linear',
+  1499→            }}
+  1500→            className="absolute w-44 md:w-56 h-36 md:h-44 flex flex-col items-center justify-end select-none pointer-events-none"
+  1501→          >
+  1502→            {/* Cute Speech Bubble above the cat */}
+  1503→            <div className={`mb-2 bg-gradient-to-r ${activeCatColor} px-4 py-2 text-[10px] md:text-xs rounded-3xl flex items-center gap-2 whitespace-nowrap cat-bubble-anim select-none relative pointer-events-auto shadow-md`}>
+  1504→              <span className="text-sm">🐾</span>
+  1505→
+  1506→              <span>{activeCatMessage}</span>
+  1507→              <div className="absolute bottom-[-6px] left-1/4 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-orange-500 fill-orange-500" />
+  1508→            </div>
+  1509→
+  1510→            {/* Real Walking Cat Animated Transparent GIF */}
+  1511→            <div
+  1512→              onClick={() => {
+  1513→                setCatClickCount(c => c + 1);
+  1514→                triggerCuteCatMeowSound();
+  1515→                setCatBehavior('jumping');
+  1516→
+  1517→                const jumpPhrases = [
+  1518→                  "Boing! Higher than a stack trace! 🚀",
+  1519→                  "Wheee! Pouncing on study bugs! 🕷️",
+  1520→                  "Please don't pull my tail! Meow! 😿",
+  1521→                  "Purr... that tickles so much! ✨",
+  1522→                  "Let's jump over the physics equations! 📈",
+  1523→                  "Catching the mouse cursor! Almost got it! 🐭",
+  1524→                  "Akash-sensei says: Awesome focus! 🌟"
+  1525→                ];
+  1526→                setActiveCatMessage(jumpPhrases[Math.floor(Math.random() * jumpPhrases.length)]);
+  1527→
+  1528→                const sw = typeof window !== 'undefined' ? window.innerWidth : 1024;
+  1529→                const sh = typeof window !== 'undefined' ? window.innerHeight : 768;
+  1530→                setCatTarget({
+  1531→                  x: Math.random() * (sw - 260) + 40,
+  1532→                  y: sh * 0.45 + Math.random() * (sh * 0.35)
+  1533→                });
+  1534→
+  1535→                setTimeout(() => {
+  1536→                  setCatBehavior('walking');
+  1537→                }, 1500);
+  1538→              }}
+  1539→              className="relative w-32 h-32 md:w-36 md:h-36 flex items-center justify-center cursor-pointer pointer-events-auto"
+  1540→            >
+  1541→              <img
+  1542→                src={activeCatGif}
+  1543→                alt="Real Walking Cat"
+  1544→                id="real-walking-cat-img"
+  1545→                referrerPolicy="no-referrer"
+  1546→                className={`w-full h-full object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.35)] select-none transition-transform duration-200 active:scale-95 ${catFacingLeft ? 'scale-x-[-1]' : 'scale-x-[1]'} ${catBehavior === 'jumping' ? 'animate-bounce' : ''}`}
+  1547→              />
+  1548→            </div>
+  1549→          </div>
+  1550→        </div>
+  1551→      )}
+  1552→
+  1553→      {/* 🐾 PET STUDY COMPANION CONTROLLER OVERLAY */}
+  1554→      {false && (user?.role === 'admin' || user?.role === 'super_admin') && (
+  1555→        <div className="fixed bottom-6 right-6 z-[9000] flex flex-col items-end gap-3 font-sans select-none pointer-events-auto">
+  1556→          {isCatControlOpen && (
+  1557→            <div className="w-80 max-w-[90vw] bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-[0_12px_40px_rgba(0,0,0,0.6)] flex flex-col gap-3.5 text-slate-200 animate-in slide-in-from-bottom duration-300">
+  1558→              {/* Header */}
+  1559→              <div className="flex items-center justify-between pb-2 border-b border-white/5">
+  1560→                <div className="flex items-center gap-2">
+  1561→                  <Cat className="w-5 h-5 text-indigo-400 animate-pulse" />
+  1562→                  <span className="font-bold text-sm tracking-wide bg-gradient-to-r from-indigo-300 to-pink-300 bg-clip-text text-transparent">Feline Study Companion</span>
+  1563→                </div>
+  1564→                <button
+  1565→                  onClick={() => setIsCatControlOpen(false)}
+  1566→                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+  1567→                  aria-label="Close companion controller"
+  1568→                >
+  1569→                  <X className="w-4 h-4" />
+  1570→                </button>
+  1571→              </div>
+  1572→
+  1573→              {/* Enable Companion Toggle */}
+  1574→              <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5">
+  1575→                <div className="flex flex-col gap-0.5">
+  1576→                  <span className="text-xs font-semibold text-slate-200">Desk Companion Mode</span>
+  1577→                  <span className="text-[10px] text-slate-400">Let cute kitty roam your desk!</span>
+  1578→                </div>
+  1579→                <button
+  1580→                  onClick={() => {
+  1581→                    const newState = !isPersistentCat;
+  1582→                    setIsPersistentCat(newState);
+  1583→                    if (newState) {
+  1584→                      triggerCuteCatMeowSound();
+  1585→                    }
+  1586→                  }}
+  1587→                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+  1588→                    isPersistentCat ? 'bg-indigo-600' : 'bg-slate-700'
+  1589→                  }`}
+  1590→                >
+  1591→                  <span
+  1592→                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+  1593→                      isPersistentCat ? 'translate-x-5' : 'translate-x-0'
+  1594→                    }`}
+  1595→                  />
+  1596→                </button>
+  1597→              </div>
+  1598→
+  1599→              {/* Select Cat Breed */}
+  1600→              <div className="flex flex-col gap-1.5">
+  1601→                <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase">Select Companion Breed</span>
+  1602→                <div className="grid grid-cols-2 gap-2">
+  1603→                  <button
+  1604→                    type="button"
+  1605→                    onClick={() => selectCatBreedByName('ginger')}
+  1606→                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all hover:bg-white/5 ${
+  1607→                      activeCatGif === 'https://media.giphy.com/media/33OrvIs9mYG9G/giphy.gif'
+  1608→                        ? 'border-orange-500 bg-orange-500/10'
+  1609→                        : 'border-white/5 bg-white/5'
+  1610→                    }`}
+  1611→                  >
+  1612→                    <img src="https://media.giphy.com/media/33OrvIs9mYG9G/giphy.gif" referrerPolicy="no-referrer" className="w-11 h-11 object-contain rounded-lg" alt="Ginger" />
+  1613→                    <span className="text-[10px] font-bold text-orange-400">Orange Ginger</span>
+  1614→                  </button>
+  1615→                  <button
+  1616→                    type="button"
+  1617→                    onClick={() => selectCatBreedByName('casper')}
+  1618→                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all hover:bg-white/5 ${
+  1619→                      activeCatGif === 'https://media.giphy.com/media/Z1fO3V8e7K44o/giphy.gif'
+  1620→                        ? 'border-sky-500 bg-sky-500/10'
+  1621→                        : 'border-white/5 bg-white/5'
+  1622→                    }`}
+  1623→                  >
+  1624→                    <img src="https://media.giphy.com/media/Z1fO3V8e7K44o/giphy.gif" referrerPolicy="no-referrer" className="w-11 h-11 object-contain rounded-lg" alt="Casper" />
+  1625→                    <span className="text-[10px] font-bold text-sky-400">Fluffy Casper</span>
+  1626→                  </button>
+  1627→                  <button
+  1628→                    type="button"
+  1629→                    onClick={() => selectCatBreedByName('shadow')}
+  1630→                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all hover:bg-white/5 ${
+  1631→                      activeCatGif === 'https://i.gifer.com/PYh.gif'
+  1632→                        ? 'border-slate-400 bg-slate-400/10'
+  1633→                        : 'border-white/5 bg-white/5'
+  1634→                    }`}
+  1635→                  >
+  1636→                    <img src="https://i.gifer.com/PYh.gif" referrerPolicy="no-referrer" className="w-11 h-11 object-contain rounded-lg" alt="Shadow" />
+  1637→                    <span className="text-[10px] font-bold text-slate-300">Midnight Shadow</span>
+  1638→                  </button>
+  1639→                  <button
+  1640→                    type="button"
+  1641→                    onClick={() => selectCatBreedByName('smokey')}
+  1642→                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all hover:bg-white/5 ${
+  1643→                      activeCatGif === 'https://media.giphy.com/media/13CoqRl85vlaTe/giphy.gif'
+  1644→                        ? 'border-purple-500 bg-purple-500/10'
+  1645→                        : 'border-white/5 bg-white/5'
+  1646→                    }`}
+  1647→                  >
+  1648→                    <img src="https://media.giphy.com/media/13CoqRl85vlaTe/giphy.gif" referrerPolicy="no-referrer" className="w-11 h-11 object-contain rounded-lg" alt="Smokey" />
+  1649→                    <span className="text-[10px] font-bold text-purple-400">Smokey Grey</span>
+  1650→                  </button>
+  1651→                </div>
+  1652→              </div>
+  1653→
+  1654→              {/* Speed Controller */}
+  1655→              <div className="flex flex-col gap-1.5">
+  1656→                <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase">Feline Speed</span>
+  1657→                <div className="flex bg-white/5 p-1 rounded-xl gap-1 border border-white/5">
+  1658→                  {(['relaxed', 'normal', 'zoomies'] as const).map(speed => (
+  1659→                    <button
+  1660→                      key={speed}
+  1661→                      type="button"
+  1662→                      onClick={() => setCatSpeedSetting(speed)}
+  1663→                      className={`flex-1 text-[10px] font-bold py-1.5 rounded-lg transition-all capitalize min-h-[36px] ${
+  1664→                        catSpeedSetting === speed
+  1665→                          ? 'bg-indigo-600 text-white shadow-md'
+  1666→                          : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+  1667→                      }`}
+  1668→                    >
+  1669→                      {speed === 'zoomies' ? '⚡ Zoomies!' : speed}
+  1670→                    </button>
+  1671→                  ))}
+  1672→                </div>
+  1673→              </div>
+  1674→
+  1675→              {/* Custom speech string */}
+  1676→              <div className="flex flex-col gap-1.5">
+  1677→                <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase">Let Cat Say Something</span>
+  1678→                <div className="flex flex-col sm:flex-row gap-1.5">
+  1679→                  <input
+  1680→                    type="text"
+  1681→                    value={customCatText}
+  1682→                    onChange={e => setCustomCatText(e.target.value)}
+  1683→                    placeholder="Tell me what to say..."
+  1684→                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500/50 min-h-[44px]"
+  1685→                    onKeyDown={e => {
+  1686→                      if (e.key === 'Enter' && customCatText.trim()) {
+  1687→                        setActiveCatMessage(customCatText);
+  1688→                        setCustomCatText('');
+  1689→                      }
+  1690→                    }}
+  1691→                  />
+  1692→                  <button
+  1693→                    type="button"
+  1694→                    onClick={() => {
+  1695→                      if (customCatText.trim()) {
+  1696→                        setActiveCatMessage(customCatText);
+  1697→                        setCustomCatText('');
+  1698→                      }
+  1699→                    }}
+  1700→                    className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-pink-600 hover:opacity-90 text-white text-xs font-bold rounded-xl transition-all min-h-[44px]"
+  1701→                  >
+  1702→                    Say
+  1703→                  </button>
+  1704→                </div>
+  1705→              </div>
+  1706→
+  1707→              {/* Direct Sound FX Switch and Pet tip */}
+  1708→              <div className="flex justify-between items-center text-[9px] text-slate-500 italic">
+  1709→                <span>💡 Tip: Click cat to make them bounce!</span>
+  1710→                <button
+  1711→                  type="button"
+  1712→                  onClick={() => triggerCuteCatMeowSound()}
+  1713→                  className="flex items-center gap-1 hover:text-violet-400 text-slate-400 text-[10px] font-bold bg-white/5 px-2 py-0.5 rounded-lg min-h-[36px]"
+  1714→                >
+  1715→                  <Volume2 className="w-3.5 h-3.5" /> Speak
+  1716→                </button>
+  1717→              </div>
+  1718→            </div>
+  1719→          )}
+  1720→
+  1721→          {/* Outer Circular Trigger Button */}
+  1722→          {!isCatControlOpen && (
+  1723→            <button
+  1724→              type="button"
+  1725→              onClick={() => {
+  1726→                setIsCatControlOpen(true);
+  1727→                triggerCuteCatMeowSound();
+  1728→              }}
+  1729→              className="group relative flex items-center gap-2 bg-gradient-to-r from-indigo-500/90 to-pink-500/90 hover:from-indigo-400 hover:to-pink-400 text-white px-4 py-2.5 rounded-full shadow-[0_6px_25px_rgba(139,92,246,0.45)] hover:shadow-[0_8px_30px_rgba(139,92,246,0.6)] border border-white/20 transition-all hover:scale-105 active:scale-95 duration-250 cursor-pointer min-h-[44px]"
+  1730→              title="Configure Study Companion Cat Companion"
+  1731→            >
+  1732→              {isPersistentCat && (
+  1733→                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+  1734→                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+  1735→                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-pink-500"></span>
+  1736→                </span>
+  1737→              )}
+  1738→              <Cat className="w-5 h-5 text-white animate-pulse" />
+  1739→              <span className="font-black text-xs tracking-wider uppercase">
+  1740→                {isPersistentCat ? '🐱 Companion Active' : '🐾 Summon Pet Companion'}
+  1741→              </span>
+  1742→            </button>
+  1743→          )}
+  1744→        </div>
+  1745→      )}
+  1746→
+  1747→      {/* Mobile-first sticky header — hamburger triggers the Sidebar drawer (Sheet pattern handled inside Sidebar.tsx). Visible on mobile. */}
+  1748→      <header className="lg:hidden sticky top-0 z-30 glass-header px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2 min-h-[4rem]">
+  1749→        <button
+  1750→          onClick={() => setIsMobileSidebarOpen(prev => !prev)}
+  1751→          className="p-2 bg-white/5 border border-white/10 text-slate-300 hover:text-white rounded-lg shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+  1752→          aria-label="Toggle navigation menu"
+  1753→        >
+  1754→          <Menu className="w-4 h-4" />
+  1755→        </button>
+  1756→        <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+  1757→          <img
+  1758→            src="/pracpedia_logo.jpg"
+  1759→            alt="PracPedia"
+  1760→            referrerPolicy="no-referrer"
+  1761→            className="w-5 h-5 rounded-md object-cover border border-cyan-500/30 shrink-0"
+  1762→          />
+  1763→          <span className="font-extrabold text-slate-100 text-xs sm:text-sm truncate">PracPedia</span>
+  1764→          {currentView !== 'dashboard' && currentView !== 'subject' && currentView !== 'folder' && (
+  1765→            <span className="text-slate-400 text-[10px] sm:text-xs capitalize truncate">
+  1766→              · {currentView === 'artists' ? 'Marketplace' :
+  1767→                 currentView === 'artist_dashboard' ? 'Artist Dashboard' :
+  1768→                 currentView === 'creds' ? 'System Credentials' :
+  1769→                 currentView === 'academy' ? 'AI Academy' :
+  1770→                 currentView === 'profile' ? 'Profile' :
+  1771→                 currentView === 'chat' ? 'Discussion Chat' :
+  1772→                 currentView === 'admins' ? (user?.role === 'super_admin' ? 'Super Admin CMS' : 'Admin Portal') : currentView}
+  1773→            </span>
+  1774→          )}
+  1775→        </div>
+  1776→        <div className="flex items-center gap-1.5 shrink-0">
+  1777→          <div className="flex items-center gap-1 bg-slate-950/80 border border-white/[0.04] rounded-xl p-1 shrink-0 max-w-[140px]">
+  1778→            <select
+  1779→              value={activeTheme}
+  1780→              onChange={(e) => setActiveTheme(e.target.value)}
+  1781→              className="bg-slate-900 border-none text-[10px] font-mono font-bold text-slate-300 rounded-lg py-1 px-1.5 focus:ring-1 focus:ring-indigo-500/50 cursor-pointer uppercase select-none outline-none max-w-[120px]"
+  1782→            >
+  1783→              <option value="default">🌌 Navy</option>
+  1784→              <option value="peaceful-purple">🔮 Purple</option>
+  1785→              <option value="deep-blue">🌊 Blue</option>
+  1786→              <option value="cosmic-black">🖤 Black</option>
+  1787→              <option value="mesh-aurora">🌈 Aurora</option>
+  1788→              <option value="emerald-green">🌲 Emerald</option>
+  1789→            </select>
+  1790→          </div>
+  1791→        </div>
+  1792→      </header>
+  1793→
+  1794→      {/* Interactive sidebar element — Sidebar handles its own mobile drawer (Sheet pattern). */}
+  1795→      <Sidebar
+  1796→        currentView={currentView}
+  1797→        setView={setView}
+  1798→        stats={stats}
+  1799→        onOpenFolderCreate={() => {
+  1800→          setEditFolderData(null);
+  1801→          setIsFolderModalOpen(true);
+  1802→        }}
+  1803→        isMobileOpen={isMobileSidebarOpen}
+  1804→        setMobileOpen={setIsMobileSidebarOpen}
+  1805→        sessionSeconds={sessionSeconds}
+  1806→        subjects={subjects}
+  1807→        selectedSubjectId={selectedSubjectId}
+  1808→        selectedFolderId={selectedFolderId}
+  1809→        folders={folders}
+  1810→        studyLogs={studyLogs}
+  1811→      />
+  1812→
+  1813→      {/* Main dashboard view container */}
+  1814→      <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden">
+  1815→
+  1816→        {/* Desktop Navigation Admin Header */}
+  1817→        <header className="hidden lg:flex sticky top-0 glass-header py-3 px-3 sm:px-6 md:px-8 justify-between items-center z-30 min-h-[4rem] gap-2">
+  1818→          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
+  1819→            {/* Breadcrumb Navigation Trail */}
+  1820→            <div className="flex items-center gap-1 sm:gap-2 text-xs text-slate-400 font-sans tracking-wide min-w-0 flex-1 truncate">
+  1821→              <button
+  1822→                onClick={() => setView('dashboard')}
+  1823→                className="hover:text-white font-semibold transition-colors truncate max-w-[120px] sm:max-w-none hover:scale-102 duration-150 inline-flex items-center gap-1.5 shrink-0"
+  1824→              >
+  1825→                <img
+  1826→                  src="/pracpedia_logo.jpg"
+  1827→                  alt="PracPedia"
+  1828→                  referrerPolicy="no-referrer"
+  1829→                  className="w-4 h-4 rounded-md object-cover border border-cyan-500/30"
+  1830→                />
+  1831→                <span className="font-extrabold text-slate-100">PracPedia</span>
+  1832→              </button>
+  1833→
+  1834→              {currentView === 'dashboard' && (
+  1835→                <>
+  1836→                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+  1837→                  <span className="text-slate-200 font-bold truncate">Dashboard</span>
+  1838→                </>
+  1839→              )}
+  1840→
+  1841→              {(currentView === 'subject' || currentView === 'folder') && selectedSubjectId && activeSubject && (
+  1842→                <>
+  1843→                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+  1844→                  <button
+  1845→                    onClick={() => setView('subject', selectedSubjectId)}
+  1846→                    className="hover:text-white font-semibold transition-colors text-indigo-400 truncate max-w-[100px] sm:max-w-none hover:scale-102 duration-150 inline-flex items-center"
+  1847→                  >
+  1848→                    {activeSubject.title}
+  1849→                  </button>
+  1850→                </>
+  1851→              )}
+  1852→
+  1853→              {currentView === 'folder' && selectedFolderId && activeFolder && (
+  1854→                <>
+  1855→                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+  1856→                  <span className="text-slate-200 font-bold truncate max-w-[120px] sm:max-w-xs inline-flex items-center">
+  1857→                    {activeFolder.title}
+  1858→                  </span>
+  1859→                </>
+  1860→              )}
+  1861→
+  1862→              {currentView !== 'dashboard' && currentView !== 'subject' && currentView !== 'folder' && (
+  1863→                <>
+  1864→                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+  1865→                  <span className="text-slate-200 font-bold capitalize truncate">
+  1866→                    {currentView === 'artists' ? 'Marketplace' :
+  1867→                     currentView === 'artist_dashboard' ? 'Artist Dashboard' :
+  1868→                     currentView === 'creds' ? 'System Credentials' :
+  1869→                     currentView === 'academy' ? 'AI Academy' :
+  1870→                     currentView === 'profile' ? 'Profile' :
+  1871→                     currentView === 'chat' ? 'Discussion Chat' :
+  1872→                     currentView === 'admins' ? (user?.role === 'super_admin' ? 'Super Admin CMS' : 'Admin Portal') : currentView}
+  1873→                  </span>
+  1874→                </>
+  1875→              )}
+  1876→            </div>
+  1877→          </div>
+  1878→
+  1879→          {/* Right Balanced Console Stats & Status */}
+  1880→          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+  1881→            {/* Theme Selection Panel */}
+  1882→            <div className="flex items-center gap-1 bg-slate-950/80 border border-white/[0.04] rounded-xl p-1 shrink-0 max-w-[130px] sm:max-w-none">
+  1883→              <span className="text-[9px] font-mono font-bold text-slate-500 uppercase px-1 hidden sm:inline">Theme:</span>
+  1884→              <select
+  1885→                value={activeTheme}
+  1886→                onChange={(e) => setActiveTheme(e.target.value)}
+  1887→                className="bg-slate-900 border-none text-[10px] font-mono font-bold text-slate-300 rounded-lg py-1 px-1.5 focus:ring-1 focus:ring-indigo-500/50 cursor-pointer uppercase select-none outline-none max-w-[110px] sm:max-w-none text-ellipsis overflow-hidden"
+  1888→              >
+  1889→                <option value="default">🌌 Navy</option>
+  1890→                <option value="peaceful-purple">🔮 Purple</option>
+  1891→                <option value="deep-blue">🌊 Blue</option>
+  1892→                <option value="cosmic-black">🖤 Black</option>
+  1893→                <option value="mesh-aurora">🌈 Aurora</option>
+  1894→                <option value="emerald-green">🌲 Emerald</option>
+  1895→              </select>
+  1896→            </div>
+  1897→
+  1898→            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-slate-950/60 border border-white/[0.04] rounded-xl text-slate-400 text-[10px] font-mono uppercase tracking-wider">
+  1899→              <span className="w-1.5 h-1.5 rounded-full bg-[#22d3ee] animate-pulse" />
+  1900→              <span>LIVE WORKSPACE DOCK</span>
+  1901→            </div>
+  1902→          </div>
+  1903→        </header>
+  1904→
+  1905→        {/* Dashboard Pages wrapper */}
+  1906→        <main className="flex-1 p-3 sm:p-6 md:p-8 space-y-6 max-w-7xl w-full mx-auto min-w-0 overflow-x-hidden">
+  1907→
+  1908→          {isLoading && (
+  1909→            <DataLoader />
+  1910→          )}
+  1911→
+  1912→          {!isLoading && (
+  1913→            <>
+  1914→              {/* ==============================================
+  1915→                  📊 VIEW: MAIN DASHBOARD GALLERY VIEW
+  1916→                  ============================================== */}
+  1917→              {currentView === 'dashboard' && (
+  1918→                <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
+  1919→
+  1920→                  {/* Dynamic Announcement Alerts */}
+  1921→                  {announcements.length > 0 && (
+  1922→                    <div className="space-y-3 animate-in slide-in-from-top-3 duration-300">
+  1923→                      <div className="flex items-center justify-between gap-2 flex-wrap">
+  1924→                        <h3 className="text-xs font-mono uppercase tracking-widest text-[#fbbf24] font-bold flex items-center gap-1.5">
+  1925→                          <span className="relative flex h-2 w-2">
+  1926→                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+  1927→                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+  1928→                          </span>
+  1929→                          Active Deadlines & Announcements
+  1930→                        </h3>
+  1931→                      </div>
+  1932→
+  1933→                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  1934→                        {announcements.slice(0, 2).map((ann) => (
+  1935→                          <div
+  1936→                            key={ann.id}
+  1937→                            className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900/60 to-slate-950/20 border border-amber-500/15 relative overflow-hidden group hover:border-amber-400/30 transition-all flex flex-col justify-between shadow-lg"
+  1938→                          >
+  1939→                            <div className="absolute top-0 right-0 p-3 text-[10px] font-mono text-slate-600 bg-white/[0.01] border-l border-b border-white/[0.03] rounded-bl-xl">
+  1940→                              {new Date(ann.createdAt).toLocaleDateString()}
+  1941→                            </div>
+  1942→
+  1943→                            <div className="space-y-1.5 max-w-[85%]">
+  1944→                              <h4 className="text-sm font-extrabold text-white tracking-tight group-hover:text-[#fbbf24] transition-colors break-words">
+  1945→                                {ann.title}
+  1946→                              </h4>
+  1947→                              <p className="text-xs text-slate-300 leading-relaxed line-clamp-2 break-words">
+  1948→                                {ann.content}
+  1949→                              </p>
+  1950→                            </div>
+  1951→
+  1952→                            <div className="flex items-center justify-between pt-4 mt-3 border-t border-white/[0.03] text-[10.5px] font-mono gap-2 flex-wrap">
+  1953→                              <span className="text-slate-400 font-sans truncate min-w-0">Posted by: {ann.createdByName}</span>
+  1954→                              {ann.deadline && (
+  1955→                                <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-extrabold border border-amber-500/20 shrink-0">
+  1956→                                  Deadline: {ann.deadline}
+  1957→                                </span>
+  1958→                              )}
+  1959→                            </div>
+  1960→                          </div>
+  1961→                        ))}
+  1962→                      </div>
+  1963→                    </div>
+  1964→                  )}
+  1965→
+  1966→                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+  1967→                    <div className="min-w-0">
+  1968→                      <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight break-words">University Archive Panel</h2>
+  1969→                      <p className="text-xs text-slate-400 mt-1">Select from five premium subject areas to access specific experiment galleries.</p>
+  1970→                    </div>
+  1971→
+  1972→                    {/* Quick Search */}
+  1973→                    <div className="relative w-full sm:w-72">
+  1974→                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">
+  1975→                        <Search className="w-4 h-4" />
+  1976→                      </span>
+  1977→                      <input
+  1978→                        type="text"
+  1979→                        placeholder="Search all practical modules..."
+  1980→                        value={searchQuery}
+  1981→                        onChange={(e) => setSearchQuery(e.target.value)}
+  1982→                        className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl outline-none focus:border-indigo-500/50 text-xs transition-transform focus:scale-[1.01] min-h-[44px]"
+  1983→                      />
+  1984→                    </div>
+  1985→                  </div>
+  1986→
+  1987→                  {/* Standard Counter Statistics Blocks */}
+  1988→                  <StatsGrid stats={stats} />
+  1989→
+  1990→                  {/* Subject folders list */}
+  1991→                  {!searchQuery ? (
+  1992→                    <div className="space-y-5">
+  1993→                      <div className="flex items-center justify-between gap-2 flex-wrap">
+  1994→                        <div className="flex items-center gap-2.5 min-w-0">
+  1995→                          <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+  1996→                            <Compass className="w-4 h-4" />
+  1997→                          </div>
+  1998→                          <div className="min-w-0">
+  1999→                            <h3 className="text-sm font-black uppercase tracking-wider font-mono text-white truncate">
+  2000→                              Primary Course Subjects
+
+[showing lines 1-2000 of 2935; use offset=2001 with limit to continue reading]

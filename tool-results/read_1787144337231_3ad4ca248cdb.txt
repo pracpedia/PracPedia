@@ -1,0 +1,1051 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useEffect, useCallback, useRef } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import {
+     6→  Key,
+     7→  ShieldCheck,
+     8→  Database,
+     9→  Server,
+    10→  Cpu,
+    11→  Lock,
+    12→  Copy,
+    13→  RefreshCw,
+    14→  ArrowLeft,
+    15→  CheckCircle,
+    16→  AlertTriangle,
+    17→  X,
+    18→  Crown,
+    19→  Users,
+    20→  Folder,
+    21→  Bell,
+    22→  MessageSquare,
+    23→  Briefcase,
+    24→  Image as ImageIcon,
+    25→  Layers,
+    26→  BookOpen,
+    27→  Palette,
+    28→  UserCog,
+    29→  LogIn,
+    30→  FileText,
+    31→  GraduationCap,
+    32→  Activity,
+    33→  HardDrive,
+    34→  Hash,
+    35→} from 'lucide-react';
+    36→import { useAuth } from '@/context/AuthContext';
+    37→
+    38→// ============================================================================
+    39→// Types
+    40→// ============================================================================
+    41→interface CredentialsViewProps {
+    42→  onBack?: () => void;
+    43→  activeTheme?: string;
+    44→}
+    45→
+    46→interface SystemInfo {
+    47→  appName?: string;
+    48→  framework?: string;
+    49→  language?: string;
+    50→  styling?: string;
+    51→  orm?: string;
+    52→  database?: string;
+    53→  databaseUrl?: string;
+    54→  jwtSecretSet?: boolean;
+    55→  zAiSdkInstalled?: boolean;
+    56→  nodeVersion?: string;
+    57→  platform?: string;
+    58→  arch?: string;
+    59→  uptime?: string;
+    60→}
+    61→
+    62→interface StatsInfo {
+    63→  users?: number;
+    64→  subjects?: number;
+    65→  folders?: number;
+    66→  bookings?: number;
+    67→  portfolio?: number;
+    68→  announcements?: number;
+    69→  chatMessages?: number;
+    70→  hireRequests?: number;
+    71→}
+    72→
+    73→interface RoleUser {
+    74→  id: string;
+    75→  name: string;
+    76→  email: string;
+    77→  createdAt?: string;
+    78→}
+    79→
+    80→interface DemoAccount {
+    81→  email: string;
+    82→  password: string;
+    83→  role: string;
+    84→}
+    85→
+    86→interface CredentialsPayload {
+    87→  generatedAt?: string;
+    88→  system: SystemInfo;
+    89→  stats: StatsInfo;
+    90→  roles: {
+    91→    superAdmins: RoleUser[];
+    92→    admins: RoleUser[];
+    93→  };
+    94→  endpoints: string[];
+    95→  demoAccounts: DemoAccount[];
+    96→}
+    97→
+    98→interface EndpointCategory {
+    99→  name: string;
+   100→  icon: React.ElementType;
+   101→  color: string;
+   102→  bg: string;
+   103→  border: string;
+   104→  endpoints: { method: string; path: string; note?: string }[];
+   105→}
+   106→
+   107→// ============================================================================
+   108→// Helpers
+   109→// ============================================================================
+   110→const maskDatabaseUrl = (url: string | undefined): string => {
+   111→  if (!url) return '(not set)';
+   112→  // For file:./prisma/dev.db-style SQLite URLs, show just the path tail
+   113→  if (url.startsWith('file:')) {
+   114→    const parts = url.replace('file:', '').split('/');
+   115→    return `file:./${parts[parts.length - 1]}`;
+   116→  }
+   117→  // For postgres/etc URLs, mask credentials
+   118→  try {
+   119→    if (url.includes('://')) {
+   120→      const u = new URL(url);
+   121→      const host = u.hostname || 'db-host';
+   122→      const path = u.pathname ? `/${u.pathname}` : '';
+   123→      return `${u.protocol}//••••@${host}${path}`;
+   124→    }
+   125→  } catch {
+   126→    /* fall through */
+   127→  }
+   128→  // Fallback: show last 2 segments
+   129→  const parts = url.split(/[\/\\]/).filter(Boolean);
+   130→  return parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : url;
+   131→};
+   132→
+   133→const categorizeEndpoints = (endpoints: string[]): EndpointCategory[] => {
+   134→  const buckets: Record<string, EndpointCategory> = {
+   135→    auth: { name: 'Auth', icon: LogIn, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', endpoints: [] },
+   136→    subjects: { name: 'Subjects', icon: BookOpen, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', endpoints: [] },
+   137→    folders: { name: 'Folders', icon: Folder, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', endpoints: [] },
+   138→    images: { name: 'Images', icon: ImageIcon, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', endpoints: [] },
+   139→    announcements: { name: 'Announcements', icon: Bell, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', endpoints: [] },
+   140→    users: { name: 'Users', icon: UserCog, color: 'text-sky-400', bg: 'bg-sky-500/10', border: 'border-sky-500/20', endpoints: [] },
+   141→    bookings: { name: 'Bookings', icon: Briefcase, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', endpoints: [] },
+   142→    portfolio: { name: 'Portfolio', icon: Palette, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', endpoints: [] },
+   143→    artists: { name: 'Artists', icon: Palette, color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/20', endpoints: [] },
+   144→    chat: { name: 'Chat', icon: MessageSquare, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', endpoints: [] },
+   145→    hire: { name: 'Hire', icon: Briefcase, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', endpoints: [] },
+   146→    profile: { name: 'Profile', icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', endpoints: [] },
+   147→    academy: { name: 'Academy', icon: GraduationCap, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', endpoints: [] },
+   148→    credentials: { name: 'Credentials', icon: Key, color: 'text-fuchsia-400', bg: 'bg-fuchsia-500/10', border: 'border-fuchsia-500/20', endpoints: [] },
+   149→    stats: { name: 'Stats', icon: Activity, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', endpoints: [] },
+   150→    other: { name: 'Other', icon: Hash, color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', endpoints: [] },
+   151→  };
+   152→
+   153→  for (const ep of endpoints) {
+   154→    const trimmed = ep.trim();
+   155→    const spaceIdx = trimmed.indexOf(' ');
+   156→    let method = '';
+   157→    let path = trimmed;
+   158→    if (spaceIdx > -1) {
+   159→      method = trimmed.slice(0, spaceIdx).trim();
+   160→      path = trimmed.slice(spaceIdx + 1).trim();
+   161→    }
+   162→    // Pull a trailing note in parens off the path
+   163→    let note: string | undefined;
+   164→    const noteMatch = path.match(/\(([^)]+)\)/);
+   165→    if (noteMatch) {
+   166→      note = noteMatch[1];
+   167→      path = path.replace(/\s*\([^)]+\)\s*$/, '').trim();
+   168→    }
+   169→    // Route to bucket by path prefix
+   170→    const lower = path.toLowerCase();
+   171→    let key = 'other';
+   172→    if (lower.startsWith('/api/auth')) key = 'auth';
+   173→    else if (lower.startsWith('/api/subjects')) key = 'subjects';
+   174→    else if (lower.startsWith('/api/folders')) key = 'folders';
+   175→    else if (lower.startsWith('/api/images')) key = 'images';
+   176→    else if (lower.startsWith('/api/announcements')) key = 'announcements';
+   177→    else if (lower.startsWith('/api/users')) key = 'users';
+   178→    else if (lower.startsWith('/api/bookings')) key = 'bookings';
+   179→    else if (lower.startsWith('/api/portfolio')) key = 'portfolio';
+   180→    else if (lower.startsWith('/api/artists')) key = 'artists';
+   181→    else if (lower.startsWith('/api/chat')) key = 'chat';
+   182→    else if (lower.startsWith('/api/hire')) key = 'hire';
+   183→    else if (lower.startsWith('/api/profile')) key = 'profile';
+   184→    else if (lower.startsWith('/api/academy')) key = 'academy';
+   185→    else if (lower.startsWith('/api/credentials')) key = 'credentials';
+   186→    else if (lower.startsWith('/api/stats')) key = 'stats';
+   187→    buckets[key].endpoints.push({ method, path, note });
+   188→  }
+   189→
+   190→  // Return only non-empty categories, in canonical order
+   191→  const order = ['auth', 'subjects', 'folders', 'images', 'announcements', 'users', 'bookings', 'portfolio', 'artists', 'chat', 'hire', 'profile', 'academy', 'credentials', 'stats', 'other'];
+   192→  return order.map((k) => buckets[k]).filter((b) => b.endpoints.length > 0);
+   193→};
+   194→
+   195→const methodColor = (method: string): string => {
+   196→  switch (method.toUpperCase()) {
+   197→    case 'GET':
+   198→      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+   199→    case 'POST':
+   200→      return 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
+   201→    case 'PUT':
+   202→      return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+   203→    case 'DELETE':
+   204→      return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+   205→    case 'PATCH':
+   206→      return 'bg-purple-500/15 text-purple-300 border-purple-500/30';
+   207→    default:
+   208→      return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+   209→  }
+   210→};
+   211→
+   212→const formatDate = (iso?: string): string => {
+   213→  if (!iso) return '—';
+   214→  try {
+   215→    const d = new Date(iso);
+   216→    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+   217→  } catch {
+   218→    return '—';
+   219→  }
+   220→};
+   221→
+   222→// ============================================================================
+   223→// Component
+   224→// ============================================================================
+   225→export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, activeTheme: _activeTheme }) => {
+   226→  const { apiFetch } = useAuth();
+   227→  const [data, setData] = useState<CredentialsPayload | null>(null);
+   228→  const [isLoading, setIsLoading] = useState(true);
+   229→  const [error, setErrorMsg] = useState<string | null>(null);
+   230→  const [forbidden, setForbidden] = useState(false);
+   231→  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+   232→  const [now, setNow] = useState<Date>(new Date());
+   233→  const [autoRefresh, setAutoRefresh] = useState(true);
+   234→  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+   235→  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+   236→  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   237→  const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+   238→  const tickTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+   239→
+   240→  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+   241→    setToast({ msg, type });
+   242→    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+   243→    refreshTimerRef.current = setTimeout(() => setToast(null), 2500);
+   244→  };
+   245→
+   246→  const fetchCredentials = useCallback(async () => {
+   247→    setIsLoading(true);
+   248→    setErrorMsg(null);
+   249→    setForbidden(false);
+   250→    try {
+   251→      const res = await apiFetch('/api/credentials');
+   252→      if (res.status === 403) {
+   253→        setForbidden(true);
+   254→        return;
+   255→      }
+   256→      if (!res.ok) {
+   257→        const err = await res.json().catch(() => ({}));
+   258→        setErrorMsg(err.error || `Failed to load credentials (HTTP ${res.status})`);
+   259→        return;
+   260→      }
+   261→      const json = await res.json();
+   262→      setData(json as CredentialsPayload);
+   263→      setLastRefresh(new Date());
+   264→    } catch (e: any) {
+   265→      setErrorMsg(e?.message || 'Network error loading credentials.');
+   266→    } finally {
+   267→      setIsLoading(false);
+   268→    }
+   269→  }, [apiFetch]);
+   270→
+   271→  // Initial fetch
+   272→  useEffect(() => {
+   273→    fetchCredentials();
+   274→  }, [fetchCredentials]);
+   275→
+   276→  // Auto-refresh every 60s when enabled
+   277→  useEffect(() => {
+   278→    if (!autoRefresh) {
+   279→      if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+   280→      autoTimerRef.current = null;
+   281→      return;
+   282→    }
+   283→    autoTimerRef.current = setInterval(() => {
+   284→      // Silent refresh — don't toggle isLoading
+   285→      (async () => {
+   286→        try {
+   287→          const res = await apiFetch('/api/credentials');
+   288→          if (!res.ok) return;
+   289→          const json = await res.json();
+   290→          setData(json as CredentialsPayload);
+   291→          setLastRefresh(new Date());
+   292→        } catch {
+   293→          /* silent */
+   294→        }
+   295→      })();
+   296→    }, 60_000);
+   297→    return () => {
+   298→      if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+   299→    };
+   300→  }, [autoRefresh, apiFetch]);
+   301→
+   302→  // Tick "now" every second for the "X seconds ago" indicator (only when refresh exists)
+   303→  useEffect(() => {
+   304→    tickTimerRef.current = setInterval(() => setNow(new Date()), 1000);
+   305→    return () => {
+   306→      if (tickTimerRef.current) clearInterval(tickTimerRef.current);
+   307→      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+   308→    };
+   309→  }, []);
+   310→
+   311→  const secondsAgo = lastRefresh
+   312→    ? Math.max(0, Math.floor((now.getTime() - lastRefresh.getTime()) / 1000))
+   313→    : null;
+   314→
+   315→  const copyToClipboard = async (text: string, key: string) => {
+   316→    try {
+   317→      await navigator.clipboard.writeText(text);
+   318→      setCopiedKey(key);
+   319→      showToast(`Copied: ${text}`, 'success');
+   320→      setTimeout(() => setCopiedKey((cur) => (cur === key ? null : cur)), 1500);
+   321→    } catch {
+   322→      showToast('Failed to copy. Please copy manually.', 'error');
+   323→    }
+   324→  };
+   325→
+   326→  // ========================================================================
+   327→  // RENDER: Loading
+   328→  // ========================================================================
+   329→  if (isLoading && !data) {
+   330→    return (
+   331→      <div className="space-y-6 animate-in fade-in duration-300 pb-12 min-w-0 overflow-x-hidden">
+   332→        <CredentialsHeader
+   333→          onBack={onBack}
+   334→          lastRefresh={null}
+   335→          secondsAgo={null}
+   336→          autoRefresh={autoRefresh}
+   337→          setAutoRefresh={setAutoRefresh}
+   338→          onRefresh={fetchCredentials}
+   339→          isRefreshing={isLoading}
+   340→        />
+   341→        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   342→          {Array.from({ length: 3 }).map((_, i) => (
+   343→            <div key={i} className="h-48 rounded-3xl bg-slate-950/80 border border-white/10 animate-pulse" />
+   344→          ))}
+   345→        </div>
+   346→        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+   347→          {Array.from({ length: 8 }).map((_, i) => (
+   348→            <div key={i} className="h-28 rounded-2xl bg-slate-950/80 border border-white/10 animate-pulse" />
+   349→          ))}
+   350→        </div>
+   351→        <div className="h-64 rounded-3xl bg-slate-950/80 border border-white/10 animate-pulse" />
+   352→      </div>
+   353→    );
+   354→  }
+   355→
+   356→  // ========================================================================
+   357→  // RENDER: Access Denied (403)
+   358→  // ========================================================================
+   359→  if (forbidden) {
+   360→    return (
+   361→      <div className="space-y-6 animate-in fade-in duration-300 pb-12 min-w-0 overflow-x-hidden">
+   362→        <CredentialsHeader
+   363→          onBack={onBack}
+   364→          lastRefresh={lastRefresh}
+   365→          secondsAgo={secondsAgo}
+   366→          autoRefresh={autoRefresh}
+   367→          setAutoRefresh={setAutoRefresh}
+   368→          onRefresh={fetchCredentials}
+   369→          isRefreshing={isLoading}
+   370→        />
+   371→        <div className="p-8 sm:p-12 rounded-3xl bg-rose-950/30 border border-rose-500/30 text-center space-y-4 shadow-2xl relative overflow-hidden">
+   372→          <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 via-transparent to-transparent pointer-events-none" />
+   373→          <div className="relative flex justify-center">
+   374→            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+   375→              <Lock className="w-10 h-10" />
+   376→            </div>
+   377→          </div>
+   378→          <h3 className="text-xl sm:text-2xl font-black text-white">Access Denied</h3>
+   379→          <p className="text-sm text-rose-200/80 max-w-md mx-auto leading-relaxed">
+   380→            This page is restricted to <strong className="text-white">Super Admins</strong> only. Your current account does not have the required <code className="px-1.5 py-0.5 bg-slate-900 rounded text-rose-300 font-mono text-xs">super_admin</code> role.
+   381→          </p>
+   382→          <p className="text-xs text-slate-400 max-w-md mx-auto">
+   383→            If you believe this is an error, please contact the platform owner (the first super admin) and request elevation via <code className="px-1.5 py-0.5 bg-slate-900 rounded text-cyan-300 font-mono">POST /api/users/promote-super</code>.
+   384→          </p>
+   385→          {onBack && (
+   386→            <button
+   387→              onClick={onBack}
+   388→              className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[44px] mt-2"
+   389→            >
+   390→              <ArrowLeft className="w-4 h-4" />
+   391→              <span>Back to CMS</span>
+   392→            </button>
+   393→          )}
+   394→        </div>
+   395→      </div>
+   396→    );
+   397→  }
+   398→
+   399→  // ========================================================================
+   400→  // RENDER: Error
+   401→  // ========================================================================
+   402→  if (error && !data) {
+   403→    return (
+   404→      <div className="space-y-6 animate-in fade-in duration-300 pb-12 min-w-0 overflow-x-hidden">
+   405→        <CredentialsHeader
+   406→          onBack={onBack}
+   407→          lastRefresh={lastRefresh}
+   408→          secondsAgo={secondsAgo}
+   409→          autoRefresh={autoRefresh}
+   410→          setAutoRefresh={setAutoRefresh}
+   411→          onRefresh={fetchCredentials}
+   412→          isRefreshing={isLoading}
+   413→        />
+   414→        <div className="p-8 sm:p-12 rounded-3xl bg-amber-950/30 border border-amber-500/30 text-center space-y-4 shadow-2xl">
+   415→          <div className="flex justify-center">
+   416→            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+   417→              <AlertTriangle className="w-10 h-10" />
+   418→            </div>
+   419→          </div>
+   420→          <h3 className="text-xl font-black text-white">Failed to Load Credentials</h3>
+   421→          <p className="text-sm text-amber-200/80 max-w-md mx-auto leading-relaxed break-words">{error}</p>
+   422→          <button
+   423→            onClick={fetchCredentials}
+   424→            className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[44px]"
+   425→          >
+   426→            <RefreshCw className="w-4 h-4" />
+   427→            <span>Retry</span>
+   428→          </button>
+   429→        </div>
+   430→      </div>
+   431→    );
+   432→  }
+   433→
+   434→  // ========================================================================
+   435→  // RENDER: Main
+   436→  // ========================================================================
+   437→  if (!data) return null;
+   438→
+   439→  const { system, stats, roles, endpoints, demoAccounts, generatedAt } = data;
+   440→  const categories = categorizeEndpoints(endpoints);
+   441→
+   442→  const statsTiles: { label: string; value: number | undefined; icon: React.ElementType; color: string; bg: string; border: string }[] = [
+   443→    { label: 'Users', value: stats.users, icon: Users, color: 'text-sky-400', bg: 'bg-sky-500/10', border: 'border-sky-500/20' },
+   444→    { label: 'Subjects', value: stats.subjects, icon: BookOpen, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' },
+   445→    { label: 'Folders', value: stats.folders, icon: Folder, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
+   446→    { label: 'Bookings', value: stats.bookings, icon: Briefcase, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
+   447→    { label: 'Portfolio', value: stats.portfolio, icon: ImageIcon, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+   448→    { label: 'Announcements', value: stats.announcements, icon: Bell, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+   449→    { label: 'Chat Messages', value: stats.chatMessages, icon: MessageSquare, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' },
+   450→    { label: 'Hire Requests', value: stats.hireRequests, icon: Briefcase, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
+   451→  ];
+   452→
+   453→  const systemRows: { label: string; value: React.ReactNode; icon: React.ElementType }[] = [
+   454→    { label: 'App Name', value: system.appName || '—', icon: Activity },
+   455→    { label: 'Framework', value: system.framework || '—', icon: Layers },
+   456→    { label: 'Language', value: system.language || '—', icon: FileText },
+   457→    { label: 'Styling', value: system.styling || '—', icon: Palette },
+   458→    { label: 'ORM', value: system.orm || '—', icon: Database },
+   459→    { label: 'Database', value: system.database || '—', icon: HardDrive },
+   460→    {
+   461→      label: 'Database URL',
+   462→      value: (
+   463→        <span className="font-mono text-cyan-300 break-all text-[11px]">
+   464→          {maskDatabaseUrl(system.databaseUrl)}
+   465→        </span>
+   466→      ),
+   467→      icon: Server,
+   468→    },
+   469→    {
+   470→      label: 'JWT Secret',
+   471→      value: system.jwtSecretSet ? (
+   472→        <span className="inline-flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
+   473→          <CheckCircle className="w-3.5 h-3.5" />
+   474→          <span>Set</span>
+   475→        </span>
+   476→      ) : (
+   477→        <span className="inline-flex items-center gap-1.5 text-rose-300 font-bold text-xs">
+   478→          <AlertTriangle className="w-3.5 h-3.5" />
+   479→          <span>Not Set</span>
+   480→        </span>
+   481→      ),
+   482→      icon: Key,
+   483→    },
+   484→    {
+   485→      label: 'z-AI SDK',
+   486→      value: system.zAiSdkInstalled ? (
+   487→        <span className="inline-flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
+   488→          <CheckCircle className="w-3.5 h-3.5" />
+   489→          <span>Installed</span>
+   490→        </span>
+   491→      ) : (
+   492→        <span className="inline-flex items-center gap-1.5 text-rose-300 font-bold text-xs">
+   493→          <AlertTriangle className="w-3.5 h-3.5" />
+   494→          <span>Missing</span>
+   495→        </span>
+   496→      ),
+   497→      icon: Cpu,
+   498→    },
+   499→    { label: 'Node Version', value: system.nodeVersion || '—', icon: Cpu },
+   500→    { label: 'Platform', value: system.platform || '—', icon: Server },
+   501→    { label: 'Architecture', value: system.arch || '—', icon: Cpu },
+   502→    { label: 'Uptime', value: system.uptime || '—', icon: Activity },
+   503→  ];
+   504→
+   505→  return (
+   506→    <div className="space-y-6 animate-in fade-in duration-300 pb-12 min-w-0 overflow-x-hidden">
+   507→      {/* ===== Header ===== */}
+   508→      <CredentialsHeader
+   509→        onBack={onBack}
+   510→        lastRefresh={lastRefresh}
+   511→        secondsAgo={secondsAgo}
+   512→        autoRefresh={autoRefresh}
+   513→        setAutoRefresh={setAutoRefresh}
+   514→        onRefresh={fetchCredentials}
+   515→        isRefreshing={isLoading}
+   516→      />
+   517→
+   518→      {/* ===== Toast ===== */}
+   519→      <AnimatePresence>
+   520→        {toast && (
+   521→          <motion.div
+   522→            initial={{ opacity: 0, y: -8 }}
+   523→            animate={{ opacity: 1, y: 0 }}
+   524→            exit={{ opacity: 0, y: -8 }}
+   525→            className={`fixed top-4 left-1/2 -translate-x-1/2 z-[200] px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-2xl border ${
+   526→              toast.type === 'success'
+   527→                ? 'bg-emerald-950/95 text-emerald-200 border-emerald-500/40'
+   528→                : 'bg-rose-950/95 text-rose-200 border-rose-500/40'
+   529→            }`}
+   530→          >
+   531→            {toast.type === 'success' ? (
+   532→              <CheckCircle className="w-4 h-4 shrink-0" />
+   533→            ) : (
+   534→              <AlertTriangle className="w-4 h-4 shrink-0" />
+   535→            )}
+   536→            <span className="break-words">{toast.msg}</span>
+   537→            <button
+   538→              onClick={() => setToast(null)}
+   539→              className="ml-1 text-slate-400 hover:text-white shrink-0 min-w-[24px] min-h-[24px] flex items-center justify-center"
+   540→            >
+   541→              <X className="w-3.5 h-3.5" />
+   542→            </button>
+   543→          </motion.div>
+   544→        )}
+   545→      </AnimatePresence>
+   546→
+   547→      {/* ===== System Overview Card ===== */}
+   548→      <motion.div
+   549→        initial={{ opacity: 0, y: 8 }}
+   550→        animate={{ opacity: 1, y: 0 }}
+   551→        transition={{ duration: 0.25 }}
+   552→        className="p-5 sm:p-7 rounded-3xl relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#0c1324] to-slate-950 border border-fuchsia-500/20 shadow-2xl"
+   553→      >
+   554→        <div className="absolute right-0 top-0 w-80 h-80 rounded-full bg-fuchsia-500/5 blur-3xl pointer-events-none" />
+   555→        <div className="absolute left-1/3 bottom-0 w-64 h-64 rounded-full bg-cyan-500/5 blur-3xl pointer-events-none" />
+   556→
+   557→        <div className="relative z-10 space-y-5">
+   558→          <div className="flex items-center justify-between gap-3 pb-3 border-b border-white/10">
+   559→            <div className="min-w-0">
+   560→              <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2 min-w-0">
+   561→                <Server className="w-5 h-5 text-fuchsia-400 shrink-0" />
+   562→                <span className="truncate">System Overview</span>
+   563→              </h3>
+   564→              <p className="text-xs text-slate-400 mt-1 break-words">Generated: {generatedAt ? formatDate(generatedAt) : '—'}</p>
+   565→            </div>
+   566→            <span className="px-2.5 py-1 rounded-full bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20 text-[10px] font-mono font-bold uppercase tracking-wider shrink-0 hidden sm:inline">
+   567→              Restricted
+   568→            </span>
+   569→          </div>
+   570→
+   571→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+   572→            {systemRows.map((row) => {
+   573→              const RowIcon = row.icon;
+   574→              return (
+   575→                <div
+   576→                  key={row.label}
+   577→                  className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-white/15 transition-all flex items-start gap-3"
+   578→                >
+   579→                  <div className="p-2 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 shrink-0">
+   580→                    <RowIcon className="w-4 h-4" />
+   581→                  </div>
+   582→                  <div className="min-w-0 flex-1">
+   583→                    <p className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold truncate">
+   584→                      {row.label}
+   585→                    </p>
+   586→                    <div className="mt-0.5 text-sm text-slate-100 font-semibold break-words">
+   587→                      {row.value}
+   588→                    </div>
+   589→                  </div>
+   590→                </div>
+   591→              );
+   592→            })}
+   593→          </div>
+   594→        </div>
+   595→      </motion.div>
+   596→
+   597→      {/* ===== Database Stats Grid ===== */}
+   598→      <motion.div
+   599→        initial={{ opacity: 0, y: 8 }}
+   600→        animate={{ opacity: 1, y: 0 }}
+   601→        transition={{ duration: 0.25, delay: 0.05 }}
+   602→        className="space-y-3"
+   603→      >
+   604→        <div className="flex items-center justify-between gap-2">
+   605→          <h3 className="text-xs font-mono uppercase text-slate-400 font-bold tracking-wider flex items-center gap-2 truncate">
+   606→            <Database className="w-4 h-4 text-cyan-400 shrink-0" />
+   607→            <span className="truncate">Database Statistics</span>
+   608→          </h3>
+   609→          <span className="text-[10px] font-mono text-slate-500 shrink-0">Live counts</span>
+   610→        </div>
+   611→
+   612→        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5">
+   613→          {statsTiles.map((tile, idx) => {
+   614→            const TileIcon = tile.icon;
+   615→            return (
+   616→              <motion.div
+   617→                key={tile.label}
+   618→                initial={{ opacity: 0, scale: 0.95 }}
+   619→                animate={{ opacity: 1, scale: 1 }}
+   620→                transition={{ duration: 0.2, delay: idx * 0.025 }}
+   621→                className={`p-4 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border ${tile.border} transition-all duration-300 relative group overflow-hidden shadow-xl flex flex-col justify-between`}
+   622→              >
+   623→                <div className="flex items-start justify-between gap-1">
+   624→                  <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider truncate">
+   625→                    {tile.label}
+   626→                  </span>
+   627→                  <div className={`p-1.5 rounded-lg border ${tile.bg} ${tile.color} transition-transform group-hover:scale-110 shrink-0`}>
+   628→                    <TileIcon className="w-3.5 h-3.5" />
+   629→                  </div>
+   630→                </div>
+   631→                <div className="mt-3">
+   632→                  <div className="text-2xl font-black text-white tracking-tight">
+   633→                    {tile.value !== undefined && tile.value !== null ? tile.value.toLocaleString() : '—'}
+   634→                  </div>
+   635→                </div>
+   636→              </motion.div>
+   637→            );
+   638→          })}
+   639→        </div>
+   640→      </motion.div>
+   641→
+   642→      {/* ===== Role Hierarchy Section ===== */}
+   643→      <motion.div
+   644→        initial={{ opacity: 0, y: 8 }}
+   645→        animate={{ opacity: 1, y: 0 }}
+   646→        transition={{ duration: 0.25, delay: 0.1 }}
+   647→        className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6"
+   648→      >
+   649→        {/* Super Admins */}
+   650→        <RoleRosterCard
+   651→          title="Super Admins"
+   652→          subtitle="Platform owners with full access"
+   653→          icon={Crown}
+   654→          accent="fuchsia"
+   655→          users={roles.superAdmins}
+   656→          badgeLabel="Super Admin"
+   657→          badgeClass="bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30"
+   658→          emptyMessage="No super admins found."
+   659→          note="The first super admin (Professor Akash) is the platform owner and cannot be demoted."
+   660→        />
+   661→
+   662→        {/* Admins */}
+   663→        <RoleRosterCard
+   664→          title="Administrators"
+   665→          subtitle="Supervisors with elevated privileges"
+   666→          icon={ShieldCheck}
+   667→          accent="amber"
+   668→          users={roles.admins}
+   669→          badgeLabel="Admin"
+   670→          badgeClass="bg-amber-500/15 text-amber-300 border-amber-500/30"
+   671→          emptyMessage="No regular admins found."
+   672→          note="Super admins can elevate regular admins to super_admin via the CMS."
+   673→        />
+   674→      </motion.div>
+   675→
+   676→      {/* ===== Demo Accounts Section ===== */}
+   677→      <motion.div
+   678→        initial={{ opacity: 0, y: 8 }}
+   679→        animate={{ opacity: 1, y: 0 }}
+   680→        transition={{ duration: 0.25, delay: 0.15 }}
+   681→        className="p-5 sm:p-6 rounded-3xl bg-slate-950/80 border border-white/10 space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden"
+   682→      >
+   683→        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent" />
+   684→        <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
+   685→          <div className="min-w-0">
+   686→            <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2 min-w-0">
+   687→              <Users className="w-5 h-5 text-cyan-400 shrink-0" />
+   688→              <span className="truncate">Demo Accounts</span>
+   689→            </h3>
+   690→            <p className="text-xs text-slate-400 mt-1 break-words">Click a row's copy button to copy the email.</p>
+   691→          </div>
+   692→          <span className="text-[10px] font-mono text-slate-400 shrink-0 px-2.5 py-0.5 rounded-full bg-slate-900 border border-white/5">
+   693→            {demoAccounts.length} accounts
+   694→          </span>
+   695→        </div>
+   696→
+   697→        <div className="overflow-x-auto -mx-1 px-1">
+   698→          <table className="w-full text-xs min-w-[480px]">
+   699→            <thead>
+   700→              <tr className="text-left text-[10px] font-mono uppercase tracking-wider text-slate-400 border-b border-white/10">
+   701→                <th className="py-2.5 pr-3 font-bold">Email</th>
+   702→                <th className="py-2.5 pr-3 font-bold">Password</th>
+   703→                <th className="py-2.5 pr-3 font-bold">Role</th>
+   704→                <th className="py-2.5 font-bold text-right">Action</th>
+   705→              </tr>
+   706→            </thead>
+   707→            <tbody>
+   708→              {demoAccounts.map((acc, idx) => (
+   709→                <tr
+   710→                  key={`${acc.email}-${idx}`}
+   711→                  className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+   712→                >
+   713→                  <td className="py-2.5 pr-3 font-mono text-cyan-200 break-all align-top max-w-[200px]">{acc.email}</td>
+   714→                  <td className="py-2.5 pr-3 font-mono text-slate-300 break-all align-top">{acc.password}</td>
+   715→                  <td className="py-2.5 pr-3 align-top">
+   716→                    <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${
+   717→                      acc.role === 'super_admin'
+   718→                        ? 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30'
+   719→                        : acc.role === 'admin'
+   720→                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+   721→                        : acc.role === 'artist'
+   722→                        ? 'bg-pink-500/15 text-pink-300 border-pink-500/30'
+   723→                        : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+   724→                    }`}>
+   725→                      {acc.role}
+   726→                    </span>
+   727→                  </td>
+   728→                  <td className="py-2.5 text-right align-top">
+   729→                    <button
+   730→                      onClick={() => copyToClipboard(acc.email, `demo-${idx}`)}
+   731→                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer min-h-[32px] ${
+   732→                        copiedKey === `demo-${idx}`
+   733→                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+   734→                          : 'bg-slate-900 text-slate-300 border-white/10 hover:border-cyan-500/30 hover:text-cyan-300'
+   735→                      }`}
+   736→                    >
+   737→                      {copiedKey === `demo-${idx}` ? (
+   738→                        <>
+   739→                          <CheckCircle className="w-3 h-3" />
+   740→                          <span>Copied</span>
+   741→                        </>
+   742→                      ) : (
+   743→                        <>
+   744→                          <Copy className="w-3 h-3" />
+   745→                          <span>Copy</span>
+   746→                        </>
+   747→                      )}
+   748→                    </button>
+   749→                  </td>
+   750→                </tr>
+   751→              ))}
+   752→            </tbody>
+   753→          </table>
+   754→        </div>
+   755→
+   756→        <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-200/80 text-[11px] flex items-start gap-2">
+   757→          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+   758→          <span className="leading-relaxed">
+   759→            These are <strong className="text-amber-300">demo credentials</strong> for testing. In production, these would be removed.
+   760→          </span>
+   761→        </div>
+   762→      </motion.div>
+   763→
+   764→      {/* ===== API Endpoints Reference ===== */}
+   765→      <motion.div
+   766→        initial={{ opacity: 0, y: 8 }}
+   767→        animate={{ opacity: 1, y: 0 }}
+   768→        transition={{ duration: 0.25, delay: 0.2 }}
+   769→        className="p-5 sm:p-6 rounded-3xl bg-slate-950/80 border border-white/10 space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden"
+   770→      >
+   771→        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+   772→        <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
+   773→          <div className="min-w-0">
+   774→            <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2 min-w-0">
+   775→              <Activity className="w-5 h-5 text-indigo-400 shrink-0" />
+   776→              <span className="truncate">API Endpoints Reference</span>
+   777→            </h3>
+   778→            <p className="text-xs text-slate-400 mt-1 break-words">{endpoints.length} routes across {categories.length} categories.</p>
+   779→          </div>
+   780→        </div>
+   781→
+   782→        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+   783→          {categories.map((cat) => {
+   784→            const CatIcon = cat.icon;
+   785→            return (
+   786→              <div
+   787→                key={cat.name}
+   788→                className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-white/15 transition-all"
+   789→              >
+   790→                <div className="flex items-center gap-2 pb-2 mb-2 border-b border-white/5">
+   791→                  <div className={`p-1.5 rounded-lg border ${cat.bg} ${cat.color} ${cat.border} shrink-0`}>
+   792→                    <CatIcon className="w-3.5 h-3.5" />
+   793→                  </div>
+   794→                  <span className="text-xs font-bold text-white truncate">{cat.name}</span>
+   795→                  <span className="text-[10px] font-mono text-slate-500 shrink-0 ml-auto">
+   796→                    {cat.endpoints.length}
+   797→                  </span>
+   798→                </div>
+   799→
+   800→                <div className="space-y-1.5">
+   801→                  {cat.endpoints.map((ep, i) => (
+   802→                    <div
+   803→                      key={`${cat.name}-${i}`}
+   804→                      className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors group"
+   805→                    >
+   806→                      <span className={`shrink-0 inline-flex items-center justify-center w-14 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${methodColor(ep.method)}`}>
+   807→                        {ep.method || '?'}
+   808→                      </span>
+   809→                      <code className="flex-1 min-w-0 truncate text-[11px] text-slate-200 font-mono">
+   810→                        {ep.path}
+   811→                      </code>
+   812→                      {ep.note && (
+   813→                        <span className="text-[9px] text-slate-500 italic shrink-0 hidden sm:inline">
+   814→                          {ep.note}
+   815→                        </span>
+   816→                      )}
+   817→                      <button
+   818→                        onClick={() => copyToClipboard(ep.path, `ep-${cat.name}-${i}`)}
+   819→                        className={`shrink-0 p-1.5 rounded-md border transition-all cursor-pointer min-h-[28px] min-w-[28px] flex items-center justify-center ${
+   820→                          copiedKey === `ep-${cat.name}-${i}`
+   821→                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+   822→                            : 'bg-slate-900 text-slate-500 border-white/5 hover:text-cyan-300 hover:border-cyan-500/30'
+   823→                        }`}
+   824→                        title="Copy Path"
+   825→                      >
+   826→                        {copiedKey === `ep-${cat.name}-${i}` ? (
+   827→                          <CheckCircle className="w-3 h-3" />
+   828→                        ) : (
+   829→                          <Copy className="w-3 h-3" />
+   830→                        )}
+   831→                      </button>
+   832→                    </div>
+   833→                  ))}
+   834→                </div>
+   835→              </div>
+   836→            );
+   837→          })}
+   838→        </div>
+   839→      </motion.div>
+   840→
+   841→      {/* ===== Security Notice ===== */}
+   842→      <motion.div
+   843→        initial={{ opacity: 0, y: 8 }}
+   844→        animate={{ opacity: 1, y: 0 }}
+   845→        transition={{ duration: 0.25, delay: 0.25 }}
+   846→        className="p-5 sm:p-6 rounded-3xl bg-rose-950/30 border-2 border-rose-500/30 shadow-2xl relative overflow-hidden"
+   847→      >
+   848→        <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 via-transparent to-transparent pointer-events-none" />
+   849→        <div className="relative flex items-start gap-3 sm:gap-4">
+   850→          <div className="p-2.5 sm:p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 shrink-0">
+   851→            <Lock className="w-6 h-6" />
+   852→          </div>
+   853→          <div className="min-w-0 flex-1 space-y-1.5">
+   854→            <h3 className="text-sm sm:text-base font-black text-rose-100">Security Notice</h3>
+   855→            <p className="text-xs sm:text-sm text-rose-200/80 leading-relaxed">
+   856→              This page contains <strong className="text-white">sensitive system information</strong>. Do not share these credentials with unauthorized users.
+   857→            </p>
+   858→            <p className="text-[11px] text-rose-300/70 leading-relaxed">
+   859→              All access to this page is logged. If you suspect unauthorized access, rotate the JWT secret and review super admin promotions immediately.
+   860→            </p>
+   861→          </div>
+   862→        </div>
+   863→      </motion.div>
+   864→    </div>
+   865→  );
+   866→};
+   867→
+   868→// ============================================================================
+   869→// Sub-Components
+   870→// ============================================================================
+   871→interface CredentialsHeaderProps {
+   872→  onBack?: () => void;
+   873→  lastRefresh: Date | null;
+   874→  secondsAgo: number | null;
+   875→  autoRefresh: boolean;
+   876→  setAutoRefresh: (v: boolean) => void;
+   877→  onRefresh: () => void;
+   878→  isRefreshing: boolean;
+   879→}
+   880→
+   881→const CredentialsHeader: React.FC<CredentialsHeaderProps> = ({
+   882→  onBack,
+   883→  lastRefresh,
+   884→  secondsAgo,
+   885→  autoRefresh,
+   886→  setAutoRefresh,
+   887→  onRefresh,
+   888→  isRefreshing,
+   889→}) => {
+   890→  return (
+   891→    <div className="p-5 sm:p-7 rounded-3xl relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#0c1324] to-slate-950 border border-fuchsia-500/20 shadow-2xl">
+   892→      <div className="absolute right-0 top-0 w-80 h-80 rounded-full bg-fuchsia-500/5 blur-3xl pointer-events-none" />
+   893→      <div className="absolute left-1/3 bottom-0 w-64 h-64 rounded-full bg-cyan-500/5 blur-3xl pointer-events-none" />
+   894→
+   895→      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+   896→        <div className="space-y-2 min-w-0">
+   897→          <div className="flex items-center gap-2 flex-wrap">
+   898→            {onBack && (
+   899→              <button
+   900→                onClick={onBack}
+   901→                className="px-3 py-1 bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-white/10 transition-all cursor-pointer shadow-sm min-h-[32px]"
+   902→              >
+   903→                <ArrowLeft className="w-3.5 h-3.5" />
+   904→                <span>Back to CMS</span>
+   905→              </button>
+   906→            )}
+   907→            <span className="px-2.5 py-1 rounded-full bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+   908→              <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 animate-pulse" />
+   909→              Super Admin Only
+   910→            </span>
+   911→          </div>
+   912→
+   913→          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5 flex-wrap">
+   914→            <Key className="w-7 h-7 text-fuchsia-400 shrink-0" />
+   915→            <span>System Credentials</span>
+   916→          </h1>
+   917→          <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
+   918→            Restricted to Super Admins only. Shows environment configuration, role hierarchy, demo accounts, and the full API surface.
+   919→          </p>
+   920→
+   921→          {lastRefresh && (
+   922→            <p className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5">
+   923→              <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+   924→              <span>
+   925→                Last refreshed {secondsAgo !== null ? `${secondsAgo}s` : '—'} ago
+   926→              </span>
+   927→            </p>
+   928→          )}
+   929→        </div>
+   930→
+   931→        <div className="flex items-center gap-2 flex-wrap self-start md:self-auto">
+   932→          <label className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/80 border border-white/10 text-xs font-bold text-slate-300 cursor-pointer select-none min-h-[44px]">
+   933→            <input
+   934→              type="checkbox"
+   935→              checked={autoRefresh}
+   936→              onChange={(e) => setAutoRefresh(e.target.checked)}
+   937→              className="w-3.5 h-3.5 accent-fuchsia-500 cursor-pointer"
+   938→            />
+   939→            <span>Auto-refresh</span>
+   940→          </label>
+   941→          <button
+   942→            onClick={onRefresh}
+   943→            disabled={isRefreshing}
+   944→            className="px-4 py-2 rounded-xl bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-fuchsia-500/20 min-h-[44px] disabled:opacity-60 disabled:cursor-wait"
+   945→          >
+   946→            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+   947→            <span>Refresh</span>
+   948→          </button>
+   949→        </div>
+   950→      </div>
+   951→    </div>
+   952→  );
+   953→};
+   954→
+   955→interface RoleRosterCardProps {
+   956→  title: string;
+   957→  subtitle: string;
+   958→  icon: React.ElementType;
+   959→  accent: 'fuchsia' | 'amber';
+   960→  users: RoleUser[];
+   961→  badgeLabel: string;
+   962→  badgeClass: string;
+   963→  emptyMessage: string;
+   964→  note?: string;
+   965→}
+   966→
+   967→const RoleRosterCard: React.FC<RoleRosterCardProps> = ({
+   968→  title,
+   969→  subtitle,
+   970→  icon: Icon,
+   971→  accent,
+   972→  users,
+   973→  badgeLabel,
+   974→  badgeClass,
+   975→  emptyMessage,
+   976→  note,
+   977→}) => {
+   978→  const accentBorder = accent === 'fuchsia' ? 'border-fuchsia-500/20' : 'border-amber-500/20';
+   979→  const accentIcon = accent === 'fuchsia' ? 'text-fuchsia-400' : 'text-amber-400';
+   980→  const accentIconBg = accent === 'fuchsia' ? 'bg-fuchsia-500/10 border-fuchsia-500/20' : 'bg-amber-500/10 border-amber-500/20';
+   981→  const accentBar = accent === 'fuchsia' ? 'via-fuchsia-500/40' : 'via-amber-500/40';
+   982→
+   983→  return (
+   984→    <div className={`p-5 sm:p-6 rounded-3xl bg-slate-950/80 border ${accentBorder} space-y-4 shadow-xl backdrop-blur-md relative overflow-hidden`}>
+   985→      <div className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent ${accentBar} to-transparent`} />
+   986→
+   987→      <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
+   988→        <div className="min-w-0">
+   989→          <h3 className="text-sm font-extrabold text-white flex items-center gap-2 min-w-0">
+   990→            <div className={`p-1.5 rounded-lg border ${accentIconBg} ${accentIcon} shrink-0`}>
+   991→              <Icon className="w-4 h-4" />
+   992→            </div>
+   993→            <span className="truncate">{title}</span>
+   994→          </h3>
+   995→          <p className="text-[11px] text-slate-400 mt-1 break-words">{subtitle}</p>
+   996→        </div>
+   997→        <span className="text-[10px] font-mono text-slate-400 shrink-0 px-2.5 py-0.5 rounded-full bg-slate-900 border border-white/5">
+   998→          {users.length} {users.length === 1 ? 'member' : 'members'}
+   999→        </span>
+  1000→      </div>
+  1001→
+  1002→      {users.length === 0 ? (
+  1003→        <div className="p-4 text-center rounded-xl bg-slate-900/40 border border-white/5 text-xs text-slate-500">
+  1004→          {emptyMessage}
+  1005→        </div>
+  1006→      ) : (
+  1007→        <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+  1008→          {users.map((u, idx) => (
+  1009→            <motion.div
+  1010→              key={u.id || idx}
+  1011→              initial={{ opacity: 0, x: -4 }}
+  1012→              animate={{ opacity: 1, x: 0 }}
+  1013→              transition={{ duration: 0.18, delay: idx * 0.04 }}
+  1014→              className="p-3 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/5 hover:border-white/15 transition-all flex items-center gap-3"
+  1015→            >
+  1016→              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${accentIconBg} ${accentIcon} border flex items-center justify-center font-bold text-xs sm:text-sm shrink-0`}>
+  1017→                {u.name ? u.name.substring(0, 2).toUpperCase() : '—'}
+  1018→              </div>
+  1019→              <div className="min-w-0 flex-1">
+  1020→                <p className="text-xs font-bold text-white truncate">{u.name || 'Unknown'}</p>
+  1021→                <p className="text-[10px] text-slate-400 font-mono truncate">{u.email}</p>
+  1022→                {u.createdAt && (
+  1023→                  <p className="text-[9px] text-slate-500 font-mono mt-0.5">
+  1024→                    Member since: {formatDate(u.createdAt)}
+  1025→                  </p>
+  1026→                )}
+  1027→              </div>
+  1028→              <span className={`shrink-0 inline-block px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${badgeClass}`}>
+  1029→                {badgeLabel}
+  1030→              </span>
+  1031→            </motion.div>
+  1032→          ))}
+  1033→        </div>
+  1034→      )}
+  1035→
+  1036→      {note && (
+  1037→        <div className={`p-2.5 rounded-xl border text-[11px] flex items-start gap-2 ${
+  1038→          accent === 'fuchsia'
+  1039→            ? 'bg-fuchsia-500/5 border-fuchsia-500/20 text-fuchsia-200/80'
+  1040→            : 'bg-amber-500/5 border-amber-500/20 text-amber-200/80'
+  1041→        }`}>
+  1042→          <AlertTriangle className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${accentIcon}`} />
+  1043→          <span className="leading-relaxed">{note}</span>
+  1044→        </div>
+  1045→      )}
+  1046→    </div>
+  1047→  );
+  1048→};
+  1049→
+  1050→export default CredentialsView;
+  1051→

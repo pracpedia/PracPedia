@@ -299,17 +299,32 @@ html, body {
   font-family: "Space Grotesk", "Geist", ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
   width: 100%;
+  /* Extend content into curved-edge safe areas */
+  -webkit-fill-available: both;
 }
 
-/* Fixed full-screen dark background — covers the entire viewport at all times,
-   including overscroll areas and curved-edge safe areas. */
+/* Fixed full-screen dark background — covers the entire viewport including
+   curved-edge safe areas. Uses -100px inset to guarantee coverage past the
+   physical screen edge on curved-display phones. */
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  top: -200px;
+  left: -200px;
+  right: -200px;
+  bottom: -200px;
   background: #05070e;
   z-index: -1;
   pointer-events: none;
+}
+
+/* Ensure ALL root-level app containers use the same dark background
+   so there's never a color mismatch on curved edges */
+#landing_page_container,
+#auth_page_container,
+.glass-main-bg,
+[id*="classroom"] {
+  background-color: #05070e !important;
 }
 
 /* Math blocks custom safety wrapping */

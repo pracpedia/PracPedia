@@ -1,0 +1,860 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useRef } from 'react';
+     4→import {
+     5→  X, Upload, Link as LinkIcon, FileImage, AlertTriangle,
+     6→  CheckCircle, Sparkles,
+     7→  RotateCcw, Check, ArrowRight, RefreshCw
+     8→} from 'lucide-react';
+     9→import { motion, AnimatePresence } from 'framer-motion';
+    10→import { useAuth } from '@/context/AuthContext';
+    11→
+    12→interface UploadModalProps {
+    13→  isOpen: boolean;
+    14→  onClose: () => void;
+    15→  folderId: string;
+    16→  folderTitle: string;
+    17→  onUploadSuccess: (url: string, titleStr: string) => Promise<any>;
+    18→}
+    19→
+    20→interface Point {
+    21→  x: number; // Normalized (0.0 - 1.0)
+    22→  y: number;
+    23→}
+    24→
+    25→interface Corners {
+    26→  tl: Point;
+    27→  tr: Point;
+    28→  br: Point;
+    29→  bl: Point;
+    30→}
+    31→
+    32→type TabType = 'upload' | 'url';
+    33→type FilterType = 'none' | 'bw' | 'color';
+    34→
+    35→export const UploadModal: React.FC<UploadModalProps> = ({
+    36→  isOpen,
+    37→  onClose,
+    38→  folderId,
+    39→  folderTitle,
+    40→  onUploadSuccess,
+    41→}) => {
+    42→  const { apiFetch } = useAuth();
+    43→  const [activeTab, setActiveTab] = useState<TabType>('upload');
+    44→  const [title, setTitle] = useState('');
+    45→  const [error, setError] = useState<string | null>(null);
+    46→  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+    47→  const [isProcessing, setIsProcessing] = useState(false);
+    48→
+    49→  // Raw Image input
+    50→  const [rawImageBase64, setRawImageBase64] = useState<string | null>(null);
+    51→  const [imageLoaded, setImageLoaded] = useState(false);
+    52→
+    53→  // Alignment state
+    54→  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Input source, 2: Perspective Crop, 3: Save & Upload
+    55→  const [corners, setCorners] = useState<Corners>({
+    56→    tl: { x: 0.15, y: 0.15 },
+    57→    tr: { x: 0.85, y: 0.15 },
+    58→    br: { x: 0.85, y: 0.85 },
+    59→    bl: { x: 0.15, y: 0.85 }
+    60→  });
+    61→  const [activeFilter, setActiveFilter] = useState<FilterType>('bw');
+    62→  const [scannedResultBase64, setScannedResultBase64] = useState<string | null>(null);
+    63→  const [scannedWidth, setScannedWidth] = useState(0);
+    64→  const [scannedHeight, setScannedHeight] = useState(0);
+    65→
+    66→  // Elements refs
+    67→  const fileInputRef = useRef<HTMLInputElement>(null);
+    68→  const containerRef = useRef<HTMLDivElement>(null);
+    69→  const hiddenImgRef = useRef<HTMLImageElement>(null);
+    70→
+    71→  // Keep folderId referenced so React doesn't strip it
+    72→  void folderId;
+    73→
+    74→  if (!isOpen) return null;
+    75→
+    76→  // File drop helpers
+    77→  const handleFile = (file: File) => {
+    78→    if (!file.type.startsWith('image/')) {
+    79→      setError('Only image files (JPEG, PNG, WEBP) are valid for notebook scans.');
+    80→      return;
+    81→    }
+    82→    setError(null);
+    83→    setIsProcessing(true);
+    84→
+    85→    const reader = new FileReader();
+    86→    reader.onload = (e) => {
+    87→      if (e.target?.result) {
+    88→        setRawImageBase64(e.target.result as string);
+    89→        setStep(2); // Progress to alignment editor
+    90→      }
+    91→      setIsProcessing(false);
+    92→    };
+    93→    reader.onerror = () => {
+    94→      setError("Failed to digest selected file stream.");
+    95→      setIsProcessing(false);
+    96→    };
+    97→    reader.readAsDataURL(file);
+    98→  };
+    99→
+   100→  const handleDragOver = (e: React.DragEvent) => {
+   101→    e.preventDefault();
+   102→  };
+   103→
+   104→  const handleDrop = (e: React.DragEvent) => {
+   105→    e.preventDefault();
+   106→    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+   107→      handleFile(e.dataTransfer.files[0]);
+   108→    }
+   109→  };
+   110→
+   111→  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+   112→    if (e.target.files && e.target.files[0]) {
+   113→      handleFile(e.target.files[0]);
+   114→    }
+   115→  };
+   116→
+   117→  // Draggable corners calculations
+   118→  const handleControlPointDrag = (corner: 'tl'|'tr'|'br'|'bl', clientX: number, clientY: number) => {
+   119→    const container = containerRef.current;
+   120→    if (!container) return;
+   121→    const rect = container.getBoundingClientRect();
+   122→
+   123→    // Maximize relative movement bounding bounds
+   124→    const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+   125→    const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+   126→
+   127→    setCorners(prev => ({
+   128→      ...prev,
+   129→      [corner]: { x, y }
+   130→    }));
+   131→  };
+   132→
+   133→  const startDrag = (corner: 'tl'|'tr'|'br'|'bl', e: React.MouseEvent | React.TouchEvent) => {
+   134→    e.preventDefault();
+   135→    const isTouch = 'touches' in e;
+   136→
+   137→    const moveHandler = (moveEvent: MouseEvent | TouchEvent) => {
+   138→      const clientX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
+   139→      const clientY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY;
+   140→      handleControlPointDrag(corner, clientX, clientY);
+   141→    };
+   142→
+   143→    const stopHandler = () => {
+   144→      document.removeEventListener('mousemove', moveHandler);
+   145→      document.removeEventListener('mouseup', stopHandler);
+   146→      document.removeEventListener('touchmove', moveHandler);
+   147→      document.removeEventListener('touchend', stopHandler);
+   148→    };
+   149→
+   150→    document.addEventListener('mousemove', moveHandler);
+   151→    document.addEventListener('mouseup', stopHandler);
+   152→    document.addEventListener('touchmove', moveHandler, { passive: false });
+   153→    document.addEventListener('touchend', stopHandler);
+   154→  };
+   155→
+   156→  // Gemini AI auto corner detection tool request call
+   157→  const triggerAICornerDetection = async () => {
+   158→    if (!rawImageBase64) return;
+   159→    setIsProcessing(true);
+   160→    setError(null);
+   161→    try {
+   162→      const res = await apiFetch('/api/scan/detect-corners', {
+   163→        method: 'POST',
+   164→        headers: { 'Content-Type': 'application/json' },
+   165→        body: JSON.stringify({ imageBase64: rawImageBase64 })
+   166→      });
+   167→
+   168→      const data = await res.json();
+   169→      if (!res.ok) {
+   170→        throw new Error(data.error || "Failed to trigger AI vision assistance.");
+   171→      }
+   172→
+   173→      if (data.corners) {
+   174→        setCorners({
+   175→          tl: { x: data.corners.topLeft[0], y: data.corners.topLeft[1] },
+   176→          tr: { x: data.corners.topRight[0], y: data.corners.topRight[1] },
+   177→          br: { x: data.corners.bottomRight[0], y: data.corners.bottomRight[1] },
+   178→          bl: { x: data.corners.bottomLeft[0], y: data.corners.bottomLeft[1] }
+   179→        });
+   180→        setSuccessMsg("AI scan boundaries locked successfully!");
+   181→        setTimeout(() => setSuccessMsg(null), 1500);
+   182→      }
+   183→    } catch (err: any) {
+   184→      console.warn("AI corner detection fallback triggered:", err.message);
+   185→      setError("AI model busy, approx boundaries placed. Feel free to drag the glowing corners manually!");
+   186→    } finally {
+   187→      setIsProcessing(false);
+   188→    }
+   189→  };
+   190→
+   191→  const handleResetCorners = () => {
+   192→    setCorners({
+   193→      tl: { x: 0.10, y: 0.10 },
+   194→      tr: { x: 0.90, y: 0.10 },
+   195→      br: { x: 0.90, y: 0.90 },
+   196→      bl: { x: 0.10, y: 0.90 }
+   197→    });
+   198→  };
+   199→
+   200→  // Core perspective transformation & image filter flattening engine
+   201→  const executePerspectiveAlign = () => {
+   202→    if (!hiddenImgRef.current || !rawImageBase64) return;
+   203→    setIsProcessing(true);
+   204→
+   205→    setTimeout(() => {
+   206→      try {
+   207→        const img = hiddenImgRef.current!;
+   208→        const srcW = img.naturalWidth || img.width;
+   209→        const srcH = img.naturalHeight || img.height;
+   210→
+   211→        const srcCanvas = document.createElement('canvas');
+   212→        srcCanvas.width = srcW;
+   213→        srcCanvas.height = srcH;
+   214→        const srcCtx = srcCanvas.getContext('2d');
+   215→        if (!srcCtx) {
+   216→          setError("Canvas processor failed to execute context.");
+   217→          setIsProcessing(false);
+   218→          return;
+   219→        }
+   220→
+   221→        srcCtx.drawImage(img, 0, 0);
+   222→        const srcData = srcCtx.getImageData(0, 0, srcW, srcH);
+   223→
+   224→        // Calculate original high-resolution corner coords in pixels
+   225→        const x0 = corners.tl.x * srcW, y0 = corners.tl.y * srcH;
+   226→        const x1 = corners.tr.x * srcW, y1 = corners.tr.y * srcH;
+   227→        const x2 = corners.br.x * srcW, y2 = corners.br.y * srcH;
+   228→        const x3 = corners.bl.x * srcW, y3 = corners.bl.y * srcH;
+   229→
+   230→        // Calculate width and height dynamically based on the actual physical quadrilaterals (no shrinking)
+   231→        const topWidth = Math.hypot(x1 - x0, y1 - y0);
+   232→        const bottomWidth = Math.hypot(x2 - x3, y2 - y3);
+   233→        const leftHeight = Math.hypot(x3 - x0, y3 - y0);
+   234→        const rightHeight = Math.hypot(x2 - x1, y2 - y1);
+   235→
+   236→        let dstW = Math.round(Math.max(topWidth, bottomWidth));
+   237→        let dstH = Math.round(Math.max(leftHeight, rightHeight));
+   238→
+   239→        // Sanitize dimension calculation boundaries
+   240→        if (dstW < 300) dstW = 800;
+   241→        if (dstH < 300) dstH = 1100;
+   242→
+   243→        // Safe upper bound limit for mobile browsers processing memory
+   244→        const maxLimit = 2500;
+   245→        if (dstW > maxLimit || dstH > maxLimit) {
+   246→          const ratio = dstW / dstH;
+   247→          if (dstW > dstH) {
+   248→            dstW = maxLimit;
+   249→            dstH = Math.round(maxLimit / ratio);
+   250→          } else {
+   251→            dstH = maxLimit;
+   252→            dstW = Math.round(maxLimit * ratio);
+   253→          }
+   254→        }
+   255→
+   256→        setScannedWidth(dstW);
+   257→        setScannedHeight(dstH);
+   258→
+   259→        const dstCanvas = document.createElement('canvas');
+   260→        dstCanvas.width = dstW;
+   261→        dstCanvas.height = dstH;
+   262→        const dstCtx = dstCanvas.getContext('2d');
+   263→        if (!dstCtx) {
+   264→          setError("Destination canvas allocation failed.");
+   265→          setIsProcessing(false);
+   266→          return;
+   267→        }
+   268→
+   269→        const dstData = dstCtx.createImageData(dstW, dstH);
+   270→        const srcPixels = srcData.data;
+   271→        const dstPixels = dstData.data;
+   272→
+   273→        for (let yd = 0; yd < dstH; yd++) {
+   274→          const v = yd / (dstH - 1);
+   275→          for (let xd = 0; xd < dstW; xd++) {
+   276→            const u = xd / (dstW - 1);
+   277→
+   278→            // Pure bilinear interpolation mapping
+   279→            const xs = Math.round((1 - u) * (1 - v) * x0 + u * (1 - v) * x1 + u * v * x2 + (1 - u) * v * x3);
+   280→            const ys = Math.round((1 - u) * (1 - v) * y0 + u * (1 - v) * y1 + u * v * y2 + (1 - u) * v * y3);
+   281→
+   282→            const clampedXs = Math.max(0, Math.min(srcW - 1, xs));
+   283→            const clampedYs = Math.max(0, Math.min(srcH - 1, ys));
+   284→
+   285→            const srcIdx = (clampedYs * srcW + clampedXs) * 4;
+   286→            const dstIdx = (yd * dstW + xd) * 4;
+   287→
+   288→            let r = srcPixels[srcIdx];
+   289→            let g = srcPixels[srcIdx + 1];
+   290→            let b = srcPixels[srcIdx + 2];
+   291→            const a = srcPixels[srcIdx + 3];
+   292→
+   293→            if (activeFilter === 'bw') {
+   294→              // Document scanning filter (convert grayscale + expand contrast stretch + adaptively wash shadows)
+   295→              const grayscale = 0.299 * r + 0.587 * g + 0.114 * b;
+   296→
+   297→              let finalVal = grayscale;
+   298→              if (grayscale > 115) {
+   299→                // Wash out soft lighting reflections to clean white background
+   300→                finalVal = Math.min(255, grayscale * 1.35);
+   301→              } else {
+   302→                // Deepen pen/pencil ink contrasts
+   303→                finalVal = Math.max(0, grayscale * 0.75);
+   304→              }
+   305→
+   306→              // Contrast boosting stretch formula
+   307→              finalVal = (finalVal - 128) * 1.6 + 128;
+   308→              finalVal = Math.max(0, Math.min(255, finalVal));
+   309→
+   310→              r = finalVal;
+   311→              g = finalVal;
+   312→              b = finalVal;
+   313→            } else if (activeFilter === 'color') {
+   314→              // Enhanced color scan to suppress soft background shadows
+   315→              r = Math.min(255, r * 1.18);
+   316→              g = Math.min(255, g * 1.18);
+   317→              b = Math.min(255, b * 1.18);
+   318→            }
+   319→
+   320→            dstPixels[dstIdx] = r;
+   321→            dstPixels[dstIdx + 1] = g;
+   322→            dstPixels[dstIdx + 2] = b;
+   323→            dstPixels[dstIdx + 3] = a;
+   324→          }
+   325→        }
+   326→
+   327→        dstCtx.putImageData(dstData, 0, 0);
+   328→        const dataUrl = dstCanvas.toDataURL('image/jpeg', 0.90);
+   329→        setScannedResultBase64(dataUrl);
+   330→        setIsProcessing(false);
+   331→        setStep(3); // Progress to name save page
+   332→      } catch (err: any) {
+   333→        console.warn("Canvas workspace alignment error context fallback activated:", err);
+   334→        // Fallback: Bypass warping/cropping filters and use original raw image
+   335→        setScannedResultBase64(rawImageBase64);
+   336→        setIsProcessing(false);
+   337→        setStep(3);
+   338→      }
+   339→    }, 100);
+   340→  };
+   341→
+   342→  // Convert Base64 scan output to actual JPEG file blob to upload securely
+   343→  const submitAlignedPageUpload = async (e: React.FormEvent) => {
+   344→    e.preventDefault();
+   345→    if (!scannedResultBase64) return;
+   346→    setError(null);
+   347→    setSuccessMsg(null);
+   348→    setIsProcessing(true);
+   349→
+   350→    const checkTitle = title.trim() || 'Scanned Notebook Page';
+   351→
+   352→    try {
+   353→      // Decode Base64 string to Blob
+   354→      const b64Data = scannedResultBase64.replace(/^data:image\/\w+;base64,/, "");
+   355→      const byteCharacters = atob(b64Data);
+   356→      const byteArrays: BlobPart[] = [];
+   357→      for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+   358→        const slice = byteCharacters.slice(offset, offset + 512);
+   359→        const byteNumbers = new Array(slice.length);
+   360→        for (let i = 0; i < slice.length; i++) {
+   361→          byteNumbers[i] = slice.charCodeAt(i);
+   362→        }
+   363→        const byteArray = new Uint8Array(byteNumbers);
+   364→        byteArrays.push(byteArray);
+   365→      }
+   366→      const blob = new Blob(byteArrays, { type: 'image/jpeg' });
+   367→
+   368→      // Package into standard Multipart FormData
+   369→      const formData = new FormData();
+   370→      formData.append('image', blob, 'scanned_notebook_page.jpg');
+   371→
+   372→      // 1. Upload scan image to backend uploads folder with secure validation
+   373→      const uploadRes = await apiFetch('/api/images/upload-file', {
+   374→        method: 'POST',
+   375→        body: formData,
+   376→      });
+   377→
+   378→      const uploadResult = await uploadRes.json();
+   379→      if (!uploadRes.ok) {
+   380→        throw new Error(uploadResult.error || "Fail to upload parsed scan image.");
+   381→      }
+   382→
+   383→      // 2. Map scanned image URL coordinates to Course Practical Folder
+   384→      await onUploadSuccess(uploadResult.url, checkTitle);
+   385→
+   386→      setSuccessMsg("Notebook scan file attached successfully!");
+   387→      setTimeout(() => {
+   388→        onClose();
+   389→        resetModal();
+   390→      }, 1200);
+   391→    } catch (err: any) {
+   392→      setError(err.message || "Workbook scan upload failed.");
+   393→    } finally {
+   394→      setIsProcessing(false);
+   395→    }
+   396→  };
+   397→
+   398→  // External Direct Web url link upload
+   399→  const submitWebLinkUpload = async (e: React.FormEvent) => {
+   400→    e.preventDefault();
+   401→    if (!title.trim()) {
+   402→      setError("Please input a valid page description label.");
+   403→      return;
+   404→    }
+   405→    setError(null);
+   406→    setIsProcessing(true);
+   407→
+   408→    try {
+   409→      const checkTitle = title.trim();
+   410→      await onUploadSuccess(rawImageBase64?.trim() || "", checkTitle);
+   411→      setSuccessMsg("External web notebook link attached!");
+   412→      setTimeout(() => {
+   413→        onClose();
+   414→        resetModal();
+   415→      }, 1200);
+   416→    } catch (err: any) {
+   417→      setError(err.message || "Failed to link external path.");
+   418→    } finally {
+   419→      setIsProcessing(false);
+   420→    }
+   421→  };
+   422→
+   423→  const resetModal = () => {
+   424→    setStep(1);
+   425→    setRawImageBase64(null);
+   426→    setScannedResultBase64(null);
+   427→    setScannedWidth(0);
+   428→    setScannedHeight(0);
+   429→    setImageLoaded(false);
+   430→    setTitle('');
+   431→    setError(null);
+   432→    setSuccessMsg(null);
+   433→    setCorners({
+   434→      tl: { x: 0.15, y: 0.15 },
+   435→      tr: { x: 0.85, y: 0.15 },
+   436→      br: { x: 0.85, y: 0.85 },
+   437→      bl: { x: 0.15, y: 0.85 }
+   438→    });
+   439→  };
+   440→
+   441→  return (
+   442→    <AnimatePresence>
+   443→      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+   444→        {/* Backdrop glass blur overlay */}
+   445→        <motion.div
+   446→          initial={{ opacity: 0 }}
+   447→          animate={{ opacity: 1 }}
+   448→          exit={{ opacity: 0 }}
+   449→          onClick={() => { onClose(); resetModal(); }}
+   450→          className="absolute inset-0 bg-black/75 backdrop-blur-[6px]"
+   451→          id="scanner-modal-backdrop"
+   452→        />
+   453→
+   454→        {/* Floating Scanner Box */}
+   455→        <motion.div
+   456→          initial={{ scale: 0.95, y: 25, opacity: 0 }}
+   457→          animate={{ scale: 1, y: 0, opacity: 1 }}
+   458→          exit={{ scale: 0.95, y: 25, opacity: 0 }}
+   459→          className="relative w-full max-w-2xl max-w-[92vw] bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] text-slate-100 my-4"
+   460→          id="scanner-container-card"
+   461→        >
+   462→          {/* Header segment banner */}
+   463→          <div className="p-4 sm:p-5 border-b border-zinc-850 bg-zinc-90 w-full flex items-center justify-between gap-3">
+   464→            <div className="flex items-center gap-3 min-w-0">
+   465→              <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-md shrink-0">
+   466→                <FileImage className="w-5 h-5" />
+   467→              </div>
+   468→              <div className="min-w-0">
+   469→                <h3 className="text-sm font-black text-white flex items-center gap-2 tracking-tight flex-wrap">
+   470→                  <span className="truncate">Advanced Notebook Scanner</span>
+   471→                  <span className="text-[9px] bg-cyan-400/10 text-cyan-400 px-2 py-0.5 rounded-full font-mono border border-cyan-400/20 uppercase tracking-widest font-extrabold animate-pulse shrink-0">Auto Align</span>
+   472→                </h3>
+   473→                <p className="text-[10px] text-zinc-500 font-mono tracking-wide mt-0.5 uppercase truncate max-w-[200px] sm:max-w-[320px]">
+   474→                  Subject Folder: {folderTitle}
+   475→                </p>
+   476→              </div>
+   477→            </div>
+   478→
+   479→            <button
+   480→              onClick={() => { onClose(); resetModal(); }}
+   481→              className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all cursor-pointer border border-transparent hover:border-zinc-800 shrink-0"
+   482→              aria-label="Close"
+   483→            >
+   484→              <X className="w-4 h-4" />
+   485→            </button>
+   486→          </div>
+   487→
+   488→          {/* Core Content Body wizard switcher */}
+   489→          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 min-h-0">
+   490→
+   491→            {/* Notifications / Errors banner */}
+   492→            {error && (
+   493→              <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold rounded-xl flex items-center gap-2.5 break-words">
+   494→                <AlertTriangle className="w-4 h-4 shrink-0" />
+   495→                <span className="flex-1 text-[11px] leading-relaxed break-words">{error}</span>
+   496→              </div>
+   497→            )}
+   498→
+   499→            {successMsg && (
+   500→              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold rounded-xl flex items-center gap-2.5 break-words">
+   501→                <CheckCircle className="w-4 h-4 shrink-0 animate-bounce" />
+   502→                <span className="text-[11px] font-bold break-words">{successMsg}</span>
+   503→              </div>
+   504→            )}
+   505→
+   506→            {/* STEP 1: CHOOSE AND INGEST PHOTO SOURCE */}
+   507→            {step === 1 && (
+   508→              <div className="space-y-4">
+   509→                {/* Selector tab selection bar */}
+   510→                <div className="flex p-1 bg-zinc-900 border border-zinc-850 rounded-xl">
+   511→                  <button
+   512→                    onClick={() => { setActiveTab('upload'); setError(null); }}
+   513→                    className={`flex-1 py-2 min-h-[44px] text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${activeTab === 'upload' ? 'bg-cyan-500 text-white shadow-md' : 'text-zinc-400 hover:text-zinc-200'}`}
+   514→                  >
+   515→                    <Upload className="w-3.5 h-3.5" />
+   516→                    <span className="truncate">Upload Image Scan</span>
+   517→                  </button>
+   518→                  <button
+   519→                    onClick={() => { setActiveTab('url'); setError(null); }}
+   520→                    className={`flex-1 py-2 min-h-[44px] text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${activeTab === 'url' ? 'bg-cyan-500 text-white shadow-md' : 'text-zinc-400 hover:text-zinc-200'}`}
+   521→                  >
+   522→                    <LinkIcon className="w-3.5 h-3.5" />
+   523→                    <span className="truncate">Web Image Link</span>
+   524→                  </button>
+   525→                </div>
+   526→
+   527→                {/* Tab Content 1: Traditional Drag and Drop upload Area */}
+   528→                {activeTab === 'upload' && (
+   529→                  <div className="space-y-2">
+   530→                    <p className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase font-semibold">
+   531→                      Drag & Drop Notebook File Scan
+   532→                    </p>
+   533→
+   534→                    <div
+   535→                      onDragOver={handleDragOver}
+   536→                      onDrop={handleDrop}
+   537→                      onClick={() => fileInputRef.current?.click()}
+   538→                      className="w-full min-h-[220px] border-2 border-dashed border-zinc-800 hover:border-cyan-500/50 bg-zinc-900/20 hover:bg-zinc-900/40 rounded-2xl flex flex-col items-center justify-center p-4 sm:p-6 transition-all duration-300 cursor-pointer group touch-manipulation"
+   539→                    >
+   540→                      <input
+   541→                        ref={fileInputRef}
+   542→                        type="file"
+   543→                        accept="image/*"
+   544→                        onChange={handleFileChange}
+   545→                        className="hidden"
+   546→                      />
+   547→
+   548→                      <div className="p-3.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 group-hover:bg-cyan-500/10 group-hover:text-cyan-400 group-hover:border-cyan-500/20 transition-all duration-300 mb-3 shadow-inner">
+   549→                        <Upload className="w-6 h-6 group-hover:scale-110 transition-transform duration-300" />
+   550→                      </div>
+   551→                      <p className="text-xs font-black text-zinc-200 text-center tracking-tight break-words px-2">
+   552→                        Drop your diagram sketch sheet or photo scan here
+   553→                      </p>
+   554→                      <p className="text-[10px] text-zinc-500 text-center mt-1 break-words px-2">
+   555→                        Any standard image format (JPEG, PNG, WEBP) is accepted
+   556→                      </p>
+   557→                      <button className="mt-4 px-4 py-2 min-h-[44px] bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-xl text-[10.5px] font-bold text-slate-300 transition-colors">
+   558→                        Browse Files
+   559→                      </button>
+   560→                    </div>
+   561→                  </div>
+   562→                )}
+   563→
+   564→                {/* Tab Content 2: External Direct Image web input url */}
+   565→                {activeTab === 'url' && (
+   566→                  <div className="space-y-4">
+   567→                    <div className="p-4 bg-zinc-900/40 border border-zinc-850 rounded-2xl space-y-3">
+   568→                      <div className="space-y-1.5">
+   569→                        <label className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase font-semibold block">
+   570→                          Direct Web Image Link Endpoint
+   571→                        </label>
+   572→                        <div className="relative">
+   573→                          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-zinc-500 pointer-events-none">
+   574→                            <LinkIcon className="w-3.5 h-3.5" />
+   575→                          </span>
+   576→                          <input
+   577→                            type="url"
+   578→                            placeholder="https://example.com/student-practical-note.jpg"
+   579→                            onChange={(e) => setRawImageBase64(e.target.value)}
+   580→                            className="w-full pl-9 pr-4 py-2.5 min-h-[44px] bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-650 rounded-xl outline-none focus:border-cyan-500/50 transition-all font-sans"
+   581→                          />
+   582→                        </div>
+   583→                      </div>
+   584→                      <div className="space-y-1.5">
+   585→                        <label className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase font-semibold block">
+   586→                          Document Page Title Label
+   587→                        </label>
+   588→                        <input
+   589→                          type="text"
+   590→                          required
+   591→                          placeholder="e.g. Acid titration curve graph or Refraction Diagram"
+   592→                          value={title}
+   593→                          onChange={(e) => setTitle(e.target.value)}
+   594→                          className="w-full px-4 py-2.5 min-h-[44px] bg-zinc-900 border border-zinc-800 text-xs text-white placeholder-zinc-650 rounded-xl outline-none focus:border-cyan-500/50 transition-all font-sans"
+   595→                        />
+   596→                      </div>
+   597→                      <button
+   598→                        type="button"
+   599→                        onClick={submitWebLinkUpload}
+   600→                        disabled={isProcessing || !title.trim()}
+   601→                        className="w-full py-2.5 min-h-[44px] bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-black transition-all shadow-md disabled:opacity-40"
+   602→                      >
+   603→                        Submit External Web Attachment
+   604→                      </button>
+   605→                    </div>
+   606→                  </div>
+   607→                )}
+   608→              </div>
+   609→            )}
+   610→
+   611→            {/* STEP 2: CORNER AUTO-ALIGNMENT AND PERSPECTIVE WARPER GRAPHIC BOARD */}
+   612→            {step === 2 && rawImageBase64 && (
+   613→              <div className="space-y-5 flex flex-col items-center">
+   614→                <div className="w-full text-center space-y-1.5 mb-2">
+   615→                  <div className="text-xs font-extrabold text-white tracking-wide uppercase flex items-center justify-center gap-1.5 flex-wrap">
+   616→                    <Sparkles className="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
+   617→                    <span className="truncate">Step 2: Calibrate Page Boundaries</span>
+   618→                  </div>
+   619→                  <p className="text-[10.5px] text-zinc-400 max-w-lg mx-auto break-words px-2">
+   620→                    Drag the 4 glowing cyan pins to match the corners of your notebook page! Correct alignments remove perspective angles, creating flat, clean scans.
+   621→                  </p>
+   622→                </div>
+   623→
+   624→                {/* Main Interactive Warping Canvas Container box */}
+   625→                <div
+   626→                  ref={containerRef}
+   627→                  className="relative w-full max-w-sm max-w-[88vw] aspect-[3/4] bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center cursor-crosshair select-none touch-none"
+   628→                  id="perspective-warping-board"
+   629→                >
+   630→                  {/* Underlay Raw rendering Image */}
+   631→                  <img
+   632→                    ref={hiddenImgRef}
+   633→                    src={rawImageBase64}
+   634→                    alt="Scan calibrating underlay"
+   635→                    onLoad={() => setImageLoaded(true)}
+   636→                    className="w-full h-full object-contain opacity-70 border border-transparent pointer-events-none"
+   637→                  />
+   638→
+   639→                  {/* SVG overlay path lines reflecting the calibrated polygon area */}
+   640→                  {imageLoaded && (
+   641→                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
+   642→                      <polygon
+   643→                        points={`
+   644→                          ${corners.tl.x * 100}%,${corners.tl.y * 100}%
+   645→                          ${corners.tr.x * 100}%,${corners.tr.y * 100}%
+   646→                          ${corners.br.x * 100}%,${corners.br.y * 100}%
+   647→                          ${corners.bl.x * 100}%,${corners.bl.y * 100}%
+   648→                        `}
+   649→                        className="fill-cyan-500/15 stroke-cyan-400 stroke-2 stroke-dasharray-[4,4] animate-[dash_10s_linear_infinite]"
+   650→                        style={{ strokeDasharray: '4,4' }}
+   651→                      />
+   652→                    </svg>
+   653→                  )}
+   654→
+   655→                  {/* Draggable glowing corner markers anchors */}
+   656→                  {imageLoaded && (
+   657→                    <>
+   658→                      {/* TOP LEFT */}
+   659→                      <div
+   660→                        onMouseDown={(e) => startDrag('tl', e)}
+   661→                        onTouchStart={(e) => startDrag('tl', e)}
+   662→                        style={{ left: `${corners.tl.x * 100}%`, top: `${corners.tl.y * 100}%` }}
+   663→                        className="absolute w-7 h-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-cyan-400 bg-zinc-950/80 cursor-grab active:cursor-grabbing hover:scale-110 active:scale-125 transition-transform z-20 flex items-center justify-center shadow-lg shadow-cyan-400/20 group touch-none"
+   664→                      >
+   665→                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+   666→                        <span className="hidden group-hover:block absolute top-7 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[8px] text-cyan-400 uppercase font-mono tracking-tight whitespace-nowrap">TOP-LEFT</span>
+   667→                      </div>
+   668→
+   669→                      {/* TOP RIGHT */}
+   670→                      <div
+   671→                        onMouseDown={(e) => startDrag('tr', e)}
+   672→                        onTouchStart={(e) => startDrag('tr', e)}
+   673→                        style={{ left: `${corners.tr.x * 100}%`, top: `${corners.tr.y * 100}%` }}
+   674→                        className="absolute w-7 h-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-cyan-400 bg-zinc-950/80 cursor-grab active:cursor-grabbing hover:scale-110 active:scale-125 transition-transform z-20 flex items-center justify-center shadow-lg shadow-cyan-400/20 group touch-none"
+   675→                      >
+   676→                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+   677→                        <span className="hidden group-hover:block absolute top-7 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[8px] text-cyan-400 uppercase font-mono tracking-tight whitespace-nowrap">TOP-RIGHT</span>
+   678→                      </div>
+   679→
+   680→                      {/* BOTTOM RIGHT */}
+   681→                      <div
+   682→                        onMouseDown={(e) => startDrag('br', e)}
+   683→                        onTouchStart={(e) => startDrag('br', e)}
+   684→                        style={{ left: `${corners.br.x * 100}%`, top: `${corners.br.y * 100}%` }}
+   685→                        className="absolute w-7 h-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-cyan-400 bg-zinc-950/80 cursor-grab active:cursor-grabbing hover:scale-110 active:scale-125 transition-transform z-20 flex items-center justify-center shadow-lg shadow-cyan-400/20 group touch-none"
+   686→                      >
+   687→                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+   688→                        <span className="hidden group-hover:block absolute top-7 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[8px] text-cyan-400 uppercase font-mono tracking-tight whitespace-nowrap">BOT-RIGHT</span>
+   689→                      </div>
+   690→
+   691→                      {/* BOTTOM LEFT */}
+   692→                      <div
+   693→                        onMouseDown={(e) => startDrag('bl', e)}
+   694→                        onTouchStart={(e) => startDrag('bl', e)}
+   695→                        style={{ left: `${corners.bl.x * 100}%`, top: `${corners.bl.y * 100}%` }}
+   696→                        className="absolute w-7 h-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-cyan-400 bg-zinc-950/80 cursor-grab active:cursor-grabbing hover:scale-110 active:scale-125 transition-transform z-20 flex items-center justify-center shadow-lg shadow-cyan-400/20 group touch-none"
+   697→                      >
+   698→                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+   699→                        <span className="hidden group-hover:block absolute top-7 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[8px] text-cyan-400 uppercase font-mono tracking-tight whitespace-nowrap">BOT-LEFT</span>
+   700→                      </div>
+   701→                    </>
+   702→                  )}
+   703→                </div>
+   704→
+   705→                {/* Dashboard Options: AI Alignment Trigger, Grayscale Filters settings, reset buttons */}
+   706→                <div className="w-full p-4 bg-zinc-900 border border-zinc-850 rounded-2xl space-y-4">
+   707→                  <div className="flex flex-wrap items-center justify-between gap-3">
+   708→                    <div className="flex items-center gap-2 flex-wrap">
+   709→                      <button
+   710→                        type="button"
+   711→                        onClick={triggerAICornerDetection}
+   712→                        disabled={isProcessing}
+   713→                        className="px-4 py-2.5 min-h-[44px] bg-cyan-500 hover:bg-cyan-400 text-white border border-cyan-400/10 hover:border-cyan-400/20 font-black rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-50"
+   714→                      >
+   715→                        <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-spin" />
+   716→                        <span className="truncate">AI Auto-Snap (Gemini Vision)</span>
+   717→                      </button>
+   718→                      <button
+   719→                        type="button"
+   720→                        onClick={handleResetCorners}
+   721→                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center bg-zinc-950 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl border border-zinc-800 cursor-pointer"
+   722→                        title="Reset corners"
+   723→                      >
+   724→                        <RotateCcw className="w-4 h-4" />
+   725→                      </button>
+   726→                    </div>
+   727→
+   728→                    <div className="flex items-center gap-1 px-1 bg-zinc-950 border border-zinc-850 rounded-xl flex-wrap">
+   729→                      <button
+   730→                        type="button"
+   731→                        onClick={() => setActiveFilter('bw')}
+   732→                        className={`px-3 py-1.5 min-h-[36px] text-[10.5px] font-extrabold rounded-lg transition-all ${activeFilter === 'bw' ? 'bg-cyan-500/10 text-cyan-400 font-black' : 'text-zinc-500 hover:text-zinc-300'}`}
+   733→                      >
+   734→                        BW Scan
+   735→                      </button>
+   736→                      <button
+   737→                        type="button"
+   738→                        onClick={() => setActiveFilter('color')}
+   739→                        className={`px-3 py-1.5 min-h-[36px] text-[10.5px] font-extrabold rounded-lg transition-all ${activeFilter === 'color' ? 'bg-cyan-500/10 text-cyan-400 font-black' : 'text-zinc-500 hover:text-zinc-300'}`}
+   740→                      >
+   741→                        Color Booster
+   742→                      </button>
+   743→                      <button
+   744→                        type="button"
+   745→                        onClick={() => setActiveFilter('none')}
+   746→                        className={`px-3 py-1.5 min-h-[36px] text-[10.5px] font-extrabold rounded-lg transition-all ${activeFilter === 'none' ? 'bg-cyan-500/10 text-cyan-400 font-black' : 'text-zinc-500 hover:text-zinc-300'}`}
+   747→                      >
+   748→                        Original
+   749→                      </button>
+   750→                    </div>
+   751→                  </div>
+   752→
+   753→                  <div className="pt-2.5 border-t border-zinc-850 flex items-center justify-between gap-3 flex-wrap">
+   754→                    <button
+   755→                      type="button"
+   756→                      onClick={resetModal}
+   757→                      className="px-4 py-2 min-h-[44px] text-xs font-bold text-zinc-400 hover:text-zinc-200 cursor-pointer"
+   758→                    >
+   759→                      Choose different image
+   760→                    </button>
+   761→
+   762→                    <button
+   763→                      type="button"
+   764→                      onClick={executePerspectiveAlign}
+   765→                      disabled={isProcessing}
+   766→                      className="px-4 sm:px-5 py-2.5 min-h-[44px] bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-lg flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+   767→                    >
+   768→                      {isProcessing ? (
+   769→                        <>
+   770→                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+   771→                          <span className="truncate">Aligning page...</span>
+   772→                        </>
+   773→                      ) : (
+   774→                        <>
+   775→                          <span className="truncate">Align & Flatten Document</span>
+   776→                          <ArrowRight className="w-4 h-4" />
+   777→                        </>
+   778→                      )}
+   779→                    </button>
+   780→                  </div>
+   781→                </div>
+   782→              </div>
+   783→            )}
+   784→
+   785→            {/* STEP 3: PREVIEW ALIGNED STATIC JPEGS SCAN, AND ASSIGN FILENAMES */}
+   786→            {step === 3 && scannedResultBase64 && (
+   787→              <form onSubmit={submitAlignedPageUpload} className="space-y-4 flex flex-col items-center">
+   788→                <div className="w-full text-center space-y-1 mb-2">
+   789→                  <div className="text-xs font-extrabold text-white tracking-wide uppercase flex items-center justify-center gap-1.5 flex-wrap">
+   790→                    <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+   791→                    <span className="truncate">Step 3: Save Final Aligned Sheet</span>
+   792→                  </div>
+   793→                  <p className="text-[10.5px] text-zinc-400 break-words px-2">
+   794→                    Perfect alignment generated! Give this page a course name label, review the scanned output below, and upload.
+   795→                  </p>
+   796→                </div>
+   797→
+   798→                <div className="relative w-full max-w-[200px] aspect-[3/4] bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-inner shadow-black">
+   799→                  <img
+   800→                    src={scannedResultBase64}
+   801→                    alt="Aligned Result Preview"
+   802→                    className="w-full h-full object-cover"
+   803→                  />
+   804→                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+   805→                  <span className="absolute bottom-2 left-2 text-[8px] font-mono bg-zinc-950/80 text-cyan-400 border border-zinc-800 px-1.5 py-0.5 rounded whitespace-nowrap">{scannedWidth} x {scannedHeight} {scannedWidth > scannedHeight ? '(Landscape HD)' : '(Portrait HD)'}</span>
+   806→                </div>
+   807→
+   808→                <div className="w-full p-4 bg-zinc-900 border border-zinc-850 rounded-2xl space-y-4">
+   809→                  <div className="space-y-1.5">
+   810→                    <label className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase font-semibold block">
+   811→                      Notebook Page / File Label Name
+   812→                    </label>
+   813→                    <input
+   814→                      type="text"
+   815→                      required
+   816→                      placeholder="e.g. Acid titration curve graph or Refraction Diagram"
+   817→                      value={title}
+   818→                      onChange={(e) => setTitle(e.target.value)}
+   819→                      className="w-full px-4 py-2.5 min-h-[44px] bg-zinc-950 border border-zinc-800 text-xs text-white placeholder-zinc-650 rounded-xl outline-none focus:border-cyan-500/50 transition-all font-sans"
+   820→                    />
+   821→                  </div>
+   822→
+   823→                  <div className="pt-2 border-t border-zinc-850 flex items-center justify-between gap-3 flex-wrap">
+   824→                    <button
+   825→                      type="button"
+   826→                      onClick={() => setStep(2)}
+   827→                      className="px-4 py-2 min-h-[44px] text-xs font-bold text-zinc-400 hover:text-zinc-200 cursor-pointer"
+   828→                    >
+   829→                      Bypass back to Alignment board
+   830→                    </button>
+   831→
+   832→                    <button
+   833→                      type="submit"
+   834→                      disabled={isProcessing}
+   835→                      className="px-4 sm:px-5 py-2.5 min-h-[44px] bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+   836→                    >
+   837→                      {isProcessing ? (
+   838→                        <>
+   839→                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+   840→                          <span className="truncate">Uploading Scan...</span>
+   841→                        </>
+   842→                      ) : (
+   843→                        <>
+   844→                          <Check className="w-4 h-4 animate-bounce" />
+   845→                          <span className="truncate">Attach Scanned Page</span>
+   846→                        </>
+   847→                      )}
+   848→                    </button>
+   849→                  </div>
+   850→                </div>
+   851→              </form>
+   852→            )}
+   853→
+   854→          </div>
+   855→        </motion.div>
+   856→      </div>
+   857→    </AnimatePresence>
+   858→  );
+   859→};
+   860→
