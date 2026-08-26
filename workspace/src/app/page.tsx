@@ -85,6 +85,10 @@ export interface AnnouncementType {
   deadline?: string;
   createdAt: string;
   createdByName: string;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileSize?: number;
+  targetUserId?: string | null;
 }
 
 type ViewState = 'landing' | 'auth' | 'dashboard' | 'subject' | 'folder' | 'admins' | 'chat' | 'academy' | 'profile' | 'artists' | 'artist_dashboard' | 'creds';

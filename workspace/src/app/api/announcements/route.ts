@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         title: String(title).slice(0, 200),
         content: String(content).slice(0, 5000),
         deadline: deadline ? String(deadline) : null,
-        fileUrl: fileUrl ? String(fileUrl).slice(0, 500000) : null,
+        fileUrl: fileUrl ? String(fileUrl).slice(0, 70000000) : null, // 50MB file → ~67MB base64
         fileName: fileName ? String(fileName).slice(0, 255) : null,
         fileSize: Number(fileSize) || 0,
         targetUserId: targetUserId ? String(targetUserId) : null,

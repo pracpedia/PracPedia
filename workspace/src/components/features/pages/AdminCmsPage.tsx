@@ -453,6 +453,8 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   const [announceDeadline, setAnnounceDeadline] = useState('');
   const [announceFile, setAnnounceFile] = useState<{ url: string; name: string; size: number } | null>(null);
   const [announceTargetUser, setAnnounceTargetUser] = useState(''); // user ID or '' for broadcast
+  const [announceTargetName, setAnnounceTargetName] = useState(''); // display name
+  const [announceSearch, setAnnounceSearch] = useState('');
   const announceFileRef = useRef<HTMLInputElement>(null);
 
   // Super Admin States (only used when user.role === 'super_admin')
@@ -914,6 +916,8 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
         setAnnounceDeadline('');
         setAnnounceFile(null);
         setAnnounceTargetUser('');
+        setAnnounceTargetName('');
+        setAnnounceSearch('');
         refreshWorkspaceData();
       } else {
         const err = await res.json();
@@ -931,8 +935,8 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
     const file = e.target.files?.[0];
     if (announceFileRef.current) announceFileRef.current.value = '';
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      showError('Max 10 MB for file attachments.');
+    if (file.size > 50 * 1024 * 1024) {
+      showError('Max 50 MB for file attachments.');
       return;
     }
     const reader = new FileReader();
@@ -2506,24 +2510,91 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-dashed border-white/15 text-xs text-slate-400 hover:text-cyan-300 hover:border-cyan-500/30 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[44px]"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    Upload file (max 10 MB)
+                    Upload file (max 50 MB)
                   </button>
                 )}
               </div>
 
-              {/* Target user selection */}
+              {/* Target user selection with search */}
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-mono font-bold uppercase">Share With</label>
-                <select
-                  value={announceTargetUser}
-                  onChange={(e) => setAnnounceTargetUser(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-white/10 text-xs text-slate-200 rounded-xl outline-none cursor-pointer focus:border-cyan-500/50 min-h-[44px]"
+
+                {/* Broadcast option */}
+                <button
+                  type="button"
+                  onClick={() => { setAnnounceTargetUser(''); setAnnounceTargetName(''); setAnnounceSearch(''); }}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[40px] flex items-center gap-2 ${
+                    !announceTargetUser ? 'bg-cyan-500/15 border border-cyan-500/30 text-cyan-300' : 'bg-slate-900 border border-white/5 text-slate-400 hover:text-slate-200'
+                  }`}
                 >
-                  <option value="">📢 Broadcast to ALL users</option>
-                  {studentsList.map((s) => (
-                    <option key={s.id} value={s.id}>👤 {s.name} ({s.email})</option>
-                  ))}
-                </select>
+                  📢 Broadcast to ALL users
+                </button>
+
+                {/* Search input */}
+                <div className="relative mt-2">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                  <input
+                    type="text"
+                    value={announceSearch}
+                    onChange={(e) => setAnnounceSearch(e.target.value)}
+                    placeholder="Search by name, email, or phone…"
+                    className="w-full pl-8 pr-3 py-2 bg-slate-900 border border-white/10 text-xs text-slate-200 placeholder-slate-500 rounded-xl outline-none focus:border-cyan-500/50 min-h-[40px]"
+                  />
+                </div>
+
+                {/* Search results */}
+                {announceSearch.trim() && (
+                  <div className="mt-1 max-h-40 overflow-y-auto rounded-xl border border-white/5 bg-slate-950/60">
+                    {studentsList
+                      .filter((s) => {
+                        const q = announceSearch.toLowerCase();
+                        return (
+                          s.name?.toLowerCase().includes(q) ||
+                          s.email?.toLowerCase().includes(q) ||
+                          (s as any).phoneNumber?.toLowerCase().includes(q)
+                        );
+                      })
+                      .slice(0, 10)
+                      .map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setAnnounceTargetUser(s.id);
+                            setAnnounceTargetName(s.name);
+                            setAnnounceSearch('');
+                          }}
+                          className={`w-full px-3 py-2 text-left text-xs hover:bg-white/5 transition-colors flex items-center gap-2 ${
+                            announceTargetUser === s.id ? 'bg-cyan-500/10 text-cyan-300' : 'text-slate-300'
+                          }`}
+                        >
+                          <span className="font-bold truncate">{s.name}</span>
+                          <span className="text-slate-500 truncate">{s.email}</span>
+                        </button>
+                      ))}
+                    {studentsList.filter((s) => {
+                      const q = announceSearch.toLowerCase();
+                      return s.name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <div className="px-3 py-2 text-[10px] text-slate-500">No users found.</div>
+                    )}
+                  </div>
+                )}
+
+                {/* Selected user */}
+                {announceTargetUser && !announceSearch && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-xl mt-1">
+                    <span className="text-xs text-fuchsia-300 font-bold">👤 {announceTargetName}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setAnnounceTargetUser(''); setAnnounceTargetName(''); }}
+                      className="ml-auto text-rose-400 hover:text-rose-300"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 <p className="text-[9px] text-slate-500">
                   {announceTargetUser ? 'Only the selected user will see this + can download the file.' : 'Everyone will see this announcement.'}
                 </p>
@@ -2572,14 +2643,36 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
 
                       {/* File attachment download */}
                       {ann.fileUrl && (
-                        <a
-                          href={ann.fileUrl}
-                          download={ann.fileName || 'download'}
+                        <button
+                          onClick={() => {
+                            const url = ann.fileUrl!;
+                            const name = ann.fileName || 'download';
+                            // For data URLs, create a blob and download
+                            if (url.startsWith('data:')) {
+                              const [meta, base64] = url.split(',');
+                              const mime = meta.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
+                              const binary = atob(base64);
+                              const bytes = new Uint8Array(binary.length);
+                              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                              const blob = new Blob([bytes], { type: mime });
+                              const blobUrl = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = blobUrl;
+                              a.download = name;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(blobUrl);
+                            } else {
+                              // External URL — open in new tab
+                              window.open(url, '_blank');
+                            }
+                          }}
                           className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-bold transition-all cursor-pointer"
                         >
                           <FileText className="w-3.5 h-3.5" />
                           Download {ann.fileName || 'file'}
-                        </a>
+                        </button>
                       )}
 
                       {/* Targeted indicator */}
