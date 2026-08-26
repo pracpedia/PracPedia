@@ -3,6 +3,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { Logo } from '@/components/features/Logo';
 import {
   Home,
   LogOut,
@@ -104,18 +105,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Brand Header */}
           <div className="flex items-center gap-3 shrink-0 pt-1 select-none cursor-pointer" onClick={() => handleNav('dashboard')}>
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 overflow-hidden flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/10">
-              <img
-                src="/pracpedia_logo.jpg"
-                alt="PracPedia Logo"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
-            </div>
             <div className="min-w-0">
-              <h1 className="text-sm sm:text-base font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-100 to-cyan-300 bg-clip-text text-transparent font-sans truncate">
-                {t('appName')}
-              </h1>
+              <Logo size="lg" />
               <p className="text-[9px] text-cyan-400 uppercase tracking-widest font-mono font-bold truncate">
                 {t('appSub')}
               </p>

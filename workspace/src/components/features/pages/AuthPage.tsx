@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Logo } from '@/components/features/Logo';
 import {
   User,
   Mail,
@@ -333,20 +334,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
           </button>
 
           <div className="flex items-center gap-2.5 min-w-0">
-            <img
-              src="/pracpedia_logo.jpg"
-              alt="PracPedia Logo"
-              referrerPolicy="no-referrer"
-              className="w-8 h-8 rounded-xl object-cover border border-cyan-500/30 shadow-md shadow-cyan-500/10 ring-1 ring-white/10 shrink-0"
-            />
-            <div className="flex flex-col min-w-0">
-              <span className="text-base font-black tracking-tight text-white font-sans leading-none truncate">
-                Prac<span className="bg-gradient-to-r from-cyan-400 to-teal-300 text-transparent bg-clip-text">Pedia</span>
-              </span>
-              <span className="text-[8px] font-mono uppercase tracking-widest text-slate-400 hidden sm:block">
-                STEM Practical Hub
-              </span>
-            </div>
+            <Logo size="lg" />
+            <span className="text-[8px] font-mono uppercase tracking-widest text-slate-400 hidden sm:block">
+              STEM Practical Hub
+            </span>
           </div>
 
           <div className="hidden sm:inline-flex items-center gap-2 text-[9px] font-mono font-bold bg-slate-950/80 border border-white/[0.06] px-3.5 py-1.5 rounded-full text-slate-300 uppercase tracking-widest shadow-inner backdrop-blur-md">

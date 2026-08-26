@@ -7,6 +7,7 @@ import { safeLocalStorage } from '@/lib/storage';
 import { LandingPage } from '@/components/features/pages/LandingPage';
 import { AuthPage } from '@/components/features/pages/AuthPage';
 import { Sidebar } from '@/components/features/Sidebar';
+import { Logo } from '@/components/features/Logo';
 import { StatsGrid } from '@/components/features/StatsGrid';
 import { Lightbox } from '@/components/features/Lightbox';
 import { FolderModal } from '@/components/features/FolderModal';
@@ -1759,13 +1760,7 @@ function PortalConsole() {
           <Menu className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
-          <img
-            src="/pracpedia_logo.jpg"
-            alt="PracPedia"
-            referrerPolicy="no-referrer"
-            className="w-5 h-5 rounded-md object-cover border border-cyan-500/30 shrink-0"
-          />
-          <span className="font-extrabold text-slate-100 text-xs sm:text-sm truncate">PracPedia</span>
+          <Logo size="sm" />
           {currentView !== 'dashboard' && currentView !== 'subject' && currentView !== 'folder' && (
             <span className="text-slate-400 text-[10px] sm:text-xs capitalize truncate">
               · {currentView === 'artists' ? 'Marketplace' :
@@ -1827,13 +1822,7 @@ function PortalConsole() {
                 onClick={() => setView('dashboard')}
                 className="hover:text-white font-semibold transition-colors truncate max-w-[120px] sm:max-w-none hover:scale-102 duration-150 inline-flex items-center gap-1.5 shrink-0"
               >
-                <img
-                  src="/pracpedia_logo.jpg"
-                  alt="PracPedia"
-                  referrerPolicy="no-referrer"
-                  className="w-4 h-4 rounded-md object-cover border border-cyan-500/30"
-                />
-                <span className="font-extrabold text-slate-100">PracPedia</span>
+                <Logo size="sm" />
               </button>
 
               {currentView === 'dashboard' && (
@@ -2749,14 +2738,9 @@ function PortalConsole() {
         <footer className="mt-auto shrink-0 border-t border-white/5 bg-slate-950/60 backdrop-blur-md py-3 px-4 sm:px-6 md:px-8 text-[10px] sm:text-[11px] font-mono text-slate-500">
           <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 min-w-0 truncate">
-              <img
-                src="/pracpedia_logo.jpg"
-                alt="PracPedia"
-                referrerPolicy="no-referrer"
-                className="w-4 h-4 rounded-md object-cover border border-cyan-500/30 shrink-0"
-              />
-              <span className="text-slate-400 truncate">
-                PracPedia — Practical Notebook Gallery
+              <Logo size="sm" />
+              <span className="text-slate-500 truncate">
+                — Practical Notebook Gallery
               </span>
             </div>
             <div className="flex items-center gap-3 flex-wrap justify-center">
