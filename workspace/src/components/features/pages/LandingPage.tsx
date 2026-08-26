@@ -9,7 +9,6 @@ import {
   Activity,
   Calendar,
   CheckCircle2,
-  Microscope,
 } from 'lucide-react';
 import { Logo } from '@/components/features/Logo';
 
