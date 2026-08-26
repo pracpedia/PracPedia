@@ -96,15 +96,25 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Log to activity feed
+    // Log to activity feed — who hired who for what and total price
     await logActivity({
       userId: payload.userId,
       userName: payload.email,
       userRole: payload.role,
       action: 'booking_created',
       category: 'marketplace',
-      detail: `New commission: ${serviceType} for ${subject} (BDT ${price})`,
-      metadata: { bookingId: booking.id, artistId, serviceType, price },
+      detail: `${payload.email} hired ${artist.name} for ${svc === 'drawing_only' ? 'Drawing Only' : 'Drawing + Writing'} — ${subject} — ৳${price} (${np === 'artist' ? 'artist provides notebook' : 'client provides notebook'})`,
+      metadata: {
+        bookingId: booking.id,
+        clientId: payload.userId,
+        clientEmail: payload.email,
+        artistId: artist.id,
+        artistName: artist.name,
+        serviceType: svc,
+        notebookProvider: np,
+        subject,
+        price,
+      },
       request,
     });
 

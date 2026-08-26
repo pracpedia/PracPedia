@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { logActivity } from '@/lib/activity-log';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -114,6 +115,29 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         where: { id: booking.artistId },
         data: { completedOrders: { decrement: 1 } },
       });
+    }
+
+    // Log status/payment changes to activity feed
+    if (newStatus || paymentStatus !== undefined) {
+      const parts: string[] = [];
+      if (newStatus) parts.push(`status → ${newStatus}`);
+      if (paymentStatus !== undefined) parts.push(`payment → ${paymentStatus}`);
+      if (isCommissionUpdate) parts.push(`commission → ${commissionPercent}%`);
+
+      // Fetch client + artist names for the log
+      const client = await db.user.findUnique({ where: { id: booking.clientId }, select: { name: true, email: true } });
+      const artist = await db.user.findUnique({ where: { id: booking.artistId }, select: { name: true } });
+
+      await logActivity({
+        userId: payload.userId,
+        userName: payload.email,
+        userRole: payload.role,
+        action: 'booking_updated',
+        category: 'marketplace',
+        detail: `Booking #${id.slice(-8)}: ${parts.join(', ')} — ${client?.name || 'Unknown'} → ${artist?.name || 'Unknown'} — ৳${booking.price}`,
+        metadata: { bookingId: id, newStatus, paymentStatus, commissionPercent, price: booking.price },
+        request,
+      }).catch(() => {}); // non-blocking
     }
 
     return NextResponse.json({

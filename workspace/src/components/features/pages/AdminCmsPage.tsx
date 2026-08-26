@@ -155,6 +155,7 @@ const ACTION_ICONS: Record<string, React.ElementType> = {
   logout: LogOut,
   register: UserPlus,
   booking_created: ShoppingBag,
+  booking_updated: Palette,
   message_sent: MessageSquare,
   profile_updated: Users,
   default: Activity,
