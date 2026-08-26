@@ -11,12 +11,22 @@ import {
   CheckCircle2,
   Microscope,
 } from 'lucide-react';
+import { Logo } from '@/components/features/Logo';
+
+interface BannerConfig {
+  enabled: boolean;
+  text: string;
+  bgColor: string;
+  textColor: string;
+  size: 'sm' | 'md' | 'lg';
+}
 
 interface LandingPageProps {
   onEnter: () => void;
   isAuthenticated: boolean;
   onGoToDashboard: () => void;
   subjects?: any[];
+  bannerConfig?: BannerConfig;
   folders?: any[];
   announcements?: any[];
 }
@@ -28,6 +38,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   subjects = [],
   folders = [],
   announcements = [],
+  bannerConfig,
 }) => {
   // Compute dynamic contextual statistics
   const physicsCount = folders.filter(f => f.subjectId === 'sub-physics' || f.subjectId?.toLowerCase().includes('phys')).length || 6;
@@ -46,24 +57,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Grid Overlay */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#111827_1px,transparent_1px),linear-gradient(to_bottom,#111827_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_52%_at_50%_50%,#000_70%,transparent_100%)] opacity-25 pointer-events-none" />
 
-      {/* Top Banner with subtle alert */}
-      <div className="relative z-20 w-full bg-cyan-950/40 border-b border-cyan-500/10 py-2.5 text-center px-4">
-        <span className="inline-flex flex-wrap items-center justify-center gap-2 text-[10px] md:text-xs font-mono text-cyan-400 uppercase tracking-wider font-extrabold">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse inline-block" />
-          ⭐ 2026 Bangladesh National Board Curriculum Standards Fully Integrated for HSC Candidates
-        </span>
-      </div>
+      {/* Top Banner — customizable by super admin */}
+      {bannerConfig?.enabled !== false && (
+        <div
+          className="relative z-20 w-full border-b py-2.5 text-center px-4"
+          style={{
+            backgroundColor: bannerConfig?.bgColor || 'rgba(8, 47, 73, 0.4)',
+            borderColor: 'rgba(6, 182, 212, 0.1)',
+          }}
+        >
+          <span
+            className={`inline-flex flex-wrap items-center justify-center gap-2 font-mono uppercase tracking-wider font-extrabold ${
+              bannerConfig?.size === 'lg' ? 'text-sm md:text-base' :
+              bannerConfig?.size === 'sm' ? 'text-[9px]' :
+              'text-[10px] md:text-xs'
+            }`}
+            style={{ color: bannerConfig?.textColor || '#22d3ee' }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ backgroundColor: bannerConfig?.textColor || '#22d3ee' }} />
+            {bannerConfig?.text || '⭐ 2026 Bangladesh National Board Curriculum Standards Fully Integrated for HSC Candidates'}
+          </span>
+        </div>
+      )}
 
       {/* Top Header */}
       <header id="landing_header" className="relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="relative w-9 h-9 rounded-xl bg-slate-950 border border-white/10 flex items-center justify-center shadow-md shrink-0">
-            <Microscope className="w-5 h-5 text-cyan-400 animate-pulse" />
-          </div>
-          <div className="flex flex-col text-left min-w-0">
-            <span className="text-xs font-black tracking-widest font-sans text-white leading-none">HSC SCIENCE</span>
-            <span className="text-[9px] text-cyan-450 font-mono tracking-widest uppercase mt-0.5 font-bold">PRACTICAL PORTAL</span>
-          </div>
+          <Logo size="lg" />
         </div>
 
         <div className="flex items-center gap-3 shrink-0">

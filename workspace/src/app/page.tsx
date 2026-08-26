@@ -171,6 +171,7 @@ function PortalConsole() {
   const [subjects, setSubjects] = useState<SubjectType[]>([]);
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [announcements, setAnnouncements] = useState<AnnouncementType[]>([]);
+  const [bannerConfig, setBannerConfig] = useState<any>(null);
   const [adminsList, setAdminsList] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -448,6 +449,16 @@ function PortalConsole() {
         }
       } catch (annErr) {
         console.error("Could not load announcements: ", annErr);
+      }
+
+      // Fetch banner config
+      try {
+        const bannerRes = await fetch('/api/settings/banner');
+        if (bannerRes.ok) {
+          setBannerConfig(await bannerRes.json());
+        }
+      } catch {
+        // defaults will be used
       }
 
       // Fetch admin directory list
@@ -2850,6 +2861,15 @@ function PortalConsole() {
 export default function Home() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [viewAuth, setViewAuth] = useState(false);
+  const [landingBanner, setLandingBanner] = useState<any>(null);
+
+  // Fetch banner config for landing page (public, no auth needed)
+  useEffect(() => {
+    fetch('/api/settings/banner')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setLandingBanner(d))
+      .catch(() => {});
+  }, []);
 
   // Suppress unused-warning for `user` — referenced to keep the hook contract explicit.
   void user;
@@ -2898,6 +2918,7 @@ export default function Home() {
       subjects={[]}
       folders={[]}
       announcements={[]}
+      bannerConfig={landingBanner}
     />
   );
 }

@@ -387,6 +387,146 @@ const ActivityLogTab: React.FC<ActivityLogTabProps> = ({ apiFetch }) => {
   );
 };
 
+/* ── Banner Customizer Component ── */
+const BannerCustomizer: React.FC<{
+  apiFetch: (url: string, opts?: RequestInit) => Promise<Response>;
+  showSuccess: (msg: string) => void;
+  showError: (msg: string) => void;
+}> = ({ apiFetch, showSuccess, showError }) => {
+  const [config, setConfig] = useState({
+    enabled: true,
+    text: '⭐ 2026 Bangladesh National Board Curriculum Standards Fully Integrated for HSC Candidates',
+    bgColor: 'rgba(8, 47, 73, 0.4)',
+    textColor: '#22d3ee',
+    size: 'md' as 'sm' | 'md' | 'lg',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/settings/banner');
+        if (res.ok) {
+          const data = await res.json();
+          setConfig(data);
+        }
+      } catch { /* defaults */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await apiFetch('/api/settings/banner', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      if (res.ok) {
+        showSuccess('Landing page banner updated!');
+      } else {
+        showError('Failed to update banner.');
+      }
+    } catch {
+      showError('Network error.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="p-5 rounded-2xl bg-slate-950/80 border border-white/10 space-y-4 shadow-xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+          <span className="text-cyan-400">🎨</span>
+          Landing Page Banner
+        </h3>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={config.enabled}
+            onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
+            className="w-4 h-4 accent-cyan-500"
+          />
+          <span className="text-xs text-slate-300 font-bold">{config.enabled ? 'Visible' : 'Hidden'}</span>
+        </label>
+      </div>
+
+      {/* Banner text */}
+      <div className="space-y-1">
+        <label className="text-[10px] text-slate-400 font-mono uppercase">Banner Text</label>
+        <input
+          type="text"
+          value={config.text}
+          onChange={(e) => setConfig({ ...config, text: e.target.value })}
+          className="w-full px-3 py-2 bg-slate-900 border border-white/10 text-xs text-slate-100 rounded-xl outline-none focus:border-cyan-500/50 min-h-[40px]"
+        />
+      </div>
+
+      {/* Colors + size */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="space-y-1">
+          <label className="text-[10px] text-slate-400 font-mono uppercase">BG Color</label>
+          <input
+            type="color"
+            value={config.bgColor.startsWith('rgba') ? '#082f49' : config.bgColor}
+            onChange={(e) => setConfig({ ...config, bgColor: e.target.value })}
+            className="w-full h-10 rounded-lg border border-white/10 bg-slate-900 cursor-pointer"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-slate-400 font-mono uppercase">Text Color</label>
+          <input
+            type="color"
+            value={config.textColor}
+            onChange={(e) => setConfig({ ...config, textColor: e.target.value })}
+            className="w-full h-10 rounded-lg border border-white/10 bg-slate-900 cursor-pointer"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] text-slate-400 font-mono uppercase">Size</label>
+          <select
+            value={config.size}
+            onChange={(e) => setConfig({ ...config, size: e.target.value as any })}
+            className="w-full px-2 py-2 bg-slate-900 border border-white/10 text-xs text-slate-200 rounded-lg outline-none cursor-pointer h-10"
+          >
+            <option value="sm">Small</option>
+            <option value="md">Medium</option>
+            <option value="lg">Large</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Live preview */}
+      <div
+        className="rounded-xl py-2 px-4 text-center"
+        style={{ backgroundColor: config.bgColor.startsWith('rgba') ? config.bgColor : config.bgColor + '66' }}
+      >
+        <span
+          className={`font-mono uppercase tracking-wider font-extrabold ${
+            config.size === 'lg' ? 'text-sm' : config.size === 'sm' ? 'text-[9px]' : 'text-[10px]'
+          }`}
+          style={{ color: config.textColor }}
+        >
+          ● {config.text || '(empty)'}
+        </span>
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black rounded-xl text-xs transition-all cursor-pointer shadow-lg disabled:opacity-50 min-h-[44px]"
+      >
+        {saving ? 'Saving…' : 'Save Banner'}
+      </button>
+    </div>
+  );
+};
+
 export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   user,
   subjects,
@@ -1308,6 +1448,9 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
           ========================================================================= */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* Banner Customization Card */}
+          <BannerCustomizer apiFetch={apiFetch} showSuccess={showSuccess} showError={showError} />
+
           {/* Executive Metrics Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
             {[
