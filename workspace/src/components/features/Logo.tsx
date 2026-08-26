@@ -10,12 +10,8 @@ interface LogoProps {
 /**
  * PracPedia text-based logo.
  *
- * "Prac" — Outfit (geometric sans, bold uppercase) in cyan
- * "Pedia" — Cormorant Garamond (literary serif, light italic) in amber
- *
- * Cormorant Garamond has delicate, flowing letterforms with graceful
- * curves — it evokes old manuscripts and encyclopedias while still
- * feeling refined and modern at display sizes.
+ * Both parts use Lobster Two — a playful, bold display font with
+ * distinctive swashes and curves. "Prac" in cyan, "Pedia" in purple.
  */
 export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '' }) => {
   const sizeClasses = {
@@ -28,17 +24,12 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '' }) => {
   return (
     <span
       className={`inline-flex items-baseline ${sizeClasses[size]} ${className}`}
+      style={{ fontFamily: 'var(--font-lobster-two), cursive' }}
     >
-      <span
-        className="text-cyan-400 uppercase font-extrabold tracking-tight"
-        style={{ fontFamily: 'var(--font-outfit), ui-sans-serif, system-ui, sans-serif' }}
-      >
+      <span className="text-cyan-400 font-bold">
         Prac
       </span>
-      <span
-        className="text-amber-400 italic font-light"
-        style={{ fontFamily: 'var(--font-cormorant-garamond), Georgia, serif' }}
-      >
+      <span className="text-purple-400 font-bold italic">
         Pedia
       </span>
     </span>
