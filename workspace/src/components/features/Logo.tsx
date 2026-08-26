@@ -9,11 +9,12 @@ interface LogoProps {
 
 /**
  * PracPedia text-based logo.
- * "Prac" — Space Grotesk (geometric sans-serif, techy) in cyan
- * "Pedia" — Playfair Display (elegant serif, scholarly) in amber
  *
- * The contrast between the two fonts represents the blend of
- * practical (techy, hands-on) + encyclopedia (scholarly, knowledge).
+ * "Prac" — Outfit (geometric, modern, clean) in cyan, bold uppercase
+ * "Pedia" — DM Serif Display (high-contrast serif, elegant) in amber, italic
+ *
+ * The sharp contrast between a geometric sans and a high-contrast serif
+ * creates a distinctive, memorable brand mark.
  */
 export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '' }) => {
   const sizeClasses = {
@@ -25,17 +26,17 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '' }) => {
 
   return (
     <span
-      className={`font-bold tracking-tight inline-flex items-baseline ${sizeClasses[size]} ${className}`}
+      className={`inline-flex items-baseline ${sizeClasses[size]} ${className}`}
     >
       <span
-        className="text-cyan-400"
-        style={{ fontFamily: 'var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif' }}
+        className="text-cyan-400 uppercase font-extrabold tracking-tight"
+        style={{ fontFamily: 'var(--font-outfit), ui-sans-serif, system-ui, sans-serif' }}
       >
         Prac
       </span>
       <span
         className="text-amber-400 italic"
-        style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
+        style={{ fontFamily: 'var(--font-dm-serif-display), Georgia, serif' }}
       >
         Pedia
       </span>
