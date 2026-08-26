@@ -90,6 +90,10 @@ model Announcement {
   title        String
   content      String
   deadline     String?
+  fileUrl      String?  // downloadable file (URL or base64 data URL)
+  fileName     String?  // original filename for download
+  fileSize     Int      @default(0) // bytes (0 if URL)
+  targetUserId String?  // null = broadcast to all; specific user ID = targeted share
   createdById  String
   createdByName String
   createdAt    DateTime @default(now())

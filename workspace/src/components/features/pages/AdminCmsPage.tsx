@@ -34,6 +34,7 @@ import {
   UserPlus,
   Filter,
   RefreshCw,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CredentialsView } from '@/components/features/pages/CredentialsView';
@@ -76,8 +77,15 @@ interface Announcement {
   title: string;
   content: string;
   date?: string;
+  createdAt?: string;
   authorName?: string;
+  createdByName?: string;
   urgency?: 'info' | 'warning' | 'urgent';
+  deadline?: string;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileSize?: number;
+  targetUserId?: string | null;
 }
 
 interface CommissionBooking {
@@ -442,6 +450,10 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   const [announceTitle, setAnnounceTitle] = useState('');
   const [announceContent, setAnnounceContent] = useState('');
   const [announceUrgency, setAnnounceUrgency] = useState<'info' | 'warning' | 'urgent'>('info');
+  const [announceDeadline, setAnnounceDeadline] = useState('');
+  const [announceFile, setAnnounceFile] = useState<{ url: string; name: string; size: number } | null>(null);
+  const [announceTargetUser, setAnnounceTargetUser] = useState(''); // user ID or '' for broadcast
+  const announceFileRef = useRef<HTMLInputElement>(null);
 
   // Super Admin States (only used when user.role === 'super_admin')
   const [superAdminsList, setSuperAdminsList] = useState<AdminUser[]>([]);
@@ -888,14 +900,20 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
         body: JSON.stringify({
           title: announceTitle.trim(),
           content: announceContent.trim(),
-          urgency: announceUrgency
+          deadline: announceDeadline.trim() || undefined,
+          fileUrl: announceFile?.url || undefined,
+          fileName: announceFile?.name || undefined,
+          fileSize: announceFile?.size || 0,
+          targetUserId: announceTargetUser || undefined,
         })
       });
       if (res.ok) {
-        showSuccess("Announcement published live to all student dashboards!");
+        showSuccess(announceTargetUser ? "File/announcement sent to selected user!" : "Announcement published to all users!");
         setAnnounceTitle('');
         setAnnounceContent('');
-        setAnnounceUrgency('info');
+        setAnnounceDeadline('');
+        setAnnounceFile(null);
+        setAnnounceTargetUser('');
         refreshWorkspaceData();
       } else {
         const err = await res.json();
@@ -906,6 +924,27 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
     } finally {
       setIsActionLoading(false);
     }
+  };
+
+  // Handle file upload for announcement attachment
+  const handleAnnounceFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (announceFileRef.current) announceFileRef.current.value = '';
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showError('Max 10 MB for file attachments.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAnnounceFile({
+        url: String(reader.result || ''),
+        name: file.name,
+        size: file.size,
+      });
+    };
+    reader.onerror = () => showError('Could not read file.');
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteAnnouncement = async (id: string, title: string) => {
@@ -2426,16 +2465,68 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-mono font-bold uppercase">Urgency Tag</label>
+                <label className="text-[10px] text-slate-400 font-mono font-bold uppercase">Deadline (optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., 2026-12-31 or Before exam week"
+                  value={announceDeadline}
+                  onChange={(e) => setAnnounceDeadline(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-500 rounded-xl outline-none focus:border-cyan-500/50 min-h-[44px]"
+                />
+              </div>
+
+              {/* File attachment */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-mono font-bold uppercase">Attach Downloadable File (optional)</label>
+                <input
+                  ref={announceFileRef}
+                  type="file"
+                  onChange={handleAnnounceFilePick}
+                  className="hidden"
+                />
+                {announceFile ? (
+                  <div className="flex items-center gap-2 p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                    <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-slate-200 font-bold truncate">{announceFile.name}</div>
+                      <div className="text-[9px] text-slate-500">{(announceFile.size / 1024).toFixed(1)} KB</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAnnounceFile(null)}
+                      className="text-rose-400 hover:text-rose-300 text-xs p-1"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => announceFileRef.current?.click()}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-dashed border-white/15 text-xs text-slate-400 hover:text-cyan-300 hover:border-cyan-500/30 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[44px]"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Upload file (max 10 MB)
+                  </button>
+                )}
+              </div>
+
+              {/* Target user selection */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-mono font-bold uppercase">Share With</label>
                 <select
-                  value={announceUrgency}
-                  onChange={(e: any) => setAnnounceUrgency(e.target.value)}
+                  value={announceTargetUser}
+                  onChange={(e) => setAnnounceTargetUser(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-white/10 text-xs text-slate-200 rounded-xl outline-none cursor-pointer focus:border-cyan-500/50 min-h-[44px]"
                 >
-                  <option value="info">🔵 Information (Standard)</option>
-                  <option value="warning">🟡 Warning (Approaching Deadline)</option>
-                  <option value="urgent">🔴 Urgent (Immediate Action)</option>
+                  <option value="">📢 Broadcast to ALL users</option>
+                  {studentsList.map((s) => (
+                    <option key={s.id} value={s.id}>👤 {s.name} ({s.email})</option>
+                  ))}
                 </select>
+                <p className="text-[9px] text-slate-500">
+                  {announceTargetUser ? 'Only the selected user will see this + can download the file.' : 'Everyone will see this announcement.'}
+                </p>
               </div>
 
               <button
@@ -2444,7 +2535,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                 className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black rounded-xl text-xs transition-all cursor-pointer shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-1.5 min-h-[44px]"
               >
                 <Bell className="w-3.5 h-3.5" />
-                <span>Broadcast Notice Live</span>
+                <span>{announceTargetUser ? 'Send to Selected User' : 'Broadcast Notice Live'}</span>
               </button>
             </form>
           </div>
@@ -2478,6 +2569,26 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                         </span>
                       </div>
                       <p className="text-xs text-slate-300 leading-relaxed break-words">{ann.content}</p>
+
+                      {/* File attachment download */}
+                      {ann.fileUrl && (
+                        <a
+                          href={ann.fileUrl}
+                          download={ann.fileName || 'download'}
+                          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-bold transition-all cursor-pointer"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          Download {ann.fileName || 'file'}
+                        </a>
+                      )}
+
+                      {/* Targeted indicator */}
+                      {ann.targetUserId && (
+                        <span className="inline-block ml-2 mt-2 px-2 py-0.5 rounded text-[9px] font-mono bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/20">
+                          👤 Private share
+                        </span>
+                      )}
+
                       <span className="text-[10px] text-slate-500 font-mono block">
                         Published: {ann.date ? new Date(ann.date).toLocaleDateString() : 'Just now'}
                       </span>
