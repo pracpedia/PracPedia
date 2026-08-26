@@ -97,7 +97,7 @@ export const DataLoader: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="flex-1 w-full flex flex-col items-center justify-center min-h-full lg:min-h-full py-8 sm:py-12 relative overflow-hidden bg-slate-950/20 p-4 sm:p-8 space-y-5 sm:space-y-7"
+      className="fixed inset-0 w-full h-full flex flex-col items-center justify-center min-h-screen lg:min-h-screen relative overflow-hidden bg-[#05070e] p-4 space-y-6 z-40"
     >
       {/* Decorative background grid network */}
       <div className="absolute inset-0 grid grid-cols-6 grid-rows-4 gap-2 sm:gap-4 p-4 sm:p-8 opacity-20 pointer-events-none select-none">
@@ -109,34 +109,34 @@ export const DataLoader: React.FC = () => {
         ))}
       </div>
 
-      {/* Animated Arabic custom prayer element positioned at the top */}
-      <div className="text-center relative z-10 select-none flex flex-col items-center justify-center gap-1.5 pb-2">
-        <div className="arabic-text text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-cyan-400 via-amber-200 to-[#fbbf24] bg-clip-text text-transparent px-4 py-2 filter text-center font-arabic leading-relaxed max-w-full" style={{ direction: 'rtl' }}>
+      {/* Animated Arabic text + translation — ABOVE the spinner */}
+      <div className="text-center relative z-10 select-none flex flex-col items-center justify-center gap-2">
+        <div className="arabic-text text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 via-amber-200 to-[#fbbf24] bg-clip-text text-transparent px-4 py-2 filter text-center font-arabic leading-relaxed max-w-full" style={{ direction: 'rtl' }}>
           رَبِّ زِدْنِي عِلْمًا
         </div>
-        <span className="text-[10px] font-sans font-bold tracking-widest text-[#fbbf24] uppercase italic opacity-90 text-center px-2">
+        <span className="text-xs sm:text-sm font-sans font-bold tracking-widest text-[#fbbf24] uppercase italic opacity-90 text-center px-2">
           &ldquo;My Lord, increase me in knowledge&rdquo;
         </span>
       </div>
 
-      {/* Orbit ring handled by GSAP */}
-      <div className="relative flex items-center justify-center shrink-0">
+      {/* Orbit ring — centered */}
+      <div className="relative flex items-center justify-center shrink-0 z-10">
         {/* Secondary ring decoration */}
-        <div className="absolute w-24 h-24 rounded-full border border-dashed border-cyan-500/10 animate-ping opacity-45" />
+        <div className="absolute w-28 h-28 rounded-full border border-dashed border-cyan-500/10 animate-ping opacity-45" />
 
         {/* Orbit ring handled by GSAP */}
         <div
           ref={ringRef}
-          className="w-20 h-20 rounded-full border-4 border-t-[#06b6d4] border-r-indigo-500/20 border-b-slate-900 border-l-[#fbbf24]/30 flex items-center justify-center shadow-lg shadow-cyan-500/5"
+          className="w-24 h-24 rounded-full border-4 border-t-[#06b6d4] border-r-indigo-500/20 border-b-slate-900 border-l-[#fbbf24]/30 flex items-center justify-center shadow-lg shadow-cyan-500/5"
         />
 
         {/* Core scientific apparatus icon */}
         <span className="absolute">
-          <Compass className="w-7 h-7 text-[#06b6d4] animate-pulse" />
+          <Compass className="w-8 h-8 text-[#06b6d4] animate-pulse" />
         </span>
       </div>
 
-      {/* Synchronizing characters letters list */}
+      {/* Synchronizing text + progress — BELOW the spinner */}
       <div className="space-y-2 text-center relative z-10 max-w-full overflow-hidden">
         <div
           ref={textContainerRef}
