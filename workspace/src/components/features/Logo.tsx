@@ -10,11 +10,12 @@ interface LogoProps {
 /**
  * PracPedia text-based logo.
  *
- * "Prac" — Outfit (geometric, modern, clean) in cyan, bold uppercase
- * "Pedia" — DM Serif Display (high-contrast serif, elegant) in amber, italic
+ * "Prac" — Outfit (geometric sans, bold uppercase) in cyan
+ * "Pedia" — Cormorant Garamond (literary serif, light italic) in amber
  *
- * The sharp contrast between a geometric sans and a high-contrast serif
- * creates a distinctive, memorable brand mark.
+ * Cormorant Garamond has delicate, flowing letterforms with graceful
+ * curves — it evokes old manuscripts and encyclopedias while still
+ * feeling refined and modern at display sizes.
  */
 export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '' }) => {
   const sizeClasses = {
@@ -35,8 +36,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '' }) => {
         Prac
       </span>
       <span
-        className="text-amber-400 italic"
-        style={{ fontFamily: 'var(--font-dm-serif-display), Georgia, serif' }}
+        className="text-amber-400 italic font-light"
+        style={{ fontFamily: 'var(--font-cormorant-garamond), Georgia, serif' }}
       >
         Pedia
       </span>
