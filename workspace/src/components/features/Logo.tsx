@@ -9,8 +9,11 @@ interface LogoProps {
 
 /**
  * PracPedia text-based logo.
- * "Prac" in cyan, "Pedia" in amber — distinct colors.
- * Uses Space Grotesk font (loaded via next/font in layout.tsx).
+ * "Prac" — Space Grotesk (geometric sans-serif, techy) in cyan
+ * "Pedia" — Playfair Display (elegant serif, scholarly) in amber
+ *
+ * The contrast between the two fonts represents the blend of
+ * practical (techy, hands-on) + encyclopedia (scholarly, knowledge).
  */
 export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '' }) => {
   const sizeClasses = {
@@ -22,11 +25,20 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '' }) => {
 
   return (
     <span
-      className={`font-bold tracking-tight ${sizeClasses[size]} ${className}`}
-      style={{ fontFamily: 'var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif' }}
+      className={`font-bold tracking-tight inline-flex items-baseline ${sizeClasses[size]} ${className}`}
     >
-      <span className="text-cyan-400">Prac</span>
-      <span className="text-amber-400">Pedia</span>
+      <span
+        className="text-cyan-400"
+        style={{ fontFamily: 'var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif' }}
+      >
+        Prac
+      </span>
+      <span
+        className="text-amber-400 italic"
+        style={{ fontFamily: 'var(--font-playfair-display), Georgia, serif' }}
+      >
+        Pedia
+      </span>
     </span>
   );
 };
