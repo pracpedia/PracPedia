@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Space_Grotesk, Playfair_Display, Outfit, DM_Serif_Display, Cormorant_Garamond, Lobster_Two } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 
@@ -110,7 +109,6 @@ export default function RootLayout({
         <AuthProvider>
           <LanguageProvider>
             {children}
-            <Toaster />
           </LanguageProvider>
         </AuthProvider>
       </body>
