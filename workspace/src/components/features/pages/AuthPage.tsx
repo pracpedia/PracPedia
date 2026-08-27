@@ -34,6 +34,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
   const { login, apiFetch } = useAuth();
   const passwordRef = useRef<HTMLInputElement>(null);
 
+  // Safely parse a fetch Response as JSON. If the server returned an HTML error
+  // page (404 / 500 / Next.js error boundary), `res.json()` would throw a
+  // cryptic "Unexpected token '<'" — this helper converts that into a friendly
+  // error message that gets shown in the form's error banner.
+  const safeJson = async (res: Response): Promise<{ error?: string; token?: string; user?: any }> => {
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      // Non-JSON response — likely an HTML error page from Next.js or a proxy.
+      return { error: `Server returned a non-JSON response (HTTP ${res.status}). Please try again.` };
+    }
+    try {
+      return await res.json();
+    } catch {
+      return { error: 'Server returned an invalid response. Please try again.' };
+    }
+  };
+
   // Custom 2-way Auth Segment Choice: 'student' | 'artist'
   const [authType, setAuthType] = useState<'student' | 'artist'>('student');
   const [isLogin, setIsLogin] = useState(true);
@@ -145,7 +162,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
         }),
       });
 
-      const data = await res.json();
+      const data = await safeJson(res);
 
       if (!res.ok) {
         throw new Error(data.error || 'Google authentication failed.');
@@ -195,7 +212,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
           body: JSON.stringify({ email, password }),
         });
 
-        const data = await res.json();
+        const data = await safeJson(res);
 
         if (!res.ok) {
           throw new Error(data.error || 'Authentication process failed.');
@@ -224,7 +241,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
           body: JSON.stringify(body),
         });
 
-        const regData = await regRes.json();
+        const regData = await safeJson(regRes);
 
         if (!regRes.ok) {
           throw new Error(regData.error || 'Account registration failed.');
@@ -256,7 +273,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
         body: JSON.stringify({ email, code: otpCode }),
       });
 
-      const verifyData = await verifyRes.json();
+      const verifyData = await safeJson(verifyRes);
       if (!verifyRes.ok) {
         throw new Error(verifyData.error || 'Incorrect or expired verification passcode.');
       }
@@ -270,7 +287,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
         body: JSON.stringify(body),
       });
 
-      const regData = await regRes.json();
+      const regData = await safeJson(regRes);
 
       if (!regRes.ok) {
         throw new Error(regData.error || 'Account registration failed during write.');
