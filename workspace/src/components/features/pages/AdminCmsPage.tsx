@@ -27,6 +27,7 @@ import {
   Key,
   Crown,
   Activity,
+  Bug,
   LogIn,
   LogOut,
   MessageSquare,
@@ -388,6 +389,223 @@ const ActivityLogTab: React.FC<ActivityLogTabProps> = ({ apiFetch }) => {
   );
 };
 
+/* ── Bug Monitor Tab — shows recent client-side errors reported via /api/error-log ── */
+interface BugEntry {
+  ts: string;
+  type: string;
+  message: string;
+  stack?: string;
+  filename?: string;
+  lineno?: number;
+  colno?: number;
+  url?: string;
+  userAgent?: string;
+  ip?: string | null;
+  userId?: string | null;
+  userEmail?: string | null;
+  extra?: Record<string, any>;
+}
+
+const BugMonitorTab: React.FC<{ apiFetch: (url: string, opts?: RequestInit) => Promise<Response> }> = ({ apiFetch }) => {
+  const [entries, setEntries] = useState<BugEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  const doFetch = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await apiFetch('/api/error-log?limit=100');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setEntries(data.entries || []);
+      setLastRefresh(new Date());
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load error log');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    doFetch();
+    const poll = async () => {
+      while (!cancelled && autoRefresh) {
+        await new Promise((r) => setTimeout(r, 10000));
+        if (cancelled || !autoRefresh) break;
+        await doFetch(true);
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [autoRefresh, apiFetch]);
+
+  const filtered = entries.filter((e) => {
+    if (filter !== 'all' && e.type !== filter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        (e.message || '').toLowerCase().includes(q) ||
+        (e.stack || '').toLowerCase().includes(q) ||
+        (e.url || '').toLowerCase().includes(q) ||
+        (e.userEmail || '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const typeColor = (t: string): string => {
+    switch (t) {
+      case 'react_error': return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+      case 'window_error': return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+      case 'unhandledrejection': return 'bg-orange-500/15 text-orange-300 border-orange-500/30';
+      case 'fetch_error': return 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30';
+      case 'console_error': return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+      default: return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+    }
+  };
+
+  return (
+    <div className="space-y-4 animate-in fade-in duration-300">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-950/80 border border-rose-500/20">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 shrink-0">
+            <Bug className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              Bug Monitor
+              {entries.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                  {entries.length} recent
+                </span>
+              )}
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {filtered.length} entries{lastRefresh ? ` · updated ${timeAgo(lastRefresh.toISOString())}` : ''}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setAutoRefresh((v) => !v)}
+            className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer min-h-[32px] flex items-center gap-1.5 ${
+              autoRefresh ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-white/10'
+            }`}
+          >
+            <span className={`relative flex h-1.5 w-1.5 ${autoRefresh ? '' : 'opacity-40'}`}>
+              {autoRefresh && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${autoRefresh ? 'bg-emerald-500' : 'bg-slate-500'}`}></span>
+            </span>
+            {autoRefresh ? 'Live' : 'Paused'}
+          </button>
+          <button
+            onClick={() => doFetch()}
+            disabled={loading}
+            className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-900 text-slate-300 border border-white/10 hover:bg-slate-800 transition-all cursor-pointer min-h-[32px] flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-2 p-3 rounded-2xl bg-slate-950/80 border border-white/10">
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="bg-slate-900 border border-white/10 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-rose-500/50 min-h-[36px] cursor-pointer"
+        >
+          <option value="all">All types</option>
+          <option value="react_error">React render errors</option>
+          <option value="window_error">Window errors</option>
+          <option value="unhandledrejection">Unhandled rejections</option>
+          <option value="fetch_error">Fetch errors (5xx / network)</option>
+          <option value="console_error">Console errors</option>
+        </select>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search message, stack, URL, email…"
+          className="flex-1 bg-slate-900 border border-white/10 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-rose-500/50 placeholder:text-slate-500 min-h-[36px]"
+        />
+      </div>
+
+      {error && (
+        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+          {error}
+        </div>
+      )}
+
+      {/* List */}
+      {loading && entries.length === 0 ? (
+        <div className="p-8 text-center text-xs text-slate-500">Loading error log…</div>
+      ) : filtered.length === 0 ? (
+        <div className="p-8 text-center">
+          <div className="inline-flex p-3 rounded-full bg-emerald-500/10 border border-emerald-500/30 mb-2">
+            <Bug className="w-5 h-5 text-emerald-400" />
+          </div>
+          <p className="text-xs text-slate-400 font-medium">No errors reported 🎉</p>
+          <p className="text-[10px] text-slate-500 mt-1">When users hit bugs, they will show up here in real time.</p>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+          {filtered.map((e, i) => (
+            <div key={i} className="p-3 rounded-xl bg-slate-950/80 border border-white/10 hover:border-rose-500/30 transition-all">
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className={`px-2 py-0.5 rounded-md text-[9px] font-mono font-bold border ${typeColor(e.type)}`}>
+                    {e.type}
+                  </span>
+                  {e.userEmail && (
+                    <span className="text-[10px] text-slate-400 font-mono truncate">{e.userEmail}</span>
+                  )}
+                </div>
+                <span className="text-[10px] text-slate-500 shrink-0">{timeAgo(e.ts)}</span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1.5 break-words font-medium">{e.message}</p>
+              {e.url && (
+                <p className="text-[10px] text-slate-500 mt-1 font-mono truncate">📍 {e.url}</p>
+              )}
+              {e.filename && (
+                <p className="text-[10px] text-slate-500 mt-0.5 font-mono truncate">
+                  📄 {e.filename}:{e.lineno}:{e.colno}
+                </p>
+              )}
+              {e.extra && Object.keys(e.extra).length > 0 && (
+                <div className="mt-1.5 p-2 rounded-lg bg-slate-900/80 border border-white/5 text-[10px] font-mono text-slate-400 break-words">
+                  {Object.entries(e.extra).slice(0, 6).map(([k, v]) => (
+                    <div key={k} className="truncate">
+                      <span className="text-slate-500">{k}:</span> {String(v).slice(0, 200)}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {e.stack && (
+                <details className="mt-1.5 group">
+                  <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300 select-none">
+                    Stack trace
+                  </summary>
+                  <pre className="mt-1 p-2 rounded-lg bg-slate-900/80 border border-white/5 text-[9px] font-mono text-slate-400 overflow-x-auto whitespace-pre-wrap break-words max-h-40">
+                    {e.stack}
+                  </pre>
+                </details>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ── Banner Customizer Component ── */
 const BannerCustomizer: React.FC<{
   apiFetch: (url: string, opts?: RequestInit) => Promise<Response>;
@@ -540,7 +758,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
 }) => {
   const { apiFetch } = useAuth();
   // Navigation tabs: 'overview' | 'content' | 'assets' | 'users' | 'commissions' | 'announcements'
-  const [activeTab, setActiveTab] = useState<'overview' | 'content' | 'assets' | 'users' | 'commissions' | 'announcements' | 'activity'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'content' | 'assets' | 'users' | 'commissions' | 'announcements' | 'activity' | 'bugs'>('overview');
 
   // Notification Banner States
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -1441,6 +1659,18 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('bugs')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer min-h-[44px] ${
+            activeTab === 'bugs'
+              ? 'bg-rose-500 text-slate-950 font-black shadow-lg shadow-rose-500/20'
+              : 'bg-slate-950/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-white/5'
+          }`}
+        >
+          <Bug className="w-4 h-4" />
+          <span>Bug Monitor</span>
         </button>
       </div>
 
@@ -3063,6 +3293,13 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
           ========================================================================= */}
       {activeTab === 'activity' && (
         <ActivityLogTab apiFetch={apiFetch} />
+      )}
+
+      {/* =========================================================================
+          TAB 8: BUG MONITOR (CLIENT-SIDE ERROR FEED)
+          ========================================================================= */}
+      {activeTab === 'bugs' && (
+        <BugMonitorTab apiFetch={apiFetch} />
       )}
 
       {/* =========================================================================

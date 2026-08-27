@@ -172,3 +172,88 @@ Stage Summary:
   * src/app/api/scan/analyze-page/route.ts
   * src/app/api/users/recharge-trial/route.ts
   * src/app/api/users/resign/route.ts
+
+---
+Task ID: 5
+Agent: main
+Task: Gmail-only Google form, non-gmail standard form, remove ai credits/study time from profile edit, phone optional without mention, add bug monitoring
+
+Work Log:
+- Verified Gmail/non-gmail split on both forms is consistent:
+  * Standard form (frontend + /api/auth/register + /api/artists/register) rejects Gmail with 403 + helpful message
+  * Google form (frontend + /api/auth/google) rejects non-gmail with 400 + helpful message
+  * Messages clearly tell users to use the other form
+- Removed AI credits and study time from Profile page:
+  * Removed the two StatRow entries (Study Time + AI Credits) from the profile sidebar
+  * Removed the "AI Credits" card (with Buy Credits button) from the SecurityTab
+  * Cleaned up unused props: SecurityTabProps.aiCredits, SecurityTabProps.onBuyCredits
+  * Removed dead helper functions: handleBuyCredits (was "coming soon" placeholder)
+  * Removed dead helper function: formatStudyTime (was only used in the removed StatRow)
+  * aiCredits + studyTime still flow through Lightbox, AiAcademyRoom, AuthContext, /api/credentials — just not displayed on the Profile edit page
+- Phone number in signup form:
+  * Verified it's already optional (no `required` attribute on the <input>)
+  * Verified the label "Mobile Number (For Order SMS Notifications)" doesn't mention "optional"
+  * Verified handleSubmit sends `phoneNumber: phoneNumber.trim() || undefined` so empty is fine
+  * Updated the comment from "Phone number input (Optional on Register)" → "Phone number input (signup only)" to keep the codebase honest
+- Added comprehensive bug monitoring system:
+  * NEW endpoint /api/error-log (POST + GET):
+    - POST: public, rate-limited (20/min/IP), writes JSON-lines to /home/z/my-project/logs/errors.log
+    - GET: admin/super_admin only, returns last 100 entries (newest first)
+    - Defensive: invalid JSON body returns 400 instead of crashing the logger
+    - Also surfaces errors in the existing ActivityLog table (admin activity feed)
+  * NEW lib/error-log.ts — file-based JSON-lines writer/reader with mkdir + append
+  * NEW lib/client-error-capture.ts — installs three global listeners:
+    - window.addEventListener('error', …) → window_error
+    - window.addEventListener('unhandledrejection', …) → unhandledrejection
+    - console.error monkey-patch (filters out React DevTools warnings) → console_error
+    - Dedups identical errors within 5s window to prevent flooding
+    - Uses navigator.sendBeacon (pageunload-safe) with fetch fallback
+  * NEW components/features/ErrorBoundary/ErrorBoundary.tsx — React error boundary with:
+    - Friendly fallback UI with "Try again" button
+    - Reports caught errors with type='react_error' + componentStack
+  * NEW components/features/ErrorCaptureGate.tsx — wires up the global listeners + wraps the app in the top-level ErrorBoundary
+  * MODIFIED app/layout.tsx — wraps children in <ErrorCaptureGate>
+  * MODIFIED contexts/AuthContext.tsx — apiFetch now:
+    - Auto-reports 5xx responses as fetch_error
+    - Auto-reports network-level failures (DNS, connection refused) as fetch_error
+    - Still throws the original error so caller's catch() runs
+  * MODIFIED lib/rate-limit.ts — added errorLogLimiter (20/min/IP) + sweeps it on the 5-min interval
+  * MODIFIED AdminCmsPage.tsx — added new "Bug Monitor" tab:
+    - New activeTab value: 'bugs'
+    - New tab button with Bug icon and rose color scheme
+    - New BugMonitorTab component with live refresh (10s polling), filters (type/search), type-colored badges, collapsible stack traces, extra-metadata viewer
+    - Admins can see all client errors reported by users in real time
+
+Stage Summary:
+- All 4 auth flows verified working:
+  1. Gmail user → Google form → 200 + token
+  2. Non-gmail user → Google form → 400 with helpful message
+  3. Gmail user → standard form → 403 with helpful message
+  4. Non-gmail user → standard form → 200 + token (empty phone number OK)
+- Profile edit page no longer shows AI credits or study time
+- Phone number in signup form is optional without explicit "optional" labeling
+- Bug monitoring is fully operational:
+  * POST /api/error-log tested with valid + invalid payloads (200/400)
+  * GET /api/error-log returns 401 without auth, 200 with admin token
+  * Errors persisted to /home/z/my-project/logs/errors.log (JSON-lines)
+  * Client-side listeners wired up in ErrorCaptureGate which mounts in root layout
+  * Admin "Bug Monitor" tab available at /admin with real-time refresh
+- ESLint: 0 errors, 0 warnings
+- All public endpoints return 200: /api/health, /api/stats, /api/subjects, /api/artists, /
+- Files modified:
+  * src/components/features/pages/AuthPage.tsx (phone comment update)
+  * src/components/features/pages/ProfilePage.tsx (removed AI credits + study time + dead code)
+  * src/components/features/pages/AdminCmsPage.tsx (added Bug Monitor tab + BugMonitorTab component + Bug import)
+  * src/contexts/AuthContext.tsx (apiFetch error reporting)
+  * src/app/layout.tsx (wrapped in ErrorCaptureGate)
+  * src/lib/rate-limit.ts (added errorLogLimiter)
+- New files:
+  * src/app/api/error-log/route.ts (POST + GET handlers)
+  * src/lib/error-log.ts (JSON-lines file I/O)
+  * src/lib/client-error-capture.ts (browser-side capture)
+  * src/components/features/ErrorBoundary/ErrorBoundary.tsx
+  * src/components/features/ErrorBoundary/index.ts
+  * src/components/features/ErrorCaptureGate.tsx
+- Infrastructure:
+  * /home/z/my-project/logs/ directory created
+  * /home/z/my-project/logs/errors.log JSON-lines file initialized

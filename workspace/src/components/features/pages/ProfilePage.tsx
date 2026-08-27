@@ -220,13 +220,6 @@ const SERVICE_META: Record<
 const formatBdt = (n: number): string =>
   `৳${new Intl.NumberFormat('en-IN').format(Math.max(0, Math.round(Number(n) || 0)))}`;
 
-const formatStudyTime = (seconds: number): string => {
-  const total = Math.max(0, Math.floor(Number(seconds) || 0));
-  const hours = Math.floor(total / 3600);
-  const mins = Math.floor((total % 3600) / 60);
-  return `${hours}h ${mins}m`;
-};
-
 const formatDate = (iso?: string): string => {
   if (!iso) return '—';
   try {
@@ -1508,20 +1501,16 @@ const CommissionsTab: React.FC<CommissionsTabProps> = ({ loading, bookings, apiF
 interface SecurityTabProps {
   email: string;
   isPremium: boolean;
-  aiCredits: number;
   role: string;
   onSubmitPassword: () => void;
-  onBuyCredits: () => void;
   onOpenDelete: () => void;
 }
 
 const SecurityTab: React.FC<SecurityTabProps> = ({
   email,
   isPremium,
-  aiCredits,
   role,
   onSubmitPassword,
-  onBuyCredits,
   onOpenDelete,
 }) => {
   const [curPwd, setCurPwd] = useState('');
@@ -1564,37 +1553,6 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
                 Free
               </Badge>
             )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* AI credits */}
-      <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-0 shadow-none">
-        <CardHeader className="pb-4 border-b border-white/[0.04]">
-          <SectionTitle
-            icon={Sparkles}
-            title="AI Credits"
-            sub="Used for Gemini requests across the AI Academy"
-          />
-        </CardHeader>
-        <CardContent className="pt-5">
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <div className="min-w-0">
-              <div className="text-2xl font-black text-amber-300">
-                {Number(aiCredits) || 0}
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Credits remaining in this billing cycle.
-              </p>
-            </div>
-            <Button
-              type="button"
-              onClick={onBuyCredits}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold h-11 min-h-[44px]"
-            >
-              <Coins className="w-4 h-4" />
-              Buy Credits
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -2003,11 +1961,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
     showError('Account deletion requires super admin approval.');
   };
 
-  /* ---- buy credits (placeholder) ---- */
-  const handleBuyCredits = () => {
-    showError('Coming soon — credit purchases are not yet available in this version.');
-  };
-
   /* ---- password submit (placeholder) ---- */
   const handlePasswordSubmit = () => {
     showError('Password change is not yet supported in this version.');
@@ -2112,20 +2065,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
                   <Separator className="bg-white/[0.04]" />
                 </>
               )}
-
-              <StatRow
-                icon={Clock}
-                label="Study Time"
-                value={formatStudyTime(user.studyTime)}
-                tone="cyan"
-              />
-
-              <StatRow
-                icon={Sparkles}
-                label="AI Credits"
-                value={`${Number(user.aiCredits) || 0}`}
-                tone="amber"
-              />
 
               {memberSince !== '—' && (
                 <StatRow
@@ -2282,10 +2221,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
               <SecurityTab
                 email={user.email}
                 isPremium={!!user.isPremium}
-                aiCredits={Number(user.aiCredits) || 0}
                 role={user.role}
                 onSubmitPassword={handlePasswordSubmit}
-                onBuyCredits={handleBuyCredits}
                 onOpenDelete={() => setDeleteOpen(true)}
               />
             </TabsContent>

@@ -117,6 +117,11 @@ export const aiLimiter = new RateLimiter({ windowMs: 60_000, max: 10 });
 /** 30 chat messages per minute per user. */
 export const chatLimiter = new RateLimiter({ windowMs: 60_000, max: 30 });
 
+/** 20 client error reports per minute per IP — generous so a broken page can
+ * fan-out multiple errors (window.onerror + unhandledrejection + React error
+ * boundary) without being throttled, but blocks deliberate flooding. */
+export const errorLogLimiter = new RateLimiter({ windowMs: 60_000, max: 20 });
+
 // Periodic cleanup every 5 minutes to free memory
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
@@ -124,6 +129,7 @@ if (typeof setInterval !== 'undefined') {
     registerLimiter.sweep();
     aiLimiter.sweep();
     chatLimiter.sweep();
+    errorLogLimiter.sweep();
   }, 5 * 60_000).unref?.();
 }
 

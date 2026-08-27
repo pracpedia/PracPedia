@@ -684,7 +684,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
                   )}
                 </div>
 
-                {/* 4. Phone number input (Optional on Register) */}
+                {/* 4. Phone number input (signup only) */}
                 {!isLogin && (
                   <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
                     <label className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-400 block px-1">

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Space_Grotesk, Playfair_Display, Outfit, DM_Serif_Di
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { ErrorCaptureGate } from "@/components/features/ErrorCaptureGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -108,7 +109,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <LanguageProvider>
-            {children}
+            <ErrorCaptureGate>
+              {children}
+            </ErrorCaptureGate>
           </LanguageProvider>
         </AuthProvider>
       </body>
