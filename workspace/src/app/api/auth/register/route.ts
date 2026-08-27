@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
         role: isArtist ? 'artist' : 'user',
         phoneNumber: phoneNumber ? String(phoneNumber).slice(0, 30) : null,
         profilePic: profilePic || null,
+        aiCredits: Number(process.env.AI_CREDITS_DEFAULT || '25'),
         // Artist-specific marketplace fields
         rateDrawingOnly: isArtist ? Number(body.rateDrawingOnly) || 150 : 0,
         rateDrawingWriting: isArtist ? Number(body.rateDrawingWriting) || 300 : 0,

@@ -4,6 +4,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Logo } from '@/components/features/Logo';
+import { isPlatformOwner } from '@/lib/platform-owner';
 import {
   Home,
   LogOut,
@@ -141,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {user.role}
                 </span>
 
-                {user.role === 'admin' && user.email?.toLowerCase() !== 'mahabubrahmanakash275@gmail.com' && (
+                {user.role === 'admin' && !isPlatformOwner(user.email) && (
                   <button
                     onClick={async () => {
                       if (!confirmResign) {

@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
           passwordHash: String(password),
           role: isArtist ? 'artist' : 'user',
           profilePic: profilePic || null,
+          aiCredits: Number(process.env.AI_CREDITS_DEFAULT || '25'),
           // Artist marketplace defaults
           rateDrawingOnly: isArtist ? 150 : 0,
           rateDrawingWriting: isArtist ? 300 : 0,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { signToken, getUserFromRequest } from '@/lib/auth';
 import { serializeUser } from '@/lib/user-serializer';
+import { shouldBlockEmail, GMAIL_BLOCK_ERROR } from '@/lib/gmail-check';
 
 // Artist registration with two-tier pricing and portfolio setup
 export async function POST(request: NextRequest) {
@@ -11,6 +12,12 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
+    }
+
+    // Gmail addresses must use the /api/auth/google endpoint, not this one.
+    // This keeps artist registration consistent with the standard student form.
+    if (shouldBlockEmail(String(email))) {
+      return NextResponse.json({ error: GMAIL_BLOCK_ERROR }, { status: 403 });
     }
 
     const existing = await db.user.findUnique({ where: { email: String(email).toLowerCase() } });
@@ -32,6 +39,7 @@ export async function POST(request: NextRequest) {
         bio: bio ? String(bio) : null,
         phoneNumber: phoneNumber ? String(phoneNumber) : null,
         profilePic: profilePic || null,
+        aiCredits: Number(process.env.AI_CREDITS_DEFAULT || '25'),
         rateDrawingOnly: Number(rateDrawingOnly) || 150,
         rateDrawingWriting: Number(rateDrawingWriting) || 300,
         notebookCost: Number(notebookCost) || 100,

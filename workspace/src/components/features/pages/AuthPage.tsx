@@ -66,12 +66,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
 
   // Google Sign-In Modal State
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
-  const [googleEmailInput, setGoogleEmailInput] = useState('mahabubrahmanakash275@gmail.com');
+  const [googleEmailInput, setGoogleEmailInput] = useState('');
   const [googlePasswordInput, setGooglePasswordInput] = useState('');
   const [googleShowPassword, setGoogleShowPassword] = useState(false);
   const [googleModalError, setGoogleModalError] = useState<string | null>(null);
   const [googleModalLoading, setGoogleModalLoading] = useState(false);
-  const [selectedGoogleAccount, setSelectedGoogleAccount] = useState<string | null>(null);
   const [googleNotice, setGoogleNotice] = useState<string | null>(null);
 
   // Artist Special Signup Fields
@@ -81,12 +80,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
 
   // Avatar Profile Pic Field
   const [profilePic, setProfilePic] = useState('');
-
-  // OTP State Hooks
-  const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpSuccess, setOtpSuccess] = useState(false);
 
   const isGmailAddress = (mail: string): boolean => {
     if (!mail) return false;
@@ -261,54 +254,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
     }
   };
 
-  const handleOTPVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOtpLoading(true);
-    setErrorMsg(null);
-
-    try {
-      const verifyRes = await apiFetch('/api/messages/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: otpCode }),
-      });
-
-      const verifyData = await safeJson(verifyRes);
-      if (!verifyRes.ok) {
-        throw new Error(verifyData.error || 'Incorrect or expired verification passcode.');
-      }
-
-      const endpoint = authType === 'artist' ? '/api/artists/register' : '/api/auth/register';
-      const body = buildRegisterBody(authType === 'artist');
-
-      const regRes = await apiFetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const regData = await safeJson(regRes);
-
-      if (!regRes.ok) {
-        throw new Error(regData.error || 'Account registration failed during write.');
-      }
-
-      if (regData.token && regData.user) {
-        setOtpSuccess(true);
-        setTimeout(() => {
-          login(regData.token, regData.user);
-          onSuccess();
-        }, 1200);
-      } else {
-        throw new Error('Invalid server registration response.');
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Verification failed. Please review credentials.');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
   const handleQuickFill = (targetEmail: string, targetPass: string, authSegment: 'student' | 'artist') => {
     setEmail(targetEmail);
     setPassword(targetPass);
@@ -316,14 +261,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
     setAuthType(authSegment);
     setErrorMsg(null);
   };
-
-  // Reference to silence unused-variable warnings until OTP flow is fully wired.
-  void selectedGoogleAccount;
-  void isVerifyingOTP;
-  void otpCode;
-  void otpLoading;
-  void otpSuccess;
-  void handleOTPVerify;
 
   return (
     <div id="auth_page_container" className="min-h-screen text-slate-100 flex flex-col justify-center items-center relative overflow-hidden bg-[#04060b] px-3 sm:px-6 py-6 md:py-12 select-none">
@@ -962,25 +899,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
                 <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block">
                   Quick Select Verified Gmail Account
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGoogleModalError(null);
-                      setGoogleEmailInput('mahabubrahmanakash275@gmail.com');
-                      setGooglePasswordInput('password123');
-                    }}
-                    className="p-2.5 bg-slate-950/80 hover:bg-slate-900 border border-slate-700/80 rounded-xl text-left transition-all cursor-pointer flex items-center gap-2 group min-h-[56px]"
-                  >
-                    <div className="w-7 h-7 rounded-full bg-indigo-900/90 text-indigo-300 font-extrabold text-xs flex items-center justify-center shrink-0 border border-indigo-500/30">
-                      M
-                    </div>
-                    <div className="truncate min-w-0">
-                      <div className="text-[11px] font-bold text-slate-200 truncate group-hover:text-cyan-300">mahabub...</div>
-                      <div className="text-[9px] text-slate-400 font-mono truncate">@gmail.com (Founder)</div>
-                    </div>
-                  </button>
-
+                <div className="grid grid-cols-1 gap-2">
                   <button
                     type="button"
                     onClick={() => {

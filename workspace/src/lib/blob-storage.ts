@@ -95,19 +95,38 @@ export function isBlobStorageConfigured(): boolean {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function fileToDataUrl(file: File | Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
+/**
+ * Convert a File/Blob to a base64 data URL.
+ *
+ * Server-safe: uses `Buffer` (Node) when `FileReader` is unavailable (i.e. in
+ * the Next.js server runtime), and falls back to `FileReader` in the browser.
+ */
+async function fileToDataUrl(file: File | Blob): Promise<string> {
+  // Browser path
+  if (typeof FileReader !== 'undefined') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Server path (Node.js — Next.js route handlers)
+  // Convert Blob/File to a Buffer, then base64-encode.
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  // Determine mime type — File has `.type`, Blob has `.type` too.
+  const mime = (file as File).type || 'image/jpeg';
+  const base64 = buffer.toString('base64');
+  return `data:${mime};base64,${base64}`;
 }
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const [meta, base64] = dataUrl.split(',');
   const mime = meta.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
-  const binary = atob(base64);
+  // Server-safe base64 decode (atob exists in Node 16+ via Buffer, in browser natively)
+  const binary = typeof atob !== 'undefined' ? atob(base64) : Buffer.from(base64, 'base64').toString('binary');
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);

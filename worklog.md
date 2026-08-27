@@ -98,3 +98,77 @@ Stage Summary:
   * MODIFIED: src/components/features/pages/AuthPage.tsx (safeJson helper + 5 call sites)
   * MODIFIED: prisma/schema.prisma (postgresql → sqlite)
   * NEW: .env (copied from .env.example)
+
+---
+Task ID: 4
+Agent: main
+Task: Gmail-only Google form, non-gmail-only standard form, remove pre-filled gmail, fix all bugs, configure DB
+
+Work Log:
+- Removed pre-filled `mahabubrahmanakash275@gmail.com` from AuthPage Google modal default state (was on line 69)
+- Removed the "Founder" preset quick-select button from Google modal (kept the Student preset)
+- Removed dead OTP code path entirely (was referencing missing /api/messages/verify-otp):
+  * Removed 4 unused state vars (isVerifyingOTP, otpCode, otpLoading, otpSuccess)
+  * Removed handleOTPVerify function
+  * Removed selectedGoogleAccount state var (was also void)
+  * Removed all `void` silencer lines
+- Made Gmail blocking consistent across all registration routes:
+  * /api/auth/register already blocked Gmail (frontend + backend) ✓
+  * /api/artists/register was MISSING the block — added shouldBlockEmail check
+  * /api/auth/login intentionally doesn't block Gmail (admins can log in)
+  * Frontend AuthPage.tsx already blocks Gmail on standard form ✓
+  * /api/auth/google strictly enforces @gmail.com only ✓
+- Replaced hardcoded mahabubrahmanakash275@gmail.com checks with isPlatformOwner() helper:
+  * AdminCmsPage.tsx (isMainOwner + isRowMainOwner) — now imports from lib/platform-owner
+  * Sidebar.tsx (resign button visibility) — now imports from lib/platform-owner
+- Created 5 missing API endpoints that were referenced by client code:
+  * /api/images/upload-file — multipart FormData upload, returns {url}. Uses uploadImage() from blob-storage.
+  * /api/scan/detect-corners — Gemini vision API for notebook page corner detection. Returns {corners}. Graceful fallback to default corners.
+  * /api/scan/analyze-page — Gemini vision API for notebook page analysis. Returns {analysis, aiCredits}. Decrements credits per call. Graceful fallback message.
+  * /api/users/recharge-trial — tops up aiCredits to AI_CREDITS_DEFAULT (env var). Authenticated.
+  * /api/users/resign — admin self-demote to user. Platform owners protected from resigning.
+- Fixed bug in lib/blob-storage.ts:
+  * fileToDataUrl() used FileReader which is browser-only — failed in Node server runtime
+  * Added Buffer-based server path with browser fallback
+  * dataUrlToBlob() also made server-safe with atob/Buffer fallback
+- Added aiCredits default to all registration routes:
+  * /api/auth/register — aiCredits = Number(process.env.AI_CREDITS_DEFAULT || '25')
+  * /api/artists/register — same
+  * /api/auth/google — same
+- DB configuration:
+  * prisma/schema.prisma now uses sqlite at file:/home/z/my-project/db/custom.db
+  * prisma/schema.sqlite.prisma updated to match (was incorrectly still postgres)
+  * Verified prisma generate + db push work cleanly
+  * .env expanded with all documented vars: DATABASE_URL, JWT_SECRET, PLATFORM_OWNER_EMAILS, AI_CREDITS_DEFAULT, PRACPEDIA_TEST_PASSWORDS_VISIBLE, GEMINI_API_KEY, BLOB_READ_WRITE_TOKEN
+  * .env.example synced with .env
+
+Stage Summary:
+- Gmail/non-gmail split now fully consistent:
+  * Standard form (frontend blocks Gmail, /api/auth/register + /api/artists/register reject Gmail 403)
+  * Google form (frontend + /api/auth/google reject non-gmail 400)
+  * Platform owners bypass Gmail block via PLATFORM_OWNER_EMAILS env var (currently includes mahabubrahmanakash275@gmail.com)
+- All 5 missing endpoints implemented with proper auth, validation, and graceful AI fallbacks
+- Image upload now works server-side (FileReader bug fixed)
+- New users start with 25 AI credits (configurable via env var)
+- ESLint passes (0 errors)
+- All public endpoints return 200: /api/health, /api/stats, /api/subjects, /api/artists, /
+- Academy text chat (non-vision) works against the live Z-AI SDK
+- Vision API features (corner detection, page analysis) gracefully degrade when images are data URLs or GEMINI_API_KEY is unset — client has manual corner drag UI and fallback text
+- Files modified:
+  * src/components/features/pages/AuthPage.tsx (removed pre-fill, dead OTP code, founder preset)
+  * src/components/features/pages/AdminCmsPage.tsx (isPlatformOwner import + 2 callsites)
+  * src/components/features/Sidebar.tsx (isPlatformOwner import + 1 callsite)
+  * src/components/features/AiAcademyRoom.tsx (cleaned up stale comments)
+  * src/app/api/artists/register/route.ts (added Gmail block + aiCredits default)
+  * src/app/api/auth/register/route.ts (added aiCredits default)
+  * src/app/api/auth/google/route.ts (added aiCredits default)
+  * src/lib/blob-storage.ts (server-safe fileToDataUrl + dataUrlToBlob)
+  * prisma/schema.prisma (sqlite)
+  * prisma/schema.sqlite.prisma (sqlite, was incorrectly postgres)
+  * .env, .env.example (expanded with all config vars)
+- New files:
+  * src/app/api/images/upload-file/route.ts
+  * src/app/api/scan/detect-corners/route.ts
+  * src/app/api/scan/analyze-page/route.ts
+  * src/app/api/users/recharge-trial/route.ts
+  * src/app/api/users/resign/route.ts

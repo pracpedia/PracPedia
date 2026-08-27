@@ -615,10 +615,7 @@ export const AiAcademyRoom: React.FC = () => {
         alert(errData.error || "Failed to recharge trial credits.");
       }
     } catch (e) {
-      // NOTE: /api/users/recharge-trial endpoint is NOT yet implemented on the Next.js backend.
-      // The original Vite backend exposed this for granting 150 trial AI credits — preserved
-      // here so the UI flow stays intact; gracefully surfaces a friendly alert when missing.
-      console.warn('/api/users/recharge-trial endpoint not yet implemented in Next.js backend:', e);
+      console.warn('Recharge trial credits failed:', e);
       alert("Error contacting the credit recharge service.");
     } finally {
       setRechargingCredits(false);
