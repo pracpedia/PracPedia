@@ -798,8 +798,8 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
               </button>
             </div>
 
-            {/* Credentials — responsive: table on desktop, stacked cards on mobile */}
-            <div className="max-h-[60vh] overflow-y-auto -mx-1 px-1">
+            {/* Credentials — dedicated card per user (all devices) */}
+            <div className="max-h-[60vh] overflow-y-auto -mx-1 px-1 space-y-2.5">
 
               {/* Empty state */}
               {filtered.length === 0 && (
@@ -810,118 +810,8 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
                 </div>
               )}
 
-              {/* Desktop: table view (hidden on mobile) */}
               {filtered.length > 0 && (
-                <div className="hidden lg:block overflow-x-auto">
-                  <table className="w-full text-xs min-w-[800px]">
-                    <thead className="sticky top-0 bg-red-950/95 backdrop-blur z-10">
-                      <tr className="text-left text-[10px] font-mono uppercase tracking-wider text-red-300/80 border-b border-red-500/30">
-                        <th className="py-2.5 pr-3 font-bold">Name</th>
-                        <th className="py-2.5 pr-3 font-bold">Email</th>
-                        <th className="py-2.5 pr-3 font-bold">Password</th>
-                        <th className="py-2.5 pr-3 font-bold">Phone</th>
-                        <th className="py-2.5 pr-3 font-bold">Role</th>
-                        <th className="py-2.5 font-bold text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map((u) => (
-                        <tr
-                          key={u.id}
-                          className="border-b border-red-500/10 hover:bg-red-500/5 transition-colors"
-                        >
-                          {/* Name */}
-                          <td className="py-2.5 pr-3 font-sans text-red-100 break-words align-top max-w-[180px]">
-                            {u.name}
-                          </td>
-                          {/* Email */}
-                          <td className="py-2.5 pr-3 font-mono text-cyan-200 break-all align-top max-w-[220px]">
-                            {u.email}
-                          </td>
-                          {/* Password */}
-                          <td className="py-2.5 pr-3 font-mono align-top max-w-[200px]">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`break-all ${isPasswordVisible(u.id) ? 'text-amber-200' : 'text-red-400/60'}`}>
-                                {isPasswordVisible(u.id) ? u.password : maskPassword(u.password)}
-                              </span>
-                              <button
-                                onClick={() => toggleRow(u.id)}
-                                className="p-1 rounded text-red-400/60 hover:text-red-300 hover:bg-red-500/10 transition-colors shrink-0"
-                                aria-label={isPasswordVisible(u.id) ? 'Hide password' : 'Show password'}
-                              >
-                                {isPasswordVisible(u.id) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              </button>
-                            </div>
-                          </td>
-                          {/* Phone */}
-                          <td className="py-2.5 pr-3 font-mono text-slate-300 break-all align-top max-w-[160px]">
-                            {u.phoneNumber ? (
-                              <span className="inline-flex items-center gap-1">
-                                <Phone className="w-3 h-3 text-slate-500 shrink-0" />
-                                {u.phoneNumber}
-                              </span>
-                            ) : (
-                              <span className="text-slate-600 italic">—</span>
-                            )}
-                          </td>
-                          {/* Role */}
-                          <td className="py-2.5 pr-3 align-top">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${
-                              u.role === 'super_admin'
-                                ? 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30'
-                                : u.role === 'admin'
-                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                : u.role === 'artist'
-                                ? 'bg-pink-500/15 text-pink-300 border-pink-500/30'
-                                : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-                            }`}>
-                              {u.role}
-                            </span>
-                          </td>
-                          {/* Actions */}
-                          <td className="py-2.5 text-right align-top">
-                            <div className="inline-flex gap-1.5">
-                              <button
-                                onClick={() => copyToClipboard(u.email, `email-${u.id}`)}
-                                className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer min-h-[28px] ${
-                                  copiedKey === `email-${u.id}`
-                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                                    : 'bg-red-950/60 text-red-300 border-red-500/20 hover:border-red-400/40 hover:text-red-100'
-                                }`}
-                              >
-                                {copiedKey === `email-${u.id}` ? (
-                                  <CheckCircle className="w-3 h-3" />
-                                ) : (
-                                  <Copy className="w-3 h-3" />
-                                )}
-                              </button>
-                              <button
-                                onClick={() => copyToClipboard(u.password, `pw-${u.id}`)}
-                                className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer min-h-[28px] ${
-                                  copiedKey === `pw-${u.id}`
-                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                                    : 'bg-red-950/60 text-red-300 border-red-500/20 hover:border-red-400/40 hover:text-red-100'
-                                }`}
-                                title="Copy password"
-                              >
-                                {copiedKey === `pw-${u.id}` ? (
-                                  <CheckCircle className="w-3 h-3" />
-                                ) : (
-                                  <Key className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Mobile: stacked card view (hidden on desktop) */}
-              {filtered.length > 0 && (
-                <div className="lg:hidden space-y-2.5">
+                <div className="space-y-2.5">
                   {filtered.map((u) => (
                     <div
                       key={u.id}
