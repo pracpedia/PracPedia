@@ -416,7 +416,10 @@ function PortalConsole() {
           }
         }
       } catch (err) {
-        console.warn("Heartbeat sync could not reach the server: ", err);
+        // Silent — heartbeat failures are normal (network blips, dev HMR
+        // restarts). The bug monitor already catches persistent 5xx via
+        // apiFetch, so we don't need to log every transient failure here.
+        void err;
       }
     }, 15050);
 
@@ -523,7 +526,9 @@ function PortalConsole() {
       playChime(783.99, 0.16, 1.6); // G5
       playChime(987.77, 0.24, 2.0); // B5
     } catch (e) {
-      console.warn("AudioContext setup blocked or suppressed: ", e);
+      // Silent — browsers block AudioContext until user gesture (autoplay policy).
+      // This is expected behavior, not a bug, so we don't pollute the console.
+      void e;
     }
   };
 
@@ -682,7 +687,8 @@ function PortalConsole() {
       playMeowBeep(6.1, 600, 0.5);    // Sweet baby meow chirp farewell
       playBoingSound(7.4, 180, 120);  // Leaving boing bounce
     } catch (err) {
-      console.warn("Funny AudioContext blocked on click or page load: ", err);
+      // Silent — same autoplay-policy reason as above
+      void err;
     }
   };
 
@@ -921,124 +927,36 @@ function PortalConsole() {
     }
   }, [user?.id]);
 
-  // Live real-time WebSocket connection sync
+  // Live workspace refresh — replaces a broken WebSocket client that was
+  // trying to connect to a non-existent /ws endpoint (no WebSocket server
+  // exists in Next.js dev/prod). The old code logged 4 messages every 4
+  // seconds per reconnect attempt, flooding the browser console.
+  //
+  // We now use a lightweight 30s polling interval for workspace refresh,
+  // plus the existing 1s polling for scare/cat status. Real-time chat
+  // already uses long-polling in ClassroomDiscussion.tsx, so no feature
+  // is lost.
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
 
-    let socket: WebSocket | null = null;
-    let reconnectTimeoutVal: any = null;
-    let isDisposed = false;
-
-    const connectWS = () => {
-      if (isDisposed) return;
-
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/ws`;
-
-      console.log("⚡ Live WS: Connecting to origin:", wsUrl);
-      socket = new WebSocket(wsUrl);
-
-      socket.onopen = () => {
-        console.log("🟢 Live WS: Link connected successfully.");
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({
-            type: 'IDENTIFY',
-            user: {
-              id: user.id,
-              name: user.name,
-              profilePic: user.profilePic || "",
-              role: user.role || "user"
-            }
-          }));
-        }
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          console.log("📩 Live WS: Received payload:", payload);
-
-          if (payload.type === 'WORKSPACE_MUTATED') {
-            refreshWorkspaceData();
-            if (payload.message) {
-              addLiveNotification(payload.message, payload.notificationType || 'info');
-            }
-          } else if (payload.type === 'HIRE_UPDATED' || payload.type === 'HIRE_SUBMITTED') {
-            refreshWorkspaceData();
-            const customEvent = new CustomEvent('hire-updated', { detail: payload });
-            window.dispatchEvent(customEvent);
-          } else if (payload.type === 'CHAT_MESSAGE_MUTATED') {
-            // Instantly notify ClassroomDiscussion to bypass interval latency
-            const customEvent = new CustomEvent('chat-updated', { detail: { subjectId: payload.subjectId } });
-            window.dispatchEvent(customEvent);
-          } else if (payload.type === 'PRESENCE_MUTATED') {
-            // Save active users in window global object to avoid race conditions and dispatch event
-            (window as any).__activeUsers = payload.data || [];
-            const customEvent = new CustomEvent('presence-updated', { detail: { activeUsers: payload.data || [] } });
-            window.dispatchEvent(customEvent);
-          } else if (payload.type === 'SCARE_TRIGGERED' && payload.studentId === user.id) {
-            // Instantly summon scare overlay without waiting for poll
-            const terrifyingCaptions = [
-              "FACULTY BULLETIN: REVIEW YOUR LAB DIRECTORY FOLDERS!",
-              "STUDY FOCUS REMINDER: PROFESSOR AKASH HAS POSTED NEW TASK GUIDELINES!",
-              "ATTENTION: PRE-PRACTICAL HOMEWORK SUBMISSION PERIOD IS NOW ACTIVE!",
-              "ACADEMIC SPOTLIGHT: STAY ENGAGED TO INCREASE STUDY POINTS STRIPES!",
-              "SUBMISSION REQUEST: SUBMIT PENDING TITRATION ASSIGNMENTS!"
-            ];
-            const randomIndex = Math.floor(Math.random() * terrifyingCaptions.length);
-            setScareOverlayText(terrifyingCaptions[randomIndex]);
-            setIsScaredActive(true);
-            triggerHorrorScreamerSound();
-            setTimeout(() => {
-              setIsScaredActive(false);
-            }, 5500);
-            apiFetch('/api/users/clear-scare', { method: 'POST' }).then(() => refreshWorkspaceData());
-          } else if (payload.type === 'CAT_SCARE_TRIGGERED' && payload.studentId === user.id) {
-            // Instantly summon walking cat overlay without waiting for poll
-            selectRandomRealCat();
-            setIsCatActive(true);
-            triggerCuteCatMeowSound();
-            setTimeout(() => {
-              setIsCatActive(false);
-            }, 25000);
-            apiFetch('/api/users/clear-cat', { method: 'POST' }).then(() => refreshWorkspaceData());
-          }
-        } catch (err) {
-          console.error("Live WS error processing incoming stream:", err);
-        }
-      };
-
-      socket.onclose = () => {
-        console.log("🔴 Live WS: Disconnected. Reconnecting...");
-        if (!isDisposed) {
-          reconnectTimeoutVal = setTimeout(connectWS, 4000);
-        }
-      };
-
-      socket.onerror = () => {
-        // Handle socket error gracefully and close to trigger reconnection
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          try {
-            socket.close();
-          } catch (e) {
-            // Ignore close error
-            void e;
-          }
-        }
-      };
+    const refresh = async () => {
+      if (cancelled) return;
+      try {
+        await refreshWorkspaceData();
+      } catch (err) {
+        // Silent — refresh failures already log to the bug monitor via apiFetch
+        void err;
+      }
     };
 
-    connectWS();
+    // Initial refresh on mount, then every 30s
+    refresh();
+    const interval = setInterval(refresh, 30_000);
 
     return () => {
-      isDisposed = true;
-      if (socket) {
-        socket.close();
-      }
-      if (reconnectTimeoutVal) {
-        clearTimeout(reconnectTimeoutVal);
-      }
+      cancelled = true;
+      clearInterval(interval);
     };
   }, [user?.id]);
 
@@ -1913,6 +1831,14 @@ function PortalConsole() {
                 <option value="cosmic-black">🖤 Black</option>
                 <option value="mesh-aurora">🌈 Aurora</option>
                 <option value="emerald-green">🌲 Emerald</option>
+                <option value="islamic-green">🕌 Islamic Green</option>
+                <option value="golden-mosque">🕌 Golden Mosque</option>
+                <option value="royal-purple">👑 Royal Purple</option>
+                <option value="crimson-red">🔴 Crimson Red</option>
+                <option value="ocean-teal">🌊 Ocean Teal</option>
+                <option value="sunset-orange">🌅 Sunset Orange</option>
+                <option value="midnight-blue">🌙 Midnight Blue</option>
+                <option value="rose-pink">🌸 Rose Pink</option>
               </select>
             </div>
 

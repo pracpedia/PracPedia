@@ -152,92 +152,162 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* PracPedia dark glass theme — applied to the root app shell */
+/* PracPedia dark glass theme — applied to the root app shell.
+   Each theme defines:
+     --theme-bg       : page background (multi-layer gradient)
+     --theme-accent   : accent text color (links, highlights, active states)
+     --theme-glow     : subtle accent glow used by sidebar/header borders
+   Components can use `var(--theme-accent, #22d3ee)` to pick up the active theme.
+   Default fallbacks in :root keep existing look when no theme is applied.
+*/
+:root {
+  --theme-accent: #22d3ee;
+  --theme-glow: rgba(124, 58, 237, 0.18);
+  --theme-bg: #05070e;
+}
+
 @layer utilities {
   .font-arabic {
     font-family: "Amiri", "Cairo", "Noto Naskh Arabic", "Segoe UI", serif;
   }
 
   .glass-main-bg {
-    background: radial-gradient(circle at 15% 15%, rgba(124, 58, 237, 0.12) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(245, 158, 11, 0.06) 0%, transparent 40%),
+    --theme-accent: #22d3ee;
+    --theme-glow: rgba(124, 58, 237, 0.18);
+    background:
+      radial-gradient(ellipse 60% 50% at 12% 8%, rgba(124, 58, 237, 0.16) 0%, transparent 55%),
+      radial-gradient(ellipse 50% 40% at 88% 92%, rgba(245, 158, 11, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 50%, rgba(6, 182, 212, 0.04) 0%, transparent 70%),
       #05070e;
   }
 
+  /* ── COOL / NEUTRAL THEMES ── */
+
   .theme-peaceful-purple {
-    background: radial-gradient(circle at 15% 15%, rgba(139, 92, 246, 0.18) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(217, 70, 239, 0.08) 0%, transparent 40%),
+    --theme-accent: #a78bfa;
+    --theme-glow: rgba(139, 92, 246, 0.28);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(139, 92, 246, 0.25) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(217, 70, 239, 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(168, 85, 247, 0.08) 0%, transparent 60%),
       #10081d !important;
   }
   .theme-deep-blue {
-    background: radial-gradient(circle at 15% 15%, rgba(6, 182, 212, 0.16) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+    --theme-accent: #38bdf8;
+    --theme-glow: rgba(6, 182, 212, 0.25);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(6, 182, 212, 0.22) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(59, 130, 246, 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(14, 165, 233, 0.08) 0%, transparent 60%),
       #030716 !important;
   }
   .theme-cosmic-black {
-    background: radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.02) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(124, 58, 237, 0.03) 0%, transparent 40%),
+    --theme-accent: #c4b5fd;
+    --theme-glow: rgba(196, 181, 253, 0.10);
+    background:
+      radial-gradient(ellipse 70% 50% at 12% 8%, rgba(255, 255, 255, 0.04) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 88% 92%, rgba(124, 58, 237, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 50%, rgba(168, 85, 247, 0.03) 0%, transparent 70%),
       #000000 !important;
   }
   .theme-mesh-aurora {
-    background: radial-gradient(circle at 10% 20%, rgba(124, 58, 237, 0.18) 0%, transparent 45%),
-      radial-gradient(circle at 90% 10%, rgba(16, 185, 129, 0.12) 0%, transparent 40%),
-      radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.08) 0%, transparent 50%),
+    --theme-accent: #f0abfc;
+    --theme-glow: rgba(236, 72, 153, 0.25);
+    background:
+      radial-gradient(ellipse 55% 45% at 10% 20%, rgba(124, 58, 237, 0.22) 0%, transparent 55%),
+      radial-gradient(ellipse 50% 40% at 90% 10%, rgba(16, 185, 129, 0.18) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 50% at 50% 90%, rgba(236, 72, 153, 0.14) 0%, transparent 55%),
       #08060f !important;
   }
   .theme-emerald-green {
-    background: radial-gradient(circle at 15% 15%, rgba(16, 185, 129, 0.15) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(245, 158, 11, 0.04) 0%, transparent 40%),
+    --theme-accent: #34d399;
+    --theme-glow: rgba(16, 185, 129, 0.25);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(16, 185, 129, 0.22) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(245, 158, 11, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(52, 211, 153, 0.08) 0%, transparent 60%),
       #010905 !important;
   }
 
-  /* ── BRIGHT THEMES ── */
+  /* ── BRIGHT / WARM THEMES ── */
 
   .theme-islamic-green {
-    background: radial-gradient(circle at 20% 20%, rgba(0, 150, 65, 0.2) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(0, 100, 45, 0.12) 0%, transparent 45%),
+    --theme-accent: #4ade80;
+    --theme-glow: rgba(0, 200, 80, 0.28);
+    background:
+      radial-gradient(ellipse 65% 55% at 20% 20%, rgba(0, 200, 80, 0.28) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 80% 80%, rgba(0, 120, 50, 0.16) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(34, 197, 94, 0.10) 0%, transparent 60%),
       #021a0e !important;
   }
 
   .theme-golden-mosque {
-    background: radial-gradient(circle at 15% 15%, rgba(212, 175, 55, 0.15) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(180, 140, 30, 0.08) 0%, transparent 40%),
+    --theme-accent: #fbbf24;
+    --theme-glow: rgba(212, 175, 55, 0.28);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(212, 175, 55, 0.22) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(180, 140, 30, 0.14) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(250, 204, 21, 0.10) 0%, transparent 60%),
       #0d0a01 !important;
   }
 
   .theme-royal-purple {
-    background: radial-gradient(circle at 15% 15%, rgba(147, 51, 234, 0.18) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(192, 38, 211, 0.08) 0%, transparent 40%),
+    --theme-accent: #c084fc;
+    --theme-glow: rgba(147, 51, 234, 0.30);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(147, 51, 234, 0.28) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(192, 38, 211, 0.14) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(168, 85, 247, 0.12) 0%, transparent 60%),
       #0a0118 !important;
   }
 
   .theme-crimson-red {
-    background: radial-gradient(circle at 15% 15%, rgba(239, 68, 68, 0.15) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(220, 38, 38, 0.08) 0%, transparent 40%),
+    --theme-accent: #f87171;
+    --theme-glow: rgba(239, 68, 68, 0.28);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(239, 68, 68, 0.24) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(220, 38, 38, 0.14) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(248, 113, 113, 0.10) 0%, transparent 60%),
       #0a0102 !important;
   }
 
   .theme-ocean-teal {
-    background: radial-gradient(circle at 15% 15%, rgba(20, 184, 166, 0.18) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(13, 148, 136, 0.08) 0%, transparent 40%),
+    --theme-accent: #2dd4bf;
+    --theme-glow: rgba(20, 184, 166, 0.30);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(20, 184, 166, 0.26) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(13, 148, 136, 0.14) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(45, 212, 191, 0.10) 0%, transparent 60%),
       #001210 !important;
   }
 
   .theme-sunset-orange {
-    background: radial-gradient(circle at 15% 15%, rgba(251, 146, 60, 0.15) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(234, 88, 12, 0.08) 0%, transparent 40%),
+    --theme-accent: #fb923c;
+    --theme-glow: rgba(251, 146, 60, 0.28);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(251, 146, 60, 0.24) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(234, 88, 12, 0.14) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(251, 191, 36, 0.10) 0%, transparent 60%),
       #0d0500 !important;
   }
 
   .theme-midnight-blue {
-    background: radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.18) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(37, 99, 235, 0.08) 0%, transparent 40%),
+    --theme-accent: #60a5fa;
+    --theme-glow: rgba(59, 130, 246, 0.28);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(59, 130, 246, 0.26) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(37, 99, 235, 0.14) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(96, 165, 250, 0.10) 0%, transparent 60%),
       #000814 !important;
   }
 
   .theme-rose-pink {
-    background: radial-gradient(circle at 15% 15%, rgba(244, 114, 182, 0.15) 0%, transparent 45%),
-      radial-gradient(circle at 85% 85%, rgba(236, 72, 153, 0.08) 0%, transparent 40%),
+    --theme-accent: #f472b6;
+    --theme-glow: rgba(244, 114, 182, 0.28);
+    background:
+      radial-gradient(ellipse 65% 55% at 15% 15%, rgba(244, 114, 182, 0.22) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 85%, rgba(236, 72, 153, 0.14) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 100%, rgba(249, 168, 212, 0.10) 0%, transparent 60%),
       #14010a !important;
   }
 

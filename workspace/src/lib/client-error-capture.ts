@@ -135,29 +135,32 @@ export function installErrorCapture(): void {
     });
   });
 
-  // 3. Capture React/Next.js errors that go through console.error
-  //    (only those with stack traces — to avoid spamming on every console.log)
+  // 3. Capture React/Next.js errors that go through console.error.
+  //    IMPORTANT: We only report when there is an actual Error instance in
+  //    the args (i.e. something was thrown, not just a dev-mode string log).
+  //    This avoids double-reporting errors that already go through
+  //    window.onerror, and avoids logging the dozens of Next.js dev-mode
+  //    hydration/Fast-Refresh "errors" that are actually warnings.
   const origConsoleError = console.error;
   console.error = function (...args: any[]) {
     try {
-      const first = args[0];
-      const msg = typeof first === 'string' ? first :
-        first instanceof Error ? first.message :
-        (() => { try { return JSON.stringify(first); } catch { return String(first); } })();
-      // Filter noise: don't report React DevTools warnings, prop-type warnings
-      // without a stack, or warnings that already include "[Error]" prefix
-      if (
-        msg &&
-        !msg.includes('Download the React DevTools') &&
-        !msg.includes('Warning: ') &&
-        (msg.includes('Error') || msg.includes('error') || args.some(a => a instanceof Error))
-      ) {
-        const stack = args.find((a) => a instanceof Error)?.stack || '';
-        reportError({
-          type: 'console_error',
-          message: msg.slice(0, 2000),
-          stack,
-        });
+      // Only react to actual thrown errors, not dev-mode text logs
+      const errArg = args.find((a) => a instanceof Error);
+      if (errArg && errArg.stack) {
+        const msg = errArg.message || String(errArg);
+        // Skip React DevTools / hydration / Fast Refresh noise
+        if (
+          !msg.includes('Download the React DevTools') &&
+          !msg.includes('Hydration') &&
+          !msg.includes('Fast Refresh') &&
+          !msg.includes('Warning: ')
+        ) {
+          reportError({
+            type: 'console_error',
+            message: msg.slice(0, 2000),
+            stack: errArg.stack,
+          });
+        }
       }
     } catch {
       // ignore — never break console.error
