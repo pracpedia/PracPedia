@@ -128,7 +128,7 @@ const TESTIMONIALS = [
     name: 'Tasnim N.',
     role: 'HSC 2024 candidate',
     city: 'Chittagong',
-    quote: "Commissioned an optics diagram in 2 days. The artist's pencil shading was perfect.",
+    quote: "Commissioned a calculus integration diagram in 2 days. The artist's pencil shading was perfect.",
     tint: 'from-amber-500 to-orange-600',
   },
   {
@@ -564,37 +564,60 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               {/* Page content */}
               <div className="absolute inset-0 pl-10 pr-5 py-5 flex flex-col gap-3">
                 <div className="flex items-center justify-between text-[9px] font-mono text-slate-500">
-                  <span>EXP-04 · CONVEX LENS</span>
+                  <span>EXP-04 · INTEGRATION</span>
                   <span className="text-cyan-400">2026.01.14</span>
                 </div>
-                <div className="text-xs font-bold text-white">Determination of focal length</div>
+                <div className="text-xs font-bold text-white">Definite integral — area under curve</div>
 
-                {/* Diagram */}
+                {/* Diagram — y = x² shaded from x=0 to x=2 */}
                 <div className="rounded-lg bg-slate-950/60 border border-white/5 p-3 flex items-center justify-center">
                   <svg viewBox="0 0 200 90" className="w-full h-auto" aria-hidden>
-                    <line x1="10" y1="45" x2="190" y2="45" stroke="#22d3ee" strokeWidth="0.5" strokeDasharray="3 3" />
-                    <ellipse cx="100" cy="45" rx="7" ry="32" fill="none" stroke="#a78bfa" strokeWidth="1.5" />
-                    <line x1="10" y1="15" x2="100" y2="45" stroke="#34d399" strokeWidth="1" />
-                    <line x1="100" y1="45" x2="190" y2="55" stroke="#34d399" strokeWidth="1" />
-                    <circle cx="60" cy="45" r="2" fill="#fbbf24" />
-                    <circle cx="140" cy="45" r="2" fill="#fbbf24" />
-                    <text x="55" y="62" fill="#64748b" fontSize="7" fontFamily="monospace">F</text>
-                    <text x="135" y="62" fill="#64748b" fontSize="7" fontFamily="monospace">F&apos;</text>
+                    {/* Axes */}
+                    <line x1="14" y1="78" x2="190" y2="78" stroke="#475569" strokeWidth="0.6" />
+                    <line x1="14" y1="78" x2="14" y2="10" stroke="#475569" strokeWidth="0.6" />
+                    {/* y = x² scaled: 0..2 maps to x 14..150, y 78..14 (parabola opening upward) */}
+                    <path
+                      d="M14,78 L24,77.6 L34,76.6 L44,75 L54,72.8 L64,70 L74,66.6 L84,62.6 L94,58 L104,52.8 L114,47 L124,40.6 L134,33.6 L144,26 L154,17.8 L160,14"
+                      fill="none"
+                      stroke="#a78bfa"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {/* Shaded area under curve between x=0 and x=2 */}
+                    <path
+                      d="M14,78 L24,77.6 L34,76.6 L44,75 L54,72.8 L64,70 L74,66.6 L84,62.6 L94,58 L104,52.8 L114,47 L124,40.6 L134,33.6 L144,26 L154,17.8 L160,14 L160,78 Z"
+                      fill="url(#integralShade)"
+                      stroke="#22d3ee"
+                      strokeWidth="0.6"
+                      strokeOpacity="0.6"
+                    />
+                    {/* Gradient def */}
+                    <defs>
+                      <linearGradient id="integralShade" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.45" />
+                        <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.06" />
+                      </linearGradient>
+                    </defs>
+                    {/* Bounds labels */}
+                    <text x="10" y="86" fill="#64748b" fontSize="7" fontFamily="monospace">0</text>
+                    <text x="155" y="86" fill="#64748b" fontSize="7" fontFamily="monospace">2</text>
+                    <text x="166" y="18" fill="#a78bfa" fontSize="8" fontFamily="monospace">y = x²</text>
                   </svg>
                 </div>
 
-                {/* Data table */}
+                {/* Data table — integration calculation steps */}
                 <div className="rounded-lg border border-white/5 overflow-hidden text-[8px] font-mono">
                   <div className="grid grid-cols-3 bg-slate-950/60 text-slate-400">
-                    <div className="px-2 py-1 border-r border-white/5">u (cm)</div>
-                    <div className="px-2 py-1 border-r border-white/5">v (cm)</div>
-                    <div className="px-2 py-1">f (cm)</div>
+                    <div className="px-2 py-1 border-r border-white/5">Step</div>
+                    <div className="px-2 py-1 border-r border-white/5">Expression</div>
+                    <div className="px-2 py-1">Value</div>
                   </div>
                   {[
-                    ['20', '20', '10'],
-                    ['25', '16.7', '10'],
-                    ['30', '15', '10'],
-                    ['40', '13.3', '10'],
+                    ['∫₀² x² dx', '[x³/3]', '—'],
+                    ['Upper bound', '[8/3]', '2.667'],
+                    ['Lower bound', '[0/3]', '0.000'],
+                    ['Area = F(2) − F(0)', '8/3 − 0', '2.67'],
                   ].map((row, idx) => (
                     <div key={idx} className="grid grid-cols-3 text-slate-300 border-t border-white/5">
                       <div className="px-2 py-1 border-r border-white/5">{row[0]}</div>
@@ -607,7 +630,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 {/* AI feedback chip */}
                 <div className="mt-auto flex items-center gap-2 text-[9px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-md px-2.5 py-1.5">
                   <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  <span className="font-mono">AI verified · 4/4 rows correct</span>
+                  <span className="font-mono">AI verified · integral evaluated correctly</span>
                 </div>
               </div>
 

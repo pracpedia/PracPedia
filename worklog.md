@@ -347,3 +347,55 @@ Stage Summary:
   * src/app/page.tsx (removed WebSocket, added polling, silenced noisy console calls, synced theme dropdown)
   * src/lib/client-error-capture.ts (tightened console.error monkey-patch)
   * src/components/features/pages/LandingPage.tsx (full premium redesign — by frontend-styling-expert subagent)
+
+---
+Task ID: 8
+Agent: main
+Task: Restore scanner for students, change lens mockup to calculus, fix credentials load
+
+Work Log:
+- Diagnosed "System Credentials failed to load":
+  * Root cause: .env file was wiped during the session restart (along with node_modules)
+  * The /api/credentials endpoint hard-gates on PRACPEDIA_TEST_PASSWORDS_VISIBLE=true (returns 404 otherwise)
+  * With env missing, the endpoint returned 404 → CredentialsView showed "Failed to load credentials (HTTP 404)"
+  * Fix: recreated .env from .env.example with all required vars (DATABASE_URL, JWT_SECRET, PLATFORM_OWNER_EMAILS, AI_CREDITS_DEFAULT, PRACPEDIA_TEST_PASSWORDS_VISIBLE=true, GEMINI_API_KEY, BLOB_READ_WRITE_TOKEN)
+  * Restarted dev server so dotenv picks up the env
+  * Verified: /api/credentials now returns HTTP 200 with full payload (allUsers, system, stats, roles, endpoints)
+- Diagnosed "no scanner feature":
+  * The scanner (UploadModal) WAS implemented, but both trigger buttons AND the modal mount were gated to user?.role === 'admin'
+  * Students (role: 'user') and artists (role: 'artist') couldn't see the "Scan & Attach Sheet" button at all
+  * The Lightbox (image viewer + AI analysis) was already open to all authenticated users — no gate there
+  * Fix: changed all three admin gates from `user?.role === 'admin'` to `user`:
+    * Line 2367: button in the folder header toolbar (with image grid)
+    * Line 2467: button in the empty-state placeholder
+    * Line 2743: the UploadModal mount condition
+  * Now any authenticated user (admin, super_admin, user, artist) can scan and attach notebook pages
+  * The /api/images/upload-file and /api/scan/* routes already just require auth (no role gate)
+- Redesigned the LandingPage notebook mockup from optics/lens to calculus:
+  * Header changed: "EXP-04 · CONVEX LENS" → "EXP-04 · INTEGRATION"
+  * Title changed: "Determination of focal length" → "Definite integral — area under curve"
+  * SVG diagram replaced:
+    - Old: convex lens with principal axis, F/F' focal points, parallel and refracted rays
+    - New: y = x² parabola plotted on axes, with shaded area under the curve between x=0 and x=2 (gradient fill)
+    - Includes axis labels (0, 2) and function label (y = x²)
+  * Data table replaced:
+    - Old: lens equation table with u/v/f columns (object distance, image distance, focal length)
+    - New: integration calculation steps (Step, Expression, Value):
+      * ∫₀² x² dx → [x³/3] → —
+      * Upper bound → [8/3] → 2.667
+      * Lower bound → [0/3] → 0.000
+      * Area = F(2) − F(0) → 8/3 − 0 → 2.67
+  * AI feedback chip updated: "AI verified · 4/4 rows correct" → "AI verified · integral evaluated correctly"
+  * Updated the Tasnim N. testimonial: "Commissioned an optics diagram in 2 days" → "Commissioned a calculus integration diagram in 2 days"
+  * Verified: zero remaining references to lens/focal/optics/convex in LandingPage.tsx
+
+Stage Summary:
+- .env restored — credentials endpoint now returns 200 with all users + plaintext passwords (test mode)
+- Scanner feature now available to ALL authenticated users (was admin-only) — 3 gates changed from `user?.role === 'admin'` to `user`
+- Landing page notebook mockup is now calculus-themed (definite integral of x² from 0 to 2) — diagram + data table + AI feedback chip + testimonial all updated
+- ESLint: 0 errors, 0 warnings
+- All endpoints verified working: /api/health, /api/credentials, /api/auth/login, /api/settings/banner, /
+- Files modified:
+  * .env (recreated — was wiped during session restart)
+  * src/app/page.tsx (3 admin gates changed to `user` for scanner access)
+  * src/components/features/pages/LandingPage.tsx (mockup redesign + testimonial copy)

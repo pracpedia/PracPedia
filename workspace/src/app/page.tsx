@@ -2364,7 +2364,7 @@ function PortalConsole() {
                           </>
                         )}
 
-                        {user?.role === 'admin' && (
+                        {user && (
                           <button
                             onClick={() => setIsUploadModalOpen(true)}
                             className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold rounded-xl text-xs tracking-wide flex items-center gap-1.5 shadow-lg shadow-cyan-950/50 border border-cyan-500/30 transition-all duration-200 active:scale-95 animate-pulse cursor-pointer min-h-[44px]"
@@ -2464,7 +2464,7 @@ function PortalConsole() {
                           <p className="text-sm font-semibold text-slate-300">No Pages Registered Yet</p>
                           <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">This practical folder is currently empty. Notebook pages can be added by uploading image scans or web attachments.</p>
                         </div>
-                        {user?.role === 'admin' && (
+                        {user && (
                           <button
                             onClick={() => setIsUploadModalOpen(true)}
                             className="px-4 py-2 mx-auto bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs tracking-wide flex items-center gap-1.5 transition-all cursor-pointer min-h-[44px]"
@@ -2740,7 +2740,7 @@ function PortalConsole() {
       )}
 
       {/* Page image draft and uploading submission overlay */}
-      {isUploadModalOpen && selectedFolderId && activeFolder && user?.role === 'admin' && (
+      {isUploadModalOpen && selectedFolderId && activeFolder && user && (
         <UploadModal
           isOpen={isUploadModalOpen}
           onClose={() => setIsUploadModalOpen(false)}
