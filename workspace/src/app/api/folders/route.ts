@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const payload = await getUserFromRequest(request);
-    if (!payload || payload.role !== 'admin') {
+    if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
       return NextResponse.json({ error: 'Admin only.' }, { status: 403 });
     }
     const body = await request.json();

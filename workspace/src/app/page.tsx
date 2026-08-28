@@ -326,11 +326,13 @@ function PortalConsole() {
     if (isLoading) return;
 
     const ctx = gsap.context(() => {
-      // 1. Reveal page headings
-      gsap.fromTo(".reveal-header",
-        { opacity: 0, y: -20, scale: 0.98 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.65, ease: "power2.out" }
-      );
+      // 1. Reveal page headings (only if any exist on this view)
+      if (document.querySelectorAll(".reveal-header").length > 0) {
+        gsap.fromTo(".reveal-header",
+          { opacity: 0, y: -20, scale: 0.98 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.65, ease: "power2.out" }
+        );
+      }
 
       // 2. Beautiful slide-up staggered intro for all cards
       if (document.querySelectorAll(".stagger-card").length > 0) {

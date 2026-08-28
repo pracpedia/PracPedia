@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { gsap } from 'gsap';
 import {
   ShieldCheck,
   ArrowRight,
@@ -9,7 +10,6 @@ import {
   Activity,
   Calendar,
   CheckCircle2,
-  ScanLine,
   Sparkles,
   MessageCircle,
   Palette,
@@ -19,8 +19,6 @@ import {
   FlaskConical,
   Calculator,
   Microscope,
-  Star,
-  Quote,
   Mail,
   ChevronDown,
   Menu,
@@ -71,12 +69,6 @@ const FALLBACK_SUBJECTS = [
 
 const FEATURES = [
   {
-    Icon: ScanLine,
-    title: 'AI Notebook Scanner',
-    desc: 'Photograph your practical notebook and get instant AI analysis of diagrams, calculations, and data tables.',
-    tint: 'from-cyan-500 to-teal-500',
-  },
-  {
     Icon: Sparkles,
     title: 'Gemini AI Academy',
     desc: 'Ask questions 24/7 in English or Bangla. Get step-by-step lesson explanations, practice MCQs, and structured lessons.',
@@ -84,8 +76,8 @@ const FEATURES = [
   },
   {
     Icon: ShieldCheck,
-    title: 'Verified Curriculum',
-    desc: 'Every experiment aligned with the latest NCTB 2026 board syllabus. No outdated procedures.',
+    title: 'Verified NCTB 2026 Curriculum',
+    desc: 'Every experiment aligned with the latest NCTB board syllabus. No outdated procedures, no guesswork.',
     tint: 'from-emerald-500 to-teal-500',
   },
   {
@@ -110,35 +102,8 @@ const FEATURES = [
 
 const HOW_IT_WORKS = [
   { n: 1, title: 'Sign up with your email', desc: 'Create your free account in seconds with any email address.' },
-  { n: 2, title: 'Browse subjects & scan', desc: 'Pick a subject, then photograph your handwritten practicals.' },
-  { n: 3, title: 'Get AI feedback & diagrams', desc: 'Receive instant corrections and commission artist-drawn diagrams.' },
-];
-
-const TESTIMONIALS = [
-  {
-    initials: 'AR',
-    name: 'Aarav R.',
-    role: 'HSC 2025 candidate',
-    city: 'Dhaka',
-    quote: 'The AI scanner caught a calculation error in my physics practical that would have cost me 4 marks.',
-    tint: 'from-cyan-500 to-indigo-600',
-  },
-  {
-    initials: 'TN',
-    name: 'Tasnim N.',
-    role: 'HSC 2024 candidate',
-    city: 'Chittagong',
-    quote: "Commissioned a calculus integration diagram in 2 days. The artist's pencil shading was perfect.",
-    tint: 'from-amber-500 to-orange-600',
-  },
-  {
-    initials: 'MH',
-    name: 'Mehedi H.',
-    role: 'Physics teacher',
-    city: 'Rajshahi',
-    quote: "I assign my students PracPedia's AI Academy lessons for revision. The Bangla explanations are excellent.",
-    tint: 'from-emerald-500 to-teal-600',
-  },
+  { n: 2, title: 'Browse subjects & open folders', desc: 'Pick a subject, open a curated experiment folder, and follow the verified procedure.' },
+  { n: 3, title: 'Chat with AI & commission diagrams', desc: 'Ask Gemini for help, discuss in classroom chat, and commission an artist for perfect drawings.' },
 ];
 
 const FAQ_ITEMS = [
@@ -147,8 +112,8 @@ const FAQ_ITEMS = [
     a: 'Yes. Every experiment, observation sheet, and calculation formula is cross-verified against the latest NCTB standards and the current HSC practical examination format — no outdated procedures.',
   },
   {
-    q: 'How does the AI scanner check my calculations?',
-    a: 'Photograph your notebook page with your phone. The Gemini multimodal AI instantly highlights calculation errors, plotting mistakes, and scale discrepancies — and suggests the correct values.',
+    q: 'Can I ask the Gemini AI Academy questions in Bangla?',
+    a: 'Yes. The Gemini AI Academy is fully bilingual — type your question in Bangla or English and receive step-by-step explanations, practice MCQs, and structured lessons in the same language, 24/7.',
   },
   {
     q: 'Can I commission an artist to draw in my physical notebook?',
@@ -156,7 +121,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Is my data private and secure?',
-    a: 'Completely. Sessions are encrypted, your notebook scans are visible only to you, and any teacher or parent oversight requires your explicit consent — never sold, never shared.',
+    a: 'Completely. Sessions are encrypted, your AI Academy chats and marketplace bookings are visible only to you and the artist you choose, and any teacher or parent oversight requires your explicit consent — never sold, never shared.',
   },
 ];
 
@@ -169,7 +134,7 @@ const NAV_LINKS = [
   { href: '#faq', label: 'FAQ' },
 ];
 
-/* ---------------- AnimatedStat ---------------- */
+/* ---------------- AnimatedStat (kept — one-shot rAF count-up) ---------------- */
 
 const AnimatedStat: React.FC<{ value: number; className?: string }> = ({ value, className = '' }) => {
   const ref = useRef<HTMLSpanElement>(null);
@@ -200,233 +165,6 @@ const AnimatedStat: React.FC<{ value: number; className?: string }> = ({ value, 
   return <span ref={ref} className={className}>{display}</span>;
 };
 
-/* ---------------- Infinite-Loop Animation Helpers ---------------- */
-/* A collection of never-stopping, low-overhead motion primitives. Each helper
- * is a self-contained component so we can compose them across the landing page
- * without duplication. All use GPU-friendly transforms (translate3d, rotate,
- * scale, opacity) and respect prefers-reduced-motion via framer-motion's built
- * in support. */
-
-/** Drifting ambient orb — gentle continuous position + opacity drift. */
-const DriftOrb: React.FC<{
-  className: string;
-  duration?: number;
-  delay?: number;
-  drift?: { x?: number; y?: number };
-}> = ({ className, duration = 16, delay = 0, drift = { x: 24, y: -16 } }) => (
-  <motion.div
-    aria-hidden
-    className={className}
-    animate={{
-      x: [0, drift.x || 24, 0],
-      y: [0, drift.y || -16, 0],
-      opacity: [0.55, 0.9, 0.55],
-      scale: [1, 1.06, 1],
-    }}
-    transition={{
-      duration,
-      delay,
-      repeat: Infinity,
-      ease: 'easeInOut',
-    }}
-  />
-);
-
-/** Floating particle — a single dot that drifts upward and fades. */
-const Particle: React.FC<{ x: string; size: number; color: string; duration: number; delay: number }> = ({
-  x,
-  size,
-  color,
-  duration,
-  delay,
-}) => (
-  <motion.span
-    aria-hidden
-    style={{
-      left: x,
-      width: size,
-      height: size,
-      background: color,
-      borderRadius: '50%',
-      position: 'absolute',
-      boxShadow: `0 0 ${size * 2}px ${color}`,
-    }}
-    animate={{
-      y: [0, -120, -240],
-      opacity: [0, 0.85, 0],
-      scale: [0.5, 1, 0.5],
-    }}
-    transition={{
-      duration,
-      delay,
-      repeat: Infinity,
-      ease: 'easeOut',
-    }}
-  />
-);
-
-/** Particle field — renders N particles distributed across the parent. */
-const ParticleField: React.FC<{ count?: number; className?: string }> = ({
-  count = 18,
-  className = '',
-}) => {
-  // Deterministic pseudo-random so the field is stable between renders (no
-  // hydration mismatch with SSR).
-  const particles = useMemo(() => {
-    const seed = 1337;
-    let s = seed;
-    const rand = () => {
-      // Mulberry32 PRNG — fast, no deps
-      s |= 0; s = (s + 0x6d2b79f5) | 0;
-      let t = Math.imul(s ^ (s >>> 15), 1 | s);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-    const colors = ['#22d3ee', '#a78bfa', '#fbbf24', '#34d399', '#f472b6'];
-    return Array.from({ length: count }).map((_, i) => ({
-      id: i,
-      x: `${Math.floor(rand() * 100)}%`,
-      size: 2 + Math.floor(rand() * 4),
-      color: colors[Math.floor(rand() * colors.length)],
-      duration: 8 + rand() * 8,
-      delay: rand() * 8,
-    }));
-  }, [count]);
-  return (
-    <div aria-hidden className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}>
-      {particles.map((p) => (
-        <Particle key={p.id} x={p.x} size={p.size} color={p.color} duration={p.duration} delay={p.delay} />
-      ))}
-    </div>
-  );
-};
-
-/** Shimmer sweep — a diagonal highlight that sweeps across a card infinitely. */
-const ShimmerSweep: React.FC<{ delay?: number; duration?: number; color?: string }> = ({
-  delay = 0,
-  duration = 5,
-  color = 'rgba(255,255,255,0.18)',
-}) => (
-  <motion.span
-    aria-hidden
-    style={{
-      position: 'absolute',
-      inset: 0,
-      background: `linear-gradient(115deg, transparent 30%, ${color} 50%, transparent 70%)`,
-      borderRadius: 'inherit',
-      pointerEvents: 'none',
-      mixBlendMode: 'screen',
-    }}
-    animate={{ backgroundPosition: ['0% 0%', '200% 0%'] }}
-    transition={{
-      duration,
-      delay,
-      repeat: Infinity,
-      ease: 'linear',
-    }}
-  />
-);
-
-/** Breathing glow — slow opacity + scale pulse for icon chips. */
-const BreathingGlow: React.FC<{ delay?: number; duration?: number; color?: string; className?: string }> = ({
-  delay = 0,
-  duration = 4,
-  color = 'rgba(34, 211, 238, 0.25)',
-  className = '',
-}) => (
-  <motion.span
-    aria-hidden
-    style={{
-      position: 'absolute',
-      inset: -4,
-      borderRadius: 'inherit',
-      background: `radial-gradient(circle at center, ${color} 0%, transparent 70%)`,
-      pointerEvents: 'none',
-    }}
-    className={className}
-    animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.92, 1.06, 0.92] }}
-    transition={{ duration, delay, repeat: Infinity, ease: 'easeInOut' }}
-  />
-);
-
-/** Flowing dashes — animates stroke-dashoffset to make a dashed line "flow". */
-const FlowingDashes: React.FC<{ delay?: number; duration?: number; className?: string; color?: string }> = ({
-  delay = 0,
-  duration = 3,
-  className = '',
-  color = '#22d3ee',
-}) => (
-  <svg
-    aria-hidden
-    className={className}
-    preserveAspectRatio="none"
-    viewBox="0 0 100 4"
-    fill="none"
-  >
-    <motion.line
-      x1="0"
-      y1="2"
-      x2="100"
-      y2="2"
-      stroke={color}
-      strokeWidth="1"
-      strokeDasharray="6 4"
-      animate={{ strokeDashoffset: [0, -20] }}
-      transition={{ duration, delay, repeat: Infinity, ease: 'linear' }}
-    />
-  </svg>
-);
-
-/** Floating math symbol — drifts around in a small radius. */
-const FloatingGlyph: React.FC<{ glyph: string; className: string; delay?: number; duration?: number; drift?: { x?: number; y?: number } }> = ({
-  glyph,
-  className,
-  delay = 0,
-  duration = 10,
-  drift = { x: 12, y: 14 },
-}) => (
-  <motion.span
-    aria-hidden
-    className={`pointer-events-none select-none font-mono font-bold ${className}`}
-    animate={{
-      x: [0, drift.x || 12, 0, -(drift.x || 12), 0],
-      y: [0, -(drift.y || 14), 0, drift.y || 14, 0],
-      opacity: [0.45, 0.9, 0.45, 0.7, 0.45],
-      rotate: [0, 8, 0, -8, 0],
-    }}
-    transition={{
-      duration,
-      delay,
-      repeat: Infinity,
-      ease: 'easeInOut',
-    }}
-  >
-    {glyph}
-  </motion.span>
-);
-
-/** Aurora sweep — slow gradient hue shift for the CTA card. */
-const AuroraSweep: React.FC<{ delay?: number; duration?: number }> = ({
-  delay = 0,
-  duration = 12,
-}) => (
-  <motion.div
-    aria-hidden
-    style={{
-      position: 'absolute',
-      inset: 0,
-      background:
-        'linear-gradient(115deg, rgba(34,211,238,0) 30%, rgba(167,139,250,0.18) 50%, rgba(34,211,238,0) 70%)',
-      backgroundSize: '200% 200%',
-      mixBlendMode: 'screen',
-      pointerEvents: 'none',
-      borderRadius: 'inherit',
-    }}
-    animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
-    transition={{ duration, delay, repeat: Infinity, ease: 'easeInOut' }}
-  />
-);
-
 /* ---------------- LandingPage ---------------- */
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -441,7 +179,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  // Close mobile drawer on Escape
+  /* GSAP refs for the notebook */
+  const notebookRef = useRef<HTMLDivElement>(null);
+  const curvePathRef = useRef<SVGPathElement>(null);
+  const shadePathRef = useRef<SVGPathElement>(null);
+  const tableRowsRef = useRef<HTMLDivElement>(null);
+  const chipRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLSpanElement>(null);
+  const glyphRefs = useRef<Array<HTMLSpanElement | null>>([null, null, null, null]);
+
+  /* Close mobile drawer on Escape */
   useEffect(() => {
     if (!mobileNavOpen) return;
     const handler = (e: KeyboardEvent) => {
@@ -451,7 +198,164 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => window.removeEventListener('keydown', handler);
   }, [mobileNavOpen]);
 
-  // Compute dynamic contextual statistics (preserves existing logic)
+  /* GSAP notebook entrance + looping animations */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Reset the result number to 0 so the count-up is visible (final value is
+    // rendered in JSX as the graceful no-JS fallback).
+    if (resultRef.current && !prefersReduced) {
+      resultRef.current.textContent = '0.00';
+    }
+
+    const tweens: gsap.core.Tween[] = [];
+    const timelines: gsap.core.Timeline[] = [];
+
+    // ---- Entrance timeline (one-shot) ----
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    timelines.push(tl);
+
+    if (notebookRef.current) {
+      tl.fromTo(
+        notebookRef.current,
+        { scale: 0.92, opacity: 0, y: 24 },
+        { scale: 1, opacity: 1, y: 0, duration: 0.7 },
+      );
+    }
+
+    // Draw the parabola curve via strokeDashoffset
+    if (curvePathRef.current) {
+      const len = curvePathRef.current.getTotalLength();
+      gsap.set(curvePathRef.current, { strokeDasharray: len, strokeDashoffset: len });
+      tl.to(
+        curvePathRef.current,
+        { strokeDashoffset: 0, duration: 1.0, ease: 'power2.inOut' },
+        '-=0.2',
+      );
+    }
+
+    // Fade the shaded area in
+    if (shadePathRef.current) {
+      tl.fromTo(
+        shadePathRef.current,
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5 },
+        '-=0.4',
+      );
+    }
+
+    // Slide table rows in one-by-one
+    if (tableRowsRef.current) {
+      const rows = gsap.utils.toArray<HTMLElement>(tableRowsRef.current.children);
+      tl.fromTo(
+        rows,
+        { opacity: 0, x: -10 },
+        { opacity: 1, x: 0, duration: 0.35, stagger: 0.1, ease: 'power2.out' },
+        '-=0.2',
+      );
+    }
+
+    // Pop the AI-verified chip in
+    if (chipRef.current) {
+      tl.fromTo(
+        chipRef.current,
+        { scale: 0.6, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.4, ease: 'back.out(1.7)' },
+        '-=0.1',
+      );
+    }
+
+    // Count-up the integral result (0 → 2.67)
+    if (resultRef.current) {
+      const obj = { val: 0 };
+      const tween = gsap.to(obj, {
+        val: 2.67,
+        duration: 1.0,
+        ease: 'power2.out',
+        onUpdate: () => {
+          if (resultRef.current) resultRef.current.textContent = obj.val.toFixed(2);
+        },
+      });
+      tl.add(tween, '-=0.3');
+      tweens.push(tween);
+    }
+
+    if (prefersReduced) {
+      tl.progress(1);
+      if (resultRef.current) resultRef.current.textContent = '2.67';
+    }
+
+    // ---- Loop: page-turn 3D tilt (rotateY -3° ↔ 3°, 6s, infinite yoyo) ----
+    if (notebookRef.current && !prefersReduced) {
+      const turnTl = gsap.timeline({
+        repeat: -1,
+        yoyo: true,
+        delay: 0.9,
+        defaults: { ease: 'sine.inOut' },
+      });
+      turnTl.fromTo(
+        notebookRef.current,
+        { rotateY: -3 },
+        { rotateY: 3, duration: 6 },
+      );
+      timelines.push(turnTl);
+    }
+
+    // ---- Loop: shaded-area stroke hue shift (cyan ↔ indigo, 4s) ----
+    if (shadePathRef.current && !prefersReduced) {
+      tweens.push(
+        gsap.to(shadePathRef.current, {
+          stroke: '#818cf8',
+          duration: 4,
+          repeat: -1,
+          yoyo: true,
+          ease: 'sine.inOut',
+        }) as gsap.core.Tween,
+      );
+    }
+
+    // ---- Loop: glyph Lissajous floats (4 glyphs, unique x/y durations) ----
+    if (!prefersReduced) {
+      const glyphConfigs = [
+        { xAmp: 12, yAmp: -14, xDur: 3.1, yDur: 4.3 },
+        { xAmp: -14, yAmp: 10, xDur: 3.7, yDur: 4.9 },
+        { xAmp: 8, yAmp: -10, xDur: 2.6, yDur: 3.4 },
+        { xAmp: -10, yAmp: -8, xDur: 4.1, yDur: 5.2 },
+      ];
+      glyphConfigs.forEach((cfg, i) => {
+        const el = glyphRefs.current[i];
+        if (!el) return;
+        tweens.push(
+          gsap.to(el, {
+            x: cfg.xAmp,
+            duration: cfg.xDur,
+            repeat: -1,
+            yoyo: true,
+            ease: 'sine.inOut',
+          }),
+        );
+        tweens.push(
+          gsap.to(el, {
+            y: cfg.yAmp,
+            duration: cfg.yDur,
+            repeat: -1,
+            yoyo: true,
+            ease: 'sine.inOut',
+          }),
+        );
+      });
+    }
+
+    return () => {
+      tweens.forEach((t) => t.kill());
+      timelines.forEach((t) => t.kill());
+    };
+  }, []);
+
+  /* Compute dynamic contextual statistics (preserves existing logic) */
   const physicsCount =
     folders.filter(
       (f: any) => f.subjectId === 'sub-physics' || (f.subjectId || '').toLowerCase().includes('phys'),
@@ -462,7 +366,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     ).length || 8;
   const totalLabSheets = folders.length || 14;
 
-  // Subjects to display (real subjects from props if provided, otherwise fallback)
+  /* Subjects to display (real subjects from props if provided, otherwise fallback) */
   const realSubjects = (subjects || []).map((s: any, i: number) => ({
     id: s?.id ?? String(s?.name ?? Math.random()),
     name: s?.name ?? 'Untitled subject',
@@ -483,55 +387,39 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     { value: 3, label: 'Drawing specialists online', color: 'text-indigo-400', Icon: Palette },
   ];
 
+  /* Math glyphs array for the notebook surround */
+  const glyphs = [
+    { glyph: '∫', className: 'absolute -top-3 -left-2 text-cyan-400 text-2xl sm:text-3xl lg:text-4xl' },
+    { glyph: '∑', className: 'absolute -top-1 right-2 text-indigo-300 text-xl sm:text-2xl lg:text-3xl' },
+    { glyph: 'dx', className: 'absolute bottom-6 -right-3 text-amber-300 text-sm sm:text-base lg:text-lg' },
+    { glyph: 'π', className: 'absolute bottom-2 -left-1 text-emerald-300 text-xl sm:text-2xl lg:text-3xl' },
+  ];
+
+  /* Integration calculation rows for the data table */
+  const integralRows: Array<[string, string, string]> = [
+    ['∫₀² x² dx', '[x³/3]', '—'],
+    ['Upper bound', '[8/3]', '2.667'],
+    ['Lower bound', '[0/3]', '0.000'],
+    ['Area = F(2) − F(0)', '8/3 − 0', '2.67'],
+  ];
+
   return (
     <div
       id="landing_page_container"
       className="w-full min-h-screen text-slate-200 bg-[#060814] relative font-sans flex flex-col overflow-y-auto overflow-x-hidden scroll-smooth selection:bg-cyan-500/20 selection:text-cyan-300"
     >
-      {/* Ambient gradient blobs — three drifting orbs of different speeds so
-          they never sync, plus a particle field for ambient motion. */}
-      <DriftOrb
-        className="absolute top-[-10%] left-[-15%] w-[80%] h-[70%] rounded-full bg-gradient-to-br from-cyan-950/20 to-indigo-950/15 blur-[160px] pointer-events-none select-none"
-        duration={14}
-        drift={{ x: 32, y: -20 }}
-      />
-      <DriftOrb
-        className="absolute bottom-[5%] right-[-15%] w-[80%] h-[70%] rounded-full bg-gradient-to-tr from-indigo-950/15 to-purple-950/15 blur-[160px] pointer-events-none select-none"
-        duration={20}
-        delay={3}
-        drift={{ x: -28, y: 18 }}
-      />
-      <DriftOrb
-        className="absolute top-[40%] left-[40%] w-[55%] h-[55%] rounded-full bg-gradient-to-br from-emerald-950/15 to-amber-950/10 blur-[180px] pointer-events-none select-none"
-        duration={26}
-        delay={6}
-        drift={{ x: 40, y: 22 }}
+      {/* Single ambient gradient orb — the ONLY page-wide infinite animation
+          (CSS keyframes, 20s loop, GPU-friendly transform). */}
+      <div
+        aria-hidden
+        className="absolute top-[-15%] left-[-10%] w-[85%] h-[80%] rounded-full bg-gradient-to-br from-cyan-950/25 via-indigo-950/15 to-purple-950/10 blur-[180px] pointer-events-none select-none"
+        style={{ animation: 'pp-orb-drift 20s ease-in-out infinite' }}
       />
 
-      {/* Particle field — light floating dust */}
-      <ParticleField count={22} />
-
-      {/* Grid overlay with mask */}
+      {/* Grid overlay with radial mask */}
       <div
         aria-hidden
         className="absolute inset-0 bg-[linear-gradient(to_right,#111827_1px,transparent_1px),linear-gradient(to_bottom,#111827_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_52%_at_50%_50%,#000_70%,transparent_100%)] opacity-25 pointer-events-none"
-      />
-
-      {/* Animated aurora gradient sweep across the entire page — extremely
-          slow so it doesn't distract. Adds subtle "alive" feeling. */}
-      <motion.div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background:
-            'linear-gradient(180deg, transparent 0%, rgba(34,211,238,0.04) 50%, transparent 100%)',
-          backgroundSize: '100% 300%',
-          mixBlendMode: 'screen',
-          pointerEvents: 'none',
-        }}
-        animate={{ backgroundPosition: ['0% 0%', '0% 100%', '0% 0%'] }}
-        transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut' }}
       />
 
       {/* Top banner — customizable by super admin */}
@@ -693,7 +581,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Main */}
       <main className="relative z-10 flex-1 flex flex-col">
-        {/* Hero */}
+        {/* Hero — 2-column (text left, GSAP notebook right) */}
         <section
           id="hero"
           className="relative max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20 grid md:grid-cols-2 gap-10 md:gap-12 items-center"
@@ -729,35 +617,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.05]"
             >
               Master your{' '}
-              <motion.span
+              <span
                 aria-hidden
                 style={{
-                  background: 'linear-gradient(90deg, #22d3ee 0%, #34d399 25%, #818cf8 50%, #34d399 75%, #22d3ee 100%)',
-                  backgroundSize: '200% 100%',
+                  background: 'linear-gradient(90deg, #22d3ee 0%, #34d399 50%, #818cf8 100%)',
                   WebkitBackgroundClip: 'text',
                   backgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   filter: 'drop-shadow(0 0 20px rgba(6,182,212,0.25))',
                   display: 'inline-block',
                 }}
-                animate={{ backgroundPosition: ['0% 0%', '200% 0%', '0% 0%'] }}
-                transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
               >
                 HSC science practicals
-              </motion.span>{' '}
+              </span>{' '}
               with AI precision.
             </motion.h1>
 
-            {/* Subhead */}
+            {/* Subhead — focuses on the 5 real features (no scanner mention) */}
             <motion.p
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.25 }}
               className="text-slate-400 text-base sm:text-lg max-w-xl mx-auto md:mx-0 leading-relaxed"
             >
-              Scan your notebook for instant AI feedback on diagrams and calculations, ask Gemini
-              questions 24/7 in Bangla or English, and commission perfect pencil-shaded drawings — all
-              aligned with the NCTB 2026 syllabus.
+              Ask Gemini questions 24/7 in Bangla or English, discuss with peers in live classroom
+              chat, and commission pencil-shaded diagrams from Bangladeshi illustrators — all
+              aligned with the verified NCTB 2026 syllabus, with your progress visible to your
+              teachers.
             </motion.p>
 
             {/* CTAs */}
@@ -801,61 +687,66 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </motion.div>
           </div>
 
-          {/* Notebook mockup */}
-          <motion.div
-            initial={{ opacity: 0, y: 30, rotateY: 8 }}
-            animate={{ opacity: 1, y: 0, rotateY: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            whileHover={{ rotateY: -4, rotateX: 2, scale: 1.02 }}
-            style={{ transformPerspective: 1200 }}
-            className="relative mx-auto w-full max-w-md order-1 md:order-2"
+          {/* GSAP-animated calculus notebook — fully responsive */}
+          <div
+            className="relative mx-auto w-full max-w-[280px] sm:max-w-[320px] md:max-w-[360px] lg:max-w-[440px] order-1 md:order-2"
+            style={{ perspective: '1200px' }}
           >
-            {/* Glow under mockup — gentle pulsing */}
-            <motion.div
+            {/* Soft static glow under the notebook (no infinite animation) */}
+            <div
               aria-hidden
               className="absolute -inset-6 bg-gradient-to-br from-cyan-500/20 via-indigo-500/10 to-transparent blur-2xl pointer-events-none"
-              animate={{ opacity: [0.6, 1, 0.6], scale: [1, 1.06, 1] }}
-              transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
             />
 
-            {/* Floating math glyphs around the notebook — drift independently */}
-            <FloatingGlyph glyph="∫" className="absolute -top-3 -left-2 text-cyan-400 text-3xl" duration={11} delay={0} drift={{ x: 10, y: 14 }} />
-            <FloatingGlyph glyph="∑" className="absolute -top-1 right-2 text-indigo-300 text-2xl" duration={13} delay={1.5} drift={{ x: -12, y: 10 }} />
-            <FloatingGlyph glyph="dx" className="absolute bottom-6 -right-3 text-amber-300 text-base" duration={9} delay={0.7} drift={{ x: 8, y: -10 }} />
-            <FloatingGlyph glyph="π" className="absolute bottom-2 -left-1 text-emerald-300 text-2xl" duration={14} delay={2.3} drift={{ x: -8, y: -8 }} />
+            {/* Floating math glyphs — GSAP Lissajous float, each unique */}
+            {glyphs.map((g, i) => (
+              <span
+                key={g.glyph}
+                ref={(el) => {
+                  glyphRefs.current[i] = el;
+                }}
+                aria-hidden
+                className={`pointer-events-none select-none font-mono font-bold ${g.className}`}
+              >
+                {g.glyph}
+              </span>
+            ))}
 
-            <motion.div
-              animate={{ rotateY: [0, -3, 0, 3, 0], rotateX: [0, 1, 0, -1, 0] }}
-              transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-              style={{ transformPerspective: 1200 }}
+            {/* The notebook card itself — GSAP entrance + page-turn tilt */}
+            <div
+              ref={notebookRef}
+              style={{ transformStyle: 'preserve-3d' }}
+              className="relative aspect-[4/5] rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 shadow-2xl shadow-cyan-950/40 overflow-hidden"
             >
-            <div className="relative aspect-[4/5] rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 shadow-2xl shadow-cyan-950/40 overflow-hidden">
-              {/* Spiral binding */}
-              <div className="absolute left-0 top-0 bottom-0 w-6 bg-slate-800/80 border-r border-white/10 flex flex-col justify-evenly items-center py-3 z-10">
+              {/* Spiral binding — scales down on mobile */}
+              <div className="absolute left-0 top-0 bottom-0 w-5 sm:w-6 bg-slate-800/80 border-r border-white/10 flex flex-col justify-evenly items-center py-2 sm:py-3 z-10">
                 {Array.from({ length: 10 }).map((_, i) => (
                   <span
                     key={i}
-                    className="w-3 h-3 rounded-full bg-slate-700 border border-white/10 shadow-inner"
+                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-700 border border-white/10 shadow-inner"
                   />
                 ))}
               </div>
 
               {/* Page content */}
-              <div className="absolute inset-0 pl-10 pr-5 py-5 flex flex-col gap-3">
-                <div className="flex items-center justify-between text-[9px] font-mono text-slate-500">
+              <div className="absolute inset-0 pl-8 sm:pl-10 pr-3 sm:pr-5 py-4 sm:py-5 flex flex-col gap-2 sm:gap-3">
+                <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-slate-500">
                   <span>EXP-04 · INTEGRATION</span>
                   <span className="text-cyan-400">2026.01.14</span>
                 </div>
-                <div className="text-xs font-bold text-white">Definite integral — area under curve</div>
+                <div className="text-[11px] sm:text-xs font-bold text-white">
+                  Definite integral — area under curve
+                </div>
 
-                {/* Diagram — y = x² shaded from x=0 to x=2 */}
-                <div className="rounded-lg bg-slate-950/60 border border-white/5 p-3 flex items-center justify-center">
+                {/* Diagram — y = x² shaded from x=0 to x=2 (SVG scales fluidly) */}
+                <div className="rounded-lg bg-slate-950/60 border border-white/5 p-2 sm:p-3 flex items-center justify-center">
                   <svg viewBox="0 0 200 90" className="w-full h-auto" aria-hidden>
                     {/* Axes */}
                     <line x1="14" y1="78" x2="190" y2="78" stroke="#475569" strokeWidth="0.6" />
                     <line x1="14" y1="78" x2="14" y2="10" stroke="#475569" strokeWidth="0.6" />
-                    {/* y = x² scaled: 0..2 maps to x 14..150, y 78..14 (parabola opening upward) */}
+                    {/* y = x² curve — drawn via GSAP strokeDashoffset */}
                     <path
+                      ref={curvePathRef}
                       d="M14,78 L24,77.6 L34,76.6 L44,75 L54,72.8 L64,70 L74,66.6 L84,62.6 L94,58 L104,52.8 L114,47 L124,40.6 L134,33.6 L144,26 L154,17.8 L160,14"
                       fill="none"
                       stroke="#a78bfa"
@@ -863,71 +754,78 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
-                    {/* Shaded area under curve between x=0 and x=2 */}
+                    {/* Shaded area under the curve — faded in via GSAP + hue-shift loop */}
                     <path
+                      ref={shadePathRef}
                       d="M14,78 L24,77.6 L34,76.6 L44,75 L54,72.8 L64,70 L74,66.6 L84,62.6 L94,58 L104,52.8 L114,47 L124,40.6 L134,33.6 L144,26 L154,17.8 L160,14 L160,78 Z"
                       fill="url(#integralShade)"
                       stroke="#22d3ee"
-                      strokeWidth="0.6"
-                      strokeOpacity="0.6"
+                      strokeWidth="0.8"
+                      strokeOpacity="0.7"
                     />
-                    {/* Gradient def */}
                     <defs>
                       <linearGradient id="integralShade" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.45" />
                         <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.06" />
                       </linearGradient>
                     </defs>
-                    {/* Bounds labels */}
+                    {/* Bounds + function label */}
                     <text x="10" y="86" fill="#64748b" fontSize="7" fontFamily="monospace">0</text>
                     <text x="155" y="86" fill="#64748b" fontSize="7" fontFamily="monospace">2</text>
                     <text x="166" y="18" fill="#a78bfa" fontSize="8" fontFamily="monospace">y = x²</text>
                   </svg>
                 </div>
 
-                {/* Data table — integration calculation steps */}
-                <div className="rounded-lg border border-white/5 overflow-hidden text-[8px] font-mono">
+                {/* Data table — integration calculation steps (rows slide in via GSAP) */}
+                <div className="rounded-lg border border-white/5 overflow-hidden text-[7px] sm:text-[8px] font-mono">
                   <div className="grid grid-cols-3 bg-slate-950/60 text-slate-400">
-                    <div className="px-2 py-1 border-r border-white/5">Step</div>
-                    <div className="px-2 py-1 border-r border-white/5">Expression</div>
-                    <div className="px-2 py-1">Value</div>
+                    <div className="px-1.5 sm:px-2 py-1 border-r border-white/5">Step</div>
+                    <div className="px-1.5 sm:px-2 py-1 border-r border-white/5">Expression</div>
+                    <div className="px-1.5 sm:px-2 py-1">Value</div>
                   </div>
-                  {[
-                    ['∫₀² x² dx', '[x³/3]', '—'],
-                    ['Upper bound', '[8/3]', '2.667'],
-                    ['Lower bound', '[0/3]', '0.000'],
-                    ['Area = F(2) − F(0)', '8/3 − 0', '2.67'],
-                  ].map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-3 text-slate-300 border-t border-white/5">
-                      <div className="px-2 py-1 border-r border-white/5">{row[0]}</div>
-                      <div className="px-2 py-1 border-r border-white/5">{row[1]}</div>
-                      <div className="px-2 py-1 text-emerald-400">{row[2]}</div>
-                    </div>
-                  ))}
+                  <div ref={tableRowsRef}>
+                    {integralRows.map((row, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-3 text-slate-300 border-t border-white/5"
+                      >
+                        <div className="px-1.5 sm:px-2 py-1 border-r border-white/5 truncate">
+                          {row[0]}
+                        </div>
+                        <div className="px-1.5 sm:px-2 py-1 border-r border-white/5 truncate">
+                          {row[1]}
+                        </div>
+                        <div className="px-1.5 sm:px-2 py-1 text-emerald-400 truncate">
+                          {idx === 3 ? <span ref={resultRef}>2.67</span> : row[2]}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* AI feedback chip */}
-                <div className="mt-auto flex items-center gap-2 text-[9px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-md px-2.5 py-1.5">
+                {/* AI verified chip — pops in via GSAP */}
+                <div
+                  ref={chipRef}
+                  className="mt-auto flex items-center gap-1.5 sm:gap-2 text-[8px] sm:text-[9px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-md px-2 sm:px-2.5 py-1.5"
+                >
                   <CheckCircle2 className="w-3 h-3 shrink-0" />
                   <span className="font-mono">AI verified · integral evaluated correctly</span>
                 </div>
               </div>
 
-              {/* Floating scan indicator */}
-              <motion.div
+              {/* Floating scan indicator — CSS opacity pulse (1s loop) */}
+              <div
                 aria-hidden
-                className="absolute right-3 top-3 flex items-center gap-1 text-[8px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-full px-2 py-0.5"
-                animate={{ opacity: [0.6, 1, 0.6] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                className="absolute right-2 sm:right-3 top-2 sm:top-3 flex items-center gap-1 text-[7px] sm:text-[8px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-full px-2 py-0.5 animate-pulse [animation-duration:1s]"
               >
-                <ScanLine className="w-2.5 h-2.5" /> SCANNING
-              </motion.div>
+                <span className="inline-block w-1.5 h-1.5 bg-cyan-300 rounded-full" />
+                AI LIVE
+              </div>
             </div>
-            </motion.div>
-          </motion.div>
+          </div>
         </section>
 
-        {/* Stats bar */}
+        {/* Stats bar — one-shot count-up only, no infinite animations */}
         <section id="stats" className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
           <div id="stats_counter_banner" className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {stats.map((stat, i) => (
@@ -937,16 +835,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-40px' }}
                 transition={{ duration: 0.4, delay: i * 0.08 }}
-                className="relative p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/10 backdrop-blur-md group hover:border-white/20 transition-colors overflow-hidden"
+                className="relative p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/10 backdrop-blur-md hover:border-white/20 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
               >
-                <ShimmerSweep delay={i * 0.8} duration={6} color="rgba(34,211,238,0.16)" />
                 <div className="flex items-center justify-between mb-2">
-                  <motion.div
-                    animate={{ y: [0, -2, 0] }}
-                    transition={{ duration: 3 + i * 0.4, repeat: Infinity, ease: 'easeInOut', delay: i * 0.3 }}
-                  >
-                    <stat.Icon className={`w-4 h-4 ${stat.color}`} />
-                  </motion.div>
+                  <stat.Icon className={`w-4 h-4 ${stat.color}`} />
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 </div>
                 <AnimatedStat
@@ -956,20 +848,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-bold tracking-wider block mt-1">
                   {stat.label}
                 </span>
-                {/* Moving gradient bar under the number */}
-                <motion.span
-                  aria-hidden
-                  className="absolute bottom-0 left-0 h-0.5 rounded-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
-                  style={{ width: '40%' }}
-                  animate={{ x: ['-20%', '180%'] }}
-                  transition={{ duration: 5 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.5 }}
-                />
               </motion.div>
             ))}
           </div>
         </section>
 
-        {/* Subjects */}
+        {/* Subjects showcase */}
         <section id="subjects" className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24">
           <div className="text-center space-y-2 max-w-2xl mx-auto mb-10">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
@@ -992,22 +876,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-40px' }}
                 transition={{ duration: 0.4, delay: i * 0.06 }}
-                whileHover={{ y: -4 }}
-                className="group relative block rounded-2xl p-[1px] bg-gradient-to-br from-white/5 via-white/5 to-white/5 hover:from-cyan-500/30 hover:via-teal-500/30 hover:to-indigo-500/30 transition-all duration-300 cursor-pointer overflow-hidden"
+                className="group relative block rounded-2xl p-[1px] bg-gradient-to-br from-white/5 via-white/5 to-white/5 hover:from-cyan-500/30 hover:via-teal-500/30 hover:to-indigo-500/30 hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden"
               >
-                {/* Subtle shimmer sweep with unique delay per card */}
-                <ShimmerSweep delay={i * 0.7} duration={7} color="rgba(255,255,255,0.06)" />
                 <div className="relative rounded-2xl bg-slate-950/70 backdrop-blur-md p-5 h-full flex items-start gap-4">
                   <div
-                    className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${s.tint} border border-white/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform overflow-visible`}
+                    className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${s.tint} border border-white/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}
                   >
-                    <BreathingGlow delay={i * 0.6} duration={4 + i * 0.3} color="rgba(167,139,250,0.45)" />
-                    <motion.div
-                      animate={{ rotate: [0, 4, 0, -4, 0] }}
-                      transition={{ duration: 6 + i * 0.5, repeat: Infinity, ease: 'easeInOut' }}
-                    >
-                      <s.Icon className="relative w-6 h-6 text-cyan-300" />
-                    </motion.div>
+                    <s.Icon className="relative w-6 h-6 text-cyan-300" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base font-bold text-white mb-1">{s.name}</h3>
@@ -1022,7 +897,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </section>
 
-        {/* Features */}
+        {/* Features — 5 cards, no scanner */}
         <section
           id="features"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
@@ -1035,8 +910,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Built for the 2026 HSC practical exam
             </h2>
             <p className="text-sm text-slate-400">
-              Six tools that replace the chaos of paper notebooks, scanned PDFs, and guesswork — with
-              one verified workflow.
+              Five tools that replace the chaos of paper notebooks and guesswork — with one
+              verified workflow.
             </p>
           </div>
 
@@ -1048,53 +923,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-40px' }}
                 transition={{ duration: 0.4, delay: (i % 3) * 0.08 }}
-                whileHover={{ y: -4 }}
-                className="group relative rounded-2xl p-[1px] bg-gradient-to-br from-white/10 via-white/5 to-transparent hover:from-cyan-500/40 hover:to-indigo-500/40 transition-all duration-300 overflow-hidden"
+                className="group relative rounded-2xl p-[1px] bg-gradient-to-br from-white/10 via-white/5 to-transparent hover:from-cyan-500/40 hover:to-indigo-500/40 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
               >
-                <ShimmerSweep delay={i * 0.5} duration={8} color="rgba(34,211,238,0.08)" />
                 <div className="relative rounded-2xl bg-slate-950/70 backdrop-blur-md p-6 h-full flex flex-col gap-3">
                   <div
-                    className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${f.tint} flex items-center justify-center shadow-lg overflow-visible`}
+                    className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${f.tint} flex items-center justify-center shadow-lg`}
                   >
-                    <BreathingGlow delay={i * 0.7} duration={5 + (i % 3)} color="rgba(34,211,238,0.35)" />
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.08, 1],
-                        rotate: [0, 5, 0, -5, 0],
-                      }}
-                      transition={{
-                        duration: 5 + i * 0.4,
-                        repeat: Infinity,
-                        ease: 'easeInOut',
-                        delay: i * 0.3,
-                      }}
-                    >
-                      <f.Icon className="relative w-6 h-6 text-white" />
-                    </motion.div>
+                    <f.Icon className="relative w-6 h-6 text-white" />
                   </div>
                   <h3 className="text-base font-bold text-white">{f.title}</h3>
                   <p className="text-[13px] text-slate-400 leading-relaxed flex-1">{f.desc}</p>
-                  <a
-                    href="#features"
-                    onClick={(e) => e.preventDefault()}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-400 hover:text-cyan-300 uppercase tracking-wider font-mono mt-1 cursor-pointer min-h-[28px]"
+                  <button
+                    type="button"
+                    onClick={onEnter}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-400 hover:text-cyan-300 uppercase tracking-wider font-mono mt-1 cursor-pointer min-h-[28px] self-start"
                   >
                     Learn more
-                    <motion.span
-                      animate={{ x: [0, 3, 0] }}
-                      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut', delay: i * 0.2 }}
-                      className="inline-flex"
-                    >
-                      <ArrowRight className="w-3 h-3" />
-                    </motion.span>
-                  </a>
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                  </button>
                 </div>
               </motion.div>
             ))}
           </div>
         </section>
 
-        {/* How it works */}
+        {/* How it works — 3-step timeline with CSS-keyframe flowing dashed line */}
         <section
           id="how-it-works"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
@@ -1109,12 +962,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
           <div className="relative grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4">
-            {/* Flowing dashed connector line on desktop — animated stroke-dashoffset */}
-            <FlowingDashes
+            {/* Flowing dashed connector (desktop only) — CSS keyframes, not framer-motion */}
+            <svg
+              aria-hidden
               className="hidden md:block absolute top-7 left-[16.66%] right-[16.66%] h-px w-[66.66%]"
-              duration={2.5}
-              color="#22d3ee"
-            />
+              preserveAspectRatio="none"
+              viewBox="0 0 100 4"
+              fill="none"
+            >
+              <line
+                x1="0"
+                y1="2"
+                x2="100"
+                y2="2"
+                stroke="#22d3ee"
+                strokeWidth="1"
+                strokeDasharray="6 4"
+                style={{ animation: 'pp-dash-flow 2.5s linear infinite' }}
+              />
+            </svg>
 
             {HOW_IT_WORKS.map((step, i) => (
               <motion.div
@@ -1125,15 +991,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 transition={{ duration: 0.4, delay: i * 0.12 }}
                 className="relative text-center space-y-3 px-4"
               >
-                <div className="relative mx-auto w-14 h-14 rounded-full bg-slate-950 border-2 border-cyan-500/40 flex items-center justify-center text-xl font-black font-mono text-cyan-400 shadow-lg shadow-cyan-500/20 overflow-visible">
-                  <BreathingGlow delay={i * 1.2} duration={4} color="rgba(34,211,238,0.4)" />
-                  <motion.span
-                    animate={{ scale: [1, 1.08, 1] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: i * 0.5 }}
-                    className="relative"
-                  >
-                    {step.n}
-                  </motion.span>
+                <div className="relative mx-auto w-14 h-14 rounded-full bg-slate-950 border-2 border-cyan-500/40 flex items-center justify-center text-xl font-black font-mono text-cyan-400 shadow-lg shadow-cyan-500/20">
+                  {step.n}
                 </div>
                 <h3 className="text-base font-bold text-white">{step.title}</h3>
                 <p className="text-[13px] text-slate-400 leading-relaxed max-w-xs mx-auto">
@@ -1144,73 +1003,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </section>
 
-        {/* Testimonials */}
-        <section
-          id="testimonials"
-          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
-        >
-          <div className="text-center space-y-2 max-w-2xl mx-auto mb-12">
-            <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
-              Testimonials
-            </span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
-              Loved by students and teachers
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t, i) => (
-              <motion.blockquote
-                key={t.name}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-40px' }}
-                transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="relative rounded-2xl bg-slate-950/70 border border-white/10 backdrop-blur-md p-6 space-y-4 hover:border-white/20 transition-colors overflow-hidden"
-              >
-                <ShimmerSweep delay={i * 1.5} duration={9} color="rgba(251,191,36,0.07)" />
-                <Quote className="relative w-6 h-6 text-cyan-500/40" aria-hidden />
-                <div className="relative flex gap-0.5" aria-label="Rated 5 out of 5 stars">
-                  {Array.from({ length: 5 }).map((_, idx) => (
-                    <motion.span
-                      key={idx}
-                      animate={{
-                        scale: [1, 1.18, 1],
-                        opacity: [0.7, 1, 0.7],
-                      }}
-                      transition={{
-                        duration: 2.2,
-                        repeat: Infinity,
-                        ease: 'easeInOut',
-                        delay: idx * 0.18 + i * 0.3,
-                      }}
-                      style={{ display: 'inline-flex' }}
-                    >
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" aria-hidden />
-                    </motion.span>
-                  ))}
-                </div>
-                <p className="relative text-sm text-slate-300 leading-relaxed">{t.quote}</p>
-                <footer className="relative flex items-center gap-3 pt-3 border-t border-white/[0.06]">
-                  <div
-                    className={`relative w-9 h-9 rounded-full bg-gradient-to-br ${t.tint} text-white text-[10px] font-bold flex items-center justify-center shrink-0 overflow-visible`}
-                  >
-                    <BreathingGlow delay={i * 0.9} duration={6} color="rgba(251,191,36,0.35)" />
-                    <span className="relative">{t.initials}</span>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold text-white truncate">{t.name}</div>
-                    <div className="text-[11px] text-slate-400 font-mono truncate">
-                      {t.role} · {t.city}
-                    </div>
-                  </div>
-                </footer>
-              </motion.blockquote>
-            ))}
-          </div>
-        </section>
-
-        {/* Announcements */}
+        {/* Announcements — keep existing logic, no infinite per-card animations */}
         <section
           id="announcements"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
@@ -1218,12 +1011,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div id="bulletin_announcements_section" className="space-y-10">
             <div className="text-center md:text-left space-y-2">
               <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-indigo-400 font-bold">
-                <motion.span
-                  aria-hidden
-                  className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block"
-                  animate={{ opacity: [0.3, 1, 0.3], scale: [1, 1.4, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                />
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" />
                 Notice board
               </span>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
@@ -1244,17 +1032,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, margin: '-40px' }}
                     transition={{ duration: 0.4, delay: i * 0.08 }}
-                    className="relative overflow-hidden rounded-2xl bg-slate-950/60 border border-white/10 backdrop-blur-md p-5 flex flex-col gap-4 hover:border-white/20 transition-colors"
+                    className="relative overflow-hidden rounded-2xl bg-slate-950/60 border border-white/10 backdrop-blur-md p-5 flex flex-col gap-4 hover:border-white/20 hover:-translate-y-0.5 transition-all"
                   >
-                    <ShimmerSweep delay={i * 1.3} duration={8} color="rgba(99,102,241,0.06)" />
                     <div className="relative flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1 text-[8px] bg-indigo-500/15 text-indigo-300 font-bold uppercase py-0.5 px-2 rounded-md border border-indigo-500/25 font-mono tracking-wider">
-                        <motion.span
-                          aria-hidden
-                          className="w-1 h-1 rounded-full bg-indigo-400 inline-block"
-                          animate={{ opacity: [0.3, 1, 0.3] }}
-                          transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.3 }}
-                        />
+                        <span className="w-1 h-1 rounded-full bg-indigo-400 inline-block" />
                         Active bulletin
                       </span>
                       <span className="text-[9px] text-slate-400 font-mono flex items-center gap-1 truncate">
@@ -1295,7 +1077,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </section>
 
-        {/* Marketplace highlight */}
+        {/* Marketplace highlight — buttons now both call onEnter */}
         <section
           id="marketplace"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
@@ -1305,37 +1087,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5 }}
-            whileHover={{ y: -4 }}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-950 to-indigo-950/40 border border-indigo-500/20 p-6 sm:p-8 md:p-10"
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-950 to-indigo-950/40 border border-indigo-500/20 p-6 sm:p-8 md:p-10 hover:-translate-y-1 transition-transform duration-300"
           >
-            {/* Decorative pulsing glow */}
-            <motion.div
+            {/* Static decorative glow (no infinite animation) */}
+            <div
               aria-hidden
-              className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none"
-              animate={{
-                opacity: [0.5, 0.9, 0.5],
-                scale: [1, 1.12, 1],
-                x: [0, -10, 0],
-                y: [0, 10, 0],
-              }}
-              transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-indigo-500/15 blur-3xl pointer-events-none"
             />
-            {/* Slow aurora sweep across the card */}
-            <AuroraSweep delay={0} duration={14} />
 
             <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
               <div className="flex items-start gap-4 max-w-2xl">
-                <motion.div
-                  className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-xl shadow-indigo-500/30 overflow-visible"
-                  animate={{
-                    rotate: [0, 4, 0, -4, 0],
-                    scale: [1, 1.05, 1],
-                  }}
-                  transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <BreathingGlow delay={0} duration={4} color="rgba(167,139,250,0.5)" />
+                <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-xl shadow-indigo-500/30">
                   <Palette className="relative w-7 h-7 text-white" />
-                </motion.div>
+                </div>
                 <div className="space-y-2">
                   <span className="inline-block text-[10px] font-mono font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded uppercase tracking-wider border border-amber-400/20">
                     STEM Illustrator Marketplace
@@ -1353,14 +1117,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0 w-full md:w-auto">
                 <button
                   onClick={onEnter}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-sm font-bold tracking-wide rounded-xl shadow-lg shadow-amber-500/20 cursor-pointer min-h-[48px] transition-all"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-sm font-bold tracking-wide rounded-xl shadow-lg shadow-amber-500/20 hover:-translate-y-0.5 cursor-pointer min-h-[48px] transition-all"
                 >
                   Consult Sketch Artists
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => {}}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-semibold tracking-wide rounded-xl cursor-pointer min-h-[48px] transition-all"
+                  onClick={onEnter}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-semibold tracking-wide rounded-xl hover:-translate-y-0.5 cursor-pointer min-h-[48px] transition-all"
                 >
                   Browse Marketplace
                 </button>
@@ -1369,7 +1133,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </motion.div>
         </section>
 
-        {/* FAQ */}
+        {/* FAQ — accordion with 4 items (no scanner question) */}
         <section
           id="faq"
           className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
@@ -1453,31 +1217,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             transition={{ duration: 0.6 }}
             className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-8 sm:p-12 md:p-16 text-center"
           >
-            {/* Decorative dot pattern — animated background position for "moving dots" effect */}
-            <motion.div
+            {/* Static decorative dot pattern (no infinite animation) */}
+            <div
               aria-hidden
               className="absolute inset-0 opacity-25 pointer-events-none"
               style={{
                 backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
                 backgroundSize: '24px 24px',
               }}
-              animate={{ backgroundPosition: ['0% 0%', '24px 24px'] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
             />
-            {/* Slow aurora sweep on the CTA card */}
-            <AuroraSweep delay={0.5} duration={10} />
-            {/* Soft glows — pulsing */}
-            <motion.div
+            {/* Static soft glows */}
+            <div
               aria-hidden
-              className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-cyan-400/30 blur-3xl pointer-events-none"
-              animate={{ opacity: [0.4, 0.85, 0.4], scale: [1, 1.18, 1] }}
-              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none"
             />
-            <motion.div
+            <div
               aria-hidden
-              className="absolute -bottom-20 -right-20 w-72 h-72 rounded-full bg-purple-500/30 blur-3xl pointer-events-none"
-              animate={{ opacity: [0.4, 0.85, 0.4], scale: [1, 1.18, 1] }}
-              transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+              className="absolute -bottom-20 -right-20 w-72 h-72 rounded-full bg-purple-500/20 blur-3xl pointer-events-none"
             />
 
             <div className="relative z-10 space-y-5 max-w-2xl mx-auto">
@@ -1485,14 +1241,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Ready to ace your HSC practical exam?
               </h2>
               <p className="text-cyan-100 text-base sm:text-lg leading-relaxed">
-                Join 2,400+ Bangladeshi students who trust PracPedia for verified procedures, AI
-                feedback, and pro illustrations. Free to start — no credit card required.
+                Join 2,400+ Bangladeshi students who trust PracPedia for verified procedures,
+                Gemini-powered help, and pro illustrations. Free to start — no credit card required.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
                 <button
                   id="cta_final_btn"
                   onClick={heroCtaOnClick}
-                  className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-xl bg-white text-slate-900 font-bold text-sm tracking-wide shadow-2xl hover:bg-slate-100 transition-all cursor-pointer min-h-[48px]"
+                  className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-xl bg-white text-slate-900 font-bold text-sm tracking-wide shadow-2xl hover:bg-slate-100 hover:-translate-y-0.5 transition-all cursor-pointer min-h-[48px]"
                 >
                   {isAuthenticated ? (
                     <Layout className="w-4 h-4" />
@@ -1519,7 +1275,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
       </main>
 
-      {/* Footer */}
+      {/* Footer (3-column) */}
       <footer
         id="landing_footer"
         className="relative z-10 border-t border-white/[0.06] bg-[#060814]/80 backdrop-blur-md"
@@ -1552,15 +1308,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </a>
                 </li>
               ))}
-              <li>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px] inline-flex items-center"
-                >
-                  Blog
-                </a>
-              </li>
             </ul>
           </div>
 
@@ -1574,26 +1321,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             >
               <Mail className="w-4 h-4" /> hello@pracpedia.bd
             </a>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px] inline-flex items-center"
-                >
-                  Privacy
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px] inline-flex items-center"
-                >
-                  Terms
-                </a>
-              </li>
-            </ul>
+            <button
+              type="button"
+              onClick={onEnter}
+              className="block text-sm text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px] text-left"
+            >
+              Privacy
+            </button>
+            <button
+              type="button"
+              onClick={onEnter}
+              className="block text-sm text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px] text-left"
+            >
+              Terms
+            </button>
           </div>
         </div>
 

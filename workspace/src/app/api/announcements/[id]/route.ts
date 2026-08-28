@@ -5,7 +5,7 @@ import { getUserFromRequest } from '@/lib/auth';
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const payload = await getUserFromRequest(request);
-    if (!payload || payload.role !== 'admin') {
+    if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
       return NextResponse.json({ error: 'Admin only.' }, { status: 403 });
     }
     const { id } = await params;

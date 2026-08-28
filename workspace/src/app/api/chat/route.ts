@@ -113,7 +113,7 @@ export async function DELETE(request: NextRequest) {
     if (!msg) {
       return NextResponse.json({ error: 'Message not found.' }, { status: 404 });
     }
-    if (msg.userId !== payload.userId && payload.role !== 'admin') {
+    if (msg.userId !== payload.userId && payload.role !== 'admin' && payload.role !== 'super_admin') {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
     }
     await db.chatMessage.delete({ where: { id } });

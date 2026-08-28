@@ -17,16 +17,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const payload = await getUserFromRequest(request);
-    if (!payload || payload.role !== 'admin') {
+    if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
       return NextResponse.json({ error: 'Admin only.' }, { status: 403 });
     }
     const body = await request.json();
     const { title, description } = body;
-    if (!title || !description) {
-      return NextResponse.json({ error: 'Title and description required.' }, { status: 400 });
+    if (!title) {
+      return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
     }
     const created = await db.subject.create({
-      data: { title: String(title), description: String(description) },
+      data: { title: String(title), description: String(description || '') },
     });
     return NextResponse.json({ ...created, id: created.id });
   } catch (err: any) {

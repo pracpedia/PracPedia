@@ -8,7 +8,7 @@ export async function DELETE(
 ) {
   try {
     const payload = await getUserFromRequest(request);
-    if (!payload || payload.role !== 'admin') {
+    if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
       return NextResponse.json({ error: 'Admin only.' }, { status: 403 });
     }
     const { folderId, imgIndex } = await params;
