@@ -589,3 +589,62 @@ Stage Summary:
   * src/app/page.tsx (GSAP .reveal-header guard)
   * src/components/features/pages/LandingPage.tsx (full rewrite, 1610 → 1350 lines)
   * src/app/globals.css (2 new keyframes)
+
+---
+Task ID: 12
+Agent: main
+Task: Replace calculus notebook with animated 3D gradient descent
+
+Work Log:
+- Replaced the GSAP calculus integral notebook in LandingPage.tsx with a 3D gradient descent animation
+- Designed the scene:
+  * A 3D paraboloid bowl rendered as 5 concentric tilted ellipse contours (loss levels: 0.4, 1.6, 3.6, 6.4, 10)
+  * Each contour projected from 3D math coords (x, y, L = x² + y²) to 2D SVG coords using orthographic projection tilted 30° around the X axis (mathematically correct)
+  * Smaller, lower, brighter contours at the bottom (low loss / near the minimum)
+  * Larger, higher, darker contours at the top (high loss / near the rim)
+  * A yellow "minimum" target marker dot at the bowl's bottom
+  * A glowing cyan ball that travels along the gradient descent trajectory
+  * 8 trail dots showing the previous descent steps
+  * A live readout (step N, loss=X.XXX) overlaid on the SVG, top-right
+  * A data table showing the descent phases (Init → Step 1 → Step 2 → Step 3 → Converge) with their updates and loss values
+  * An "AI verified · converged in 9 steps" chip
+  * 4 floating math glyphs around the scene (∇, η, ∂, θ — the symbols used in gradient descent optimization)
+- Replaced all the GSAP setup:
+  * Old refs: notebookRef, curvePathRef, shadePathRef, tableRowsRef, chipRef, resultRef
+  * New refs: sceneRef, paraboloidRef, ballRef, trailRef, lossLabelRef, stepLabelRef, stepRowsRef, chipRef
+  * Old glyphs: ∫, ∑, dx, π (integration)
+  * New glyphs: ∇, η, ∂, θ (gradient descent optimization)
+  * Old table rows: integration calculation steps (∫₀² x² dx → 2.67)
+  * New table rows: gradient descent phases (Init → Converge, loss 9.000 → 0.001)
+- Gradient descent math:
+  * L(x,y) = x² + y² (perfect circular bowl)
+  * Starting point: (2.6, 1.8), loss = 10.0
+  * Learning rate η = 0.35, momentum = 0.55
+  * 9 steps via gradient descent with momentum (θ ← θ − η∇L + momentum·v)
+  * Final step forced near (0, 0), loss = 0.0005
+  * The trajectory is computed in JS at mount, then 8 trail dots are added to the SVG dynamically
+  * Each step's (x, y, loss) is projected to SVG pixels using the same projection function used for the contour ellipses
+- GSAP animation timeline:
+  * Entrance (one-shot): scene fades+scales in → 5 paraboloid contours draw via strokeDashoffset → 8 trail dots fade+scale in → 5 data table rows slide in staggered → AI chip pops in (back.out ease) → ball travels through all 9 descent steps (each step 0.45s, loss label updates live via onUpdate callback) → ball pulses at the minimum (scale 1.5 → 1.0)
+  * Loops (only if motion is allowed):
+    - Scene does a gentle 3D tilt (rotateY -3° ↔ 3°, 6s yoyo)
+    - Ball pulses scale 1.0 ↔ 1.15 (1.8s yoyo)
+    - 5 paraboloid contours do a hue shift cyan ↔ indigo (4s yoyo, each contour staggered)
+    - 4 floating glyphs (∇ η ∂ θ) drift on unique Lissajous paths (3.1/4.3s, 3.7/4.9s, 2.6/3.4s, 4.1/5.2s)
+- Responsive design preserved:
+  * Mobile 360px: max-w-[280px], SVG viewBox 240×160 (scales fluidly), text-[7px], padding p-3
+  * Tablet 768px: md:max-w-[360px]
+  * Desktop 1280px: lg:max-w-[440px]
+  * SVG keeps viewBox + w-full h-auto for fluid scaling
+
+Stage Summary:
+- The calculus notebook (definite integral ∫₀² x² dx) is replaced with a 3D gradient descent animation
+- A glowing ball rolls down a 3D paraboloid bowl (mathematically correct projection of L = x² + y²)
+- 5 contour levels, 8 trail dots, 9 descent steps with live loss readout, all GSAP-animated
+- Floating glyphs changed from integration symbols (∫ ∑ dx π) to optimization symbols (∇ η ∂ θ)
+- Data table changed from integration steps to gradient descent phases
+- Same responsiveness, same animation performance profile (still only 3 infinite animation groups: scene tilt, ball pulse, contour hue shift + glyph drift)
+- ESLint: 0 errors, 0 warnings
+- Page renders HTTP 200, no errors in dev log
+- Files modified:
+  * src/components/features/pages/LandingPage.tsx (replaced notebook JSX + GSAP setup + glyphs + table rows)
