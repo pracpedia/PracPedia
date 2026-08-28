@@ -399,3 +399,46 @@ Stage Summary:
   * .env (recreated — was wiped during session restart)
   * src/app/page.tsx (3 admin gates changed to `user` for scanner access)
   * src/components/features/pages/LandingPage.tsx (mockup redesign + testimonial copy)
+
+---
+Task ID: 9
+Agent: main
+Task: Add infinite unique animations to landing page
+
+Work Log:
+- Audited current LandingPage: only 2 truly infinite animations existed (2 ambient blobs + SCANNING pill). All other animations were one-shot entrance reveals.
+- Designed a library of 7 reusable infinite-animation helper components, each with unique delay/duration parameters so they never sync:
+  * DriftOrb — gentle x/y drift + opacity + scale pulse
+  * Particle + ParticleField — N floating dots with deterministic seed (no SSR hydration mismatch) drifting upward
+  * ShimmerSweep — diagonal highlight sweep across a card
+  * BreathingGlow — radial glow pulse for icon chips
+  * FlowingDashes — animated stroke-dashoffset on a dashed line
+  * FloatingGlyph — math symbol drifting in a small radius with rotation
+  * AuroraSweep — slow gradient hue shift (180° vertical sweep)
+- Wired infinite animations into every landing section:
+  * Page background: 3 drifting orbs (was 2) with different durations (14s/20s/26s) so they never sync + a 22-particle field + a 30s full-page aurora sweep
+  * Hero headline: gradient text now shifts background-position 0→200%→0 on an 8s loop (cyan→emerald→indigo→emerald→cyan)
+  * Hero notebook mockup: 4 floating math glyphs (∫, ∑, dx, π) drift independently around the notebook with unique durations (9s/11s/13s/14s) and delays + the notebook itself has a slow 12s tilt rotateY/rotateX + pulsing glow
+  * Stats bar: each KPI icon bobs vertically with unique duration (3s + 0.4s per index), plus a horizontal gradient bar slides underneath each number on a unique delay, plus a subtle shimmer sweep
+  * Subjects showcase: each card has its own shimmer sweep (7s, delay staggered by index) + the icon chip has a breathing glow + the icon inside gently rotates (±4°, 6s + 0.5s per index)
+  * Features grid: each card has shimmer sweep + icon chip has breathing glow + icon does scale+rotate loop + "Learn more →" arrow does an infinite nudge
+  * How it works: connector line replaced with FlowingDashes (animated stroke-dashoffset, 2.5s loop) + each numbered circle has a breathing glow + the number itself does a subtle scale pulse
+  * Testimonials: 5 stars in each card pulse with staggered delays (each star 0.18s offset, per-card 0.3s offset) + amber breathing glow on the avatar + amber shimmer sweep across the card
+  * Announcements: section badge has a pulsing dot + each card has a shimmer sweep + "Active bulletin" badge has a blinking dot
+  * Marketplace highlight: aurora sweep across the card + the decorative glow pulses scale/opacity + the icon chip does a slow rotate/scale loop with breathing glow
+  * Final CTA: dot pattern animates (background-position shifts in a 2s loop creating a "moving dots" effect) + aurora sweep + both soft glows pulse out of phase (6s and 7s with 1.5s delay)
+  * Footer: existing emerald animate-pulse stays
+- All animations use GPU-friendly transforms (translate3d, rotate, scale, opacity) — no layout thrashing.
+- Each helper accepts `delay`, `duration`, and `color` params so the same primitive renders uniquely in each location — no two animations on the page have the same timing signature.
+- The ParticleField uses a deterministic Mulberry32 PRNG seeded at 1337 so the particle positions/durations are stable across SSR + client (no hydration mismatch).
+
+Stage Summary:
+- Total infinite animations on the landing page: 50+ (was 2)
+- Every section has at least one infinite animation
+- All animations are unique-per-location (different delays, durations, or colors)
+- ESLint: 0 errors, 0 warnings
+- Page compiles cleanly: HTTP 200, no errors in dev log
+- LandingPage chunk still shipped: LandingPage_tsx_02o6ovo._.js
+- No new dependencies added — only used framer-motion's existing `motion` + `useMemo`
+- Files modified:
+  * src/components/features/pages/LandingPage.tsx (added 7 helper components + wired infinite animations into all 11 sections)
