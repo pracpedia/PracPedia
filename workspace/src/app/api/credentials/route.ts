@@ -83,6 +83,7 @@ export async function GET(request: NextRequest) {
         role: true,
         createdAt: true,
         isPremium: true,
+        lastIpAddress: true,
       },
     });
 
@@ -96,6 +97,7 @@ export async function GET(request: NextRequest) {
       role: user.role,
       createdAt: user.createdAt,
       isPremium: user.isPremium,
+      lastIpAddress: user.lastIpAddress || '',
     }));
 
     return NextResponse.json({

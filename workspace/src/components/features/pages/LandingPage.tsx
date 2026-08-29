@@ -201,7 +201,7 @@ const AnimatedStat: React.FC<{ value: number; className?: string }> = ({ value, 
   return <span ref={ref} className={className}>{display}</span>;
 };
 
-/* ---------------- ParallaxSectionHeading ---------------- */
+/* ---------------- ParallaxSectionHeading (desktop only — prevents mobile scroll jank) ---------------- */
 
 const ParallaxSectionHeading: React.FC<{ children: React.ReactNode; className?: string }> = ({
   children,
@@ -210,8 +210,16 @@ const ParallaxSectionHeading: React.FC<{ children: React.ReactNode; className?: 
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   const y = useTransform(scrollYProgress, [0, 1], [40, -40]);
+  // Only apply parallax on desktop — on mobile, will-change:transform causes scroll jank
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   return (
-    <motion.div ref={ref} style={{ y, willChange: 'transform' }} className={className}>
+    <motion.div ref={ref} style={{ y: isDesktop ? y : 0, willChange: isDesktop ? 'transform' as const : undefined }} className={className}>
       {children}
     </motion.div>
   );
@@ -247,11 +255,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const chipRef = useRef<HTMLDivElement>(null);
   const glyphRefs = useRef<Array<HTMLSpanElement | null>>([null, null, null, null]);
 
-  /* Parallax transforms — restore the hero parallax effect */
+  /* Parallax transforms — only on desktop (≥768px) to prevent mobile scroll jank.
+     On mobile, will-change:transform + useScroll listeners cause the scroll to
+     stutter badly. We detect the viewport and conditionally apply parallax. */
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const { scrollY } = useScroll();
-  const heroTextY = useTransform(scrollY, [0, 700], [0, -210]);
-  const heroVizY = useTransform(scrollY, [0, 700], [0, -350]);
-  const bgGridY = useTransform(scrollY, [0, 4000], [0, 600]);
+  const heroTextY = useTransform(scrollY, [0, 700], isDesktop ? [0, -210] : [0, 0]);
+  const heroVizY = useTransform(scrollY, [0, 700], isDesktop ? [0, -350] : [0, 0]);
+  const bgGridY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 600] : [0, 0]);
+  const parallaxWillChange = isDesktop ? 'transform' as const : undefined;
 
   /* Close mobile drawer on Escape */
   useEffect(() => {
@@ -476,7 +494,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   return (
     <div
       id="landing_page_container"
-      className="w-full min-h-screen text-slate-200 bg-[#060814] relative font-sans flex flex-col overflow-y-auto overflow-x-hidden scroll-smooth selection:bg-cyan-500/20 selection:text-cyan-300"
+      className="w-full min-h-screen text-slate-200 bg-[#060814] relative font-sans flex flex-col overflow-x-hidden scroll-smooth selection:bg-cyan-500/20 selection:text-cyan-300"
     >
       {/* Ambient gradient orb — the only page-wide infinite CSS animation */}
       <div
@@ -488,7 +506,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Grid overlay with radial mask — parallax (bgGridY) */}
       <motion.div
         aria-hidden
-        style={{ y: bgGridY, willChange: 'transform' }}
+        style={{ y: bgGridY, willChange: parallaxWillChange }}
         className="absolute inset-0 bg-[linear-gradient(to_right,#111827_1px,transparent_1px),linear-gradient(to_bottom,#111827_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_52%_at_50%_50%,#000_70%,transparent_100%)] opacity-25 pointer-events-none"
       />
 
@@ -669,7 +687,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         >
           {/* Text column — parallax (heroTextY), first on mobile AND first on desktop */}
           <motion.div
-            style={{ y: heroTextY, willChange: 'transform' }}
+            style={{ y: heroTextY, willChange: parallaxWillChange }}
             className="text-center md:text-left space-y-6 order-1 md:order-1"
           >
             {/* Trust badge with avatar stack — smaller on mobile */}
@@ -774,7 +792,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* Fourier series animation — parallax (heroVizY), BELOW text on mobile, RIGHT on desktop */}
           <motion.div
-            style={{ y: heroVizY, willChange: 'transform' }}
+            style={{ y: heroVizY, willChange: parallaxWillChange }}
             className="relative mx-auto w-full max-w-[260px] sm:max-w-[320px] md:max-w-[360px] lg:max-w-[440px] order-2 md:order-2"
           >
             {/* Soft static glow under the scene */}

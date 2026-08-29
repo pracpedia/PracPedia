@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
     // Successful registration — reset this IP's bucket
     registerLimiter.reset(ip);
 
+    // Record the user's IP address for security auditing
+    db.user.update({ where: { id: newUser.id }, data: { lastIpAddress: ip } }).catch(() => {});
+
     // Log to activity feed
     await logActivity({
       userId: newUser.id,

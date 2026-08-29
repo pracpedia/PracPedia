@@ -42,6 +42,10 @@ model User {
   rating          Float    @default(5.0)    // average rating (0-5)
   completedOrders Int      @default(0)      // total completed commissions
 
+  // IP address tracking — records the user's last known IP for security
+  // auditing and abuse prevention. Updated on login, register, and google auth.
+  lastIpAddress String?
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

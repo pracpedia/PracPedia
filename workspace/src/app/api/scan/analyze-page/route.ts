@@ -69,7 +69,7 @@ If the image is unclear or not a notebook page, say so politely and suggest a cl
       const userApiKey = request.headers.get('x-gemini-api-key');
       if (userApiKey) process.env.GEMINI_API_KEY = userApiKey;
       const zai = await ZAI.default.create();
-      const completion = await zai.chat.completions.createVision({
+      const completion = await (zai.chat.completions as any).createVision({
         messages: [
           { role: 'system', content: sysPrompt },
           { role: 'user', content: userContent },

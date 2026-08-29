@@ -48,7 +48,7 @@ Coordinates must be fractions in 0..1 (x = horizontal from left, y = vertical fr
       const userApiKey = request.headers.get('x-gemini-api-key');
       if (userApiKey) process.env.GEMINI_API_KEY = userApiKey;
       const zai = await ZAI.default.create();
-      const completion = await zai.chat.completions.createVision({
+      const completion = await (zai.chat.completions as any).createVision({
         messages: [
           {
             role: 'user',

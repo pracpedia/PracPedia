@@ -28,9 +28,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface AuthPageProps {
   onSuccess: () => void;
   onGoBack: () => void;
+  /** Initial mode for the auth form. 'login' (default) or 'register'. */
+  initialMode?: 'login' | 'register';
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initialMode = 'login' }) => {
   const { login, apiFetch } = useAuth();
   const passwordRef = useRef<HTMLInputElement>(null);
 
@@ -53,7 +55,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack }) => {
 
   // Custom 2-way Auth Segment Choice: 'student' | 'artist'
   const [authType, setAuthType] = useState<'student' | 'artist'>('student');
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(initialMode === 'login');
 
   // Standard Fields
   const [name, setName] = useState('');

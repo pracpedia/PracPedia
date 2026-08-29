@@ -101,6 +101,9 @@ export async function POST(request: NextRequest) {
     // Successful auth — reset login bucket
     loginLimiter.reset(ip);
 
+    // Record the user's IP address for security auditing
+    db.user.update({ where: { id: user.id }, data: { lastIpAddress: ip } }).catch(() => {});
+
     // Log to activity feed (non-blocking)
     logActivity({
       userId: user.id,

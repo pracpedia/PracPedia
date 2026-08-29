@@ -746,6 +746,105 @@ const BannerCustomizer: React.FC<{
   );
 };
 
+const LandingConfigCustomizer: React.FC<{
+  apiFetch: (url: string, opts?: RequestInit) => Promise<Response>;
+  showSuccess: (msg: string) => void;
+  showError: (msg: string) => void;
+}> = ({ apiFetch, showSuccess, showError }) => {
+  const [trustBadge, setTrustBadge] = useState({ enabled: true, useCustomCount: false, customCount: 2400 });
+  const [realUserCount, setRealUserCount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [landingRes, statsRes] = await Promise.all([
+          fetch('/api/settings/landing'),
+          fetch('/api/stats'),
+        ]);
+        if (landingRes.ok) {
+          const data = await landingRes.json();
+          if (data.trustBadge) {
+            setTrustBadge({
+              enabled: data.trustBadge.enabled !== false,
+              useCustomCount: !!data.trustBadge.useCustomCount,
+              customCount: data.trustBadge.customCount || 0,
+            });
+          }
+        }
+        if (statsRes.ok) {
+          const stats = await statsRes.json();
+          setRealUserCount(stats.users ?? 0);
+        }
+      } catch { /* defaults */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await apiFetch('/api/settings/landing', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trustBadge }),
+      });
+      if (res.ok) showSuccess('Landing page configuration saved!');
+      else { const err = await res.json().catch(() => ({})); showError(err.error || 'Failed to update.'); }
+    } catch { showError('Network error.'); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="p-5 rounded-2xl bg-slate-950/80 border border-white/10 space-y-4 shadow-xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+          <span className="text-cyan-400">Users</span>
+          Landing Page — Trust Badge
+        </h3>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={trustBadge.enabled} onChange={(e) => setTrustBadge({ ...trustBadge, enabled: e.target.checked })} className="w-4 h-4 accent-cyan-500" />
+          <span className="text-xs text-slate-300 font-bold">{trustBadge.enabled ? 'Visible' : 'Hidden'}</span>
+        </label>
+      </div>
+      <div className="text-[11px] text-slate-400 leading-relaxed bg-slate-900/60 border border-white/5 rounded-lg p-3">
+        Controls the &quot;Trusted by N students&quot; badge. When hidden, the badge disappears.
+        When set to &quot;Real DB count&quot;, shows live user count (currently <strong className="text-cyan-300">{realUserCount ?? '...'} users</strong>).
+        When set to &quot;Custom count&quot;, shows a hardcoded number.
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <button type="button" onClick={() => setTrustBadge({ ...trustBadge, useCustomCount: false })}
+          className={`p-3 rounded-xl border text-left transition-all cursor-pointer min-h-[64px] ${!trustBadge.useCustomCount ? 'bg-cyan-500/15 border-cyan-500/40' : 'bg-slate-900 border-white/10 hover:border-white/20'}`}>
+          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">Source</div>
+          <div className="text-sm font-bold text-white mt-1">Real DB count</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">{realUserCount ?? '...'} registered users</div>
+        </button>
+        <button type="button" onClick={() => setTrustBadge({ ...trustBadge, useCustomCount: true })}
+          className={`p-3 rounded-xl border text-left transition-all cursor-pointer min-h-[64px] ${trustBadge.useCustomCount ? 'bg-cyan-500/15 border-cyan-500/40' : 'bg-slate-900 border-white/10 hover:border-white/20'}`}>
+          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">Source</div>
+          <div className="text-sm font-bold text-white mt-1">Custom count</div>
+          <div className="text-[10px] text-slate-400 mt-0.5">Hardcoded marketing number</div>
+        </button>
+      </div>
+      {trustBadge.useCustomCount && (
+        <div className="space-y-1">
+          <label className="text-[10px] text-slate-400 font-mono uppercase">Custom student count</label>
+          <input type="number" min={0} max={999999} value={trustBadge.customCount}
+            onChange={(e) => setTrustBadge({ ...trustBadge, customCount: parseInt(e.target.value || '0', 10) || 0 })}
+            className="w-full px-3 py-2 bg-slate-900 border border-white/10 text-xs text-slate-100 rounded-xl outline-none focus:border-cyan-500/50 min-h-[40px]" />
+        </div>
+      )}
+      <button type="button" onClick={handleSave} disabled={saving}
+        className="w-full px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 text-xs font-black rounded-xl cursor-pointer shadow-lg shadow-cyan-500/20 transition-all min-h-[44px]">
+        {saving ? 'Saving...' : 'Save Landing Configuration'}
+      </button>
+    </div>
+  );
+};
+
 export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   user,
   subjects,
@@ -1681,6 +1780,9 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
         <div className="space-y-6">
           {/* Banner Customization Card */}
           <BannerCustomizer apiFetch={apiFetch} showSuccess={showSuccess} showError={showError} />
+
+          {/* Landing Page Trust Badge Config */}
+          <LandingConfigCustomizer apiFetch={apiFetch} showSuccess={showSuccess} showError={showError} />
 
           {/* Executive Metrics Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
