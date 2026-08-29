@@ -19,6 +19,7 @@ import { ConfirmModal } from '@/components/features/ConfirmModal';
 import { GsapStudentCounter } from '@/components/features/GsapStudentCounter';
 import { ProfilePage } from '@/components/features/pages/ProfilePage';
 import { ArtistsPage } from '@/components/features/pages/ArtistsPage';
+import { PublicMarketplace } from '@/components/features/pages/PublicMarketplace';
 import { AdminCmsPage } from '@/components/features/pages/AdminCmsPage';
 import { ArtistDashboard } from '@/components/features/pages/ArtistDashboard';
 import { CredentialsView } from '@/components/features/pages/CredentialsView';
@@ -2809,6 +2810,11 @@ export default function Home() {
   // 'register' (when triggered from a "Sign up to do X" prompt on the landing).
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [landingBanner, setLandingBanner] = useState<any>(null);
+  // When true AND the user is NOT authenticated, render the public marketplace
+  // browse view (<PublicMarketplace />) instead of the landing page. Lets
+  // unauthenticated visitors browse the STEM illustrator marketplace without
+  // being forced through AuthPage first.
+  const [viewPublicMarketplace, setViewPublicMarketplace] = useState(false);
   // Local fallback so the loading screen NEVER gets stuck even if AuthContext
   // hangs (e.g., dev server HMR restart mid-fetch, or an unreadable stale
   // localStorage entry).
@@ -2891,6 +2897,26 @@ export default function Home() {
     );
   }
 
+  // Public marketplace browse mode — renders a no-auth marketplace view
+  // when an unauthenticated visitor taps "Browse Marketplace" on the landing
+  // page. Authenticated users never reach this branch (they go to
+  // PortalConsole above, which reads localStorage.app_current_view='artists'
+  // and opens to the marketplace directly).
+  if (viewPublicMarketplace && !isAuthenticated) {
+    return (
+      <PublicMarketplace
+        onRegister={() => {
+          // Opens AuthPage in register mode; preserves viewPublicMarketplace
+          // so if the visitor closes AuthPage they fall back to the public
+          // marketplace browse view instead of the landing page.
+          setAuthMode('register');
+          setViewAuth(true);
+        }}
+        onBack={() => setViewPublicMarketplace(false)}
+      />
+    );
+  }
+
   return (
     <LandingPage
       onEnter={() => {
@@ -2915,20 +2941,18 @@ export default function Home() {
         setViewAuth(true);
       }}
       onBrowseMarketplace={() => {
-        // Browse without registration — goes straight to the dashboard's
-        // marketplace view. We pre-set the localStorage value so when
-        // PortalConsole mounts, it opens directly to 'artists' (the marketplace).
-        // If the user isn't authenticated, they hit AuthPage first; after they
-        // log in, PortalConsole will read the localStorage value and open to
-        // the marketplace.
+        // Browse the marketplace WITHOUT forcing auth. We pre-set the
+        // localStorage value so when an authenticated user does land in
+        // PortalConsole, it opens directly to 'artists' (the marketplace).
+        // For unauthenticated visitors, we set viewPublicMarketplace=true
+        // which renders the no-auth <PublicMarketplace /> view above.
         if (typeof window !== 'undefined') {
           try {
             window.localStorage.setItem('app_current_view', 'artists');
           } catch { /* ignore */ }
         }
         if (isAuthenticated) return;
-        setAuthMode('login');
-        setViewAuth(true);
+        setViewPublicMarketplace(true);
       }}
       isAuthenticated={isAuthenticated}
       onGoToDashboard={() => {

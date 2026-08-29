@@ -699,3 +699,100 @@ Stage Summary:
 - Files modified:
   * src/lib/client-error-capture.ts (added ChunkLoadError auto-reload handler)
   * src/app/page.tsx (added inline SSR script for 6s hydration-failure auto-reload + restored forceLoaded/authMode/onRegister/onSignIn/onBrowseMarketplace that were lost in a previous edit)
+
+---
+Task ID: 21
+Agent: main
+Task: Rewrite LandingPage.tsx — replace calculus animation with Fourier series epicycles, restore parallax, fix mobile layout, premium mobile UI, allow unauthenticated marketplace browsing
+
+Work Log:
+
+Issue 1 — Fourier series epicycle animation (replaces z = sin(x)·cos(y) squared grid surface)
+- Replaced the entire 3D squared-grid surface animation with a 2D Fourier series epicycle animation that approximates a square wave
+- Math: f(t) = (4/π) · Σ_{k=1..7} sin((2k-1)·ω·t) / (2k-1)  — 7 odd harmonics (1, 3, 5, 7, 9, 11, 13)
+- Each harmonic has amplitude A_k = (4/π) / (2k-1) and angular velocity ω_k = (2k-1) · ω_base where ω_base = 1.4 rad/s
+- 7 epicycles chained together — each circle's center is the previous circle's tip; the tip of the last circle traces a complex curve whose y-coordinate equals the Fourier sum (≈ a square wave)
+- SVG layout (viewBox 0 0 240 160):
+  * Left half (0–120): 7 epicycles centered around (60, 80)
+  * Right half (120–240): the waveform being drawn — recomputed each frame from past time samples (WAVE_WINDOW = 6 seconds visible, WAVE_SAMPLES = 120 points); naturally scrolls leftward as t advances
+  * A horizontal amber trail line connects the last epicycle tip to the rightmost (newest) waveform sample at x=240
+- Colors: 7 circles stroke through a cyan → teal → indigo → violet gradient (#22d3ee, #14b8a6, #2dd4bf, #5eead4, #818cf8, #6366f1, #a78bfa); radius lines match; trail in amber (#fbbf24); tip marker in amber-100; waveform in cyan-white (#e0f2fe)
+- Floating math glyphs changed from gradient descent symbols (∇ η ∂ θ) to Fourier analysis symbols (∑ π ω ƒ)
+- Data table: changed from gradient descent phases (Init → Converge) to harmonic terms table — 7 rows showing k, Aₖ sin(kωt), and amplitude (1.273, 0.424, 0.255, 0.182, 0.142, 0.116, 0.098)
+- Live readout: shows current "t = X.XXs" and "Σ = X.XXX" (the current Fourier sum value), updated each frame
+- AI verified chip: "Fourier series · square wave approximation with 7 harmonics"
+- GSAP setup preserved: useEffect + manual tweens/timelines arrays with cleanup
+  * Entrance timeline: scene fades+scales in → 7 epicycles fade in (staggered) → 7 radius lines fade in (staggered) → AI chip pops in (back.out) → 7 data table rows slide in (staggered)
+  * Infinite loops: gsap.ticker drives renderFrame() each frame (computes epicycle positions, updates SVG attrs, recomputes waveform polyline, updates trail, updates live readouts)
+  * 4 floating glyphs drift on unique Lissajous paths (3.1/4.3s, 3.7/4.9s, 2.6/3.4s, 4.1/5.2s)
+- Replaced refs: removed paraboloidRef, evalMarkerRef, axesRef, evalLabelRef, evalValueRef; added circleRefs[7], lineRefs[7], tipRef, trailLineRef, waveformRef, tLabelRef, sumLabelRef
+- Responsive preserved: max-w-[260px] mobile (slightly smaller than before), sm:max-w-[320px], md:max-w-[360px], lg:max-w-[440px]; SVG viewBox 240×160 scales fluidly
+- Removed the aspect-[4/5] constraint on the scene card — the card now sizes naturally to its content so the 7-row data table + equation + SVG + chip all fit without overflow
+
+Issue 2 — Restored parallax effect
+- Added useScroll and useTransform to the framer-motion import (was missing entirely — the old code only imported motion, AnimatePresence, useInView)
+- Added three parallax transforms in the component body:
+  * heroTextY = useTransform(scrollY, [0, 700], [0, -210]) → applied to hero text container via <motion.div style={{ y: heroTextY, willChange: 'transform' }}>
+  * heroVizY = useTransform(scrollY, [0, 700], [0, -350]) → applied to Fourier animation container via <motion.div style={{ y: heroVizY, willChange: 'transform' }}>
+  * bgGridY = useTransform(scrollY, [0, 4000], [0, 600]) → applied to the background grid overlay (converted from plain <div> to <motion.div>)
+- Added ParallaxSectionHeading component (uses useScroll with target ref + offset ['start end', 'end start'] + useTransform scrollYProgress [0,1] → [40,-40]); wraps each section heading (Subjects, Features, How it works, Announcements, FAQ)
+
+Issue 3 — Fixed mobile layout: animation BELOW text
+- Text container: changed `order-2 md:order-1` → `order-1 md:order-1` (first on mobile, first on desktop = left column)
+- Animation container: changed `order-1 md:order-2` → `order-2 md:order-2` (below text on mobile, right column on desktop)
+- Net effect: on mobile, visitors see trust badge → headline → subhead → CTAs → mini trust row → Fourier animation (in that vertical order); on desktop, text is in the left column and animation in the right column
+
+Issue 4 — Premium mobile UI
+- Trust badge: text-[9px] on mobile (was text-[10px]); avatars w-5 h-5 on mobile (was w-6 h-6); avatar stack -space-x-1.5 on mobile (was -space-x-2); badge padding px-2.5 py-1.5 on mobile
+- Headline: text-3xl on mobile (was text-4xl), sm:text-5xl, lg:text-6xl
+- Subhead: text-xs on mobile (was text-base), sm:text-sm, md:text-[13.5px]
+- CTA buttons: added w-full sm:w-auto to both buttons so they are full-width stacked on mobile, side-by-side on sm+; container stays flex-col sm:flex-row gap-3 sm:justify-center md:justify-start
+- Mini trust row (Real-time sync / NCTB 2026 verified): hidden sm:flex (was always visible); shows on sm+ only
+- Animation card: max-w-[260px] on mobile (was 280px) with mx-auto centering
+- Section spacing: changed `py-16 md:py-24` → `py-8 md:py-16 lg:py-24` on all sections (Subjects, Features, How it works, Announcements, Marketplace, FAQ, Final CTA) — much smaller vertical padding on mobile, progressive scale up
+- Sticky header: changed h-16 → h-14 md:h-16 (shorter on mobile)
+- Stats bar cards: changed p-4 sm:p-5 → p-3 sm:p-4 sm:p-5 (tighter padding on mobile)
+- Feature grid: changed `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` → `grid-cols-1 md:grid-cols-2 lg:grid-cols-4` (since Progress Tracking was removed, 4 features remain → 4-col grid on desktop)
+- FEATURES array: removed the "Progress Tracking" feature card (was the 5th card) — now 4 features: Gemini AI Academy, Verified NCTB 2026 Curriculum, Live Classroom Chat, STEM Illustrator Marketplace
+- Updated the Features section subhead from "Five tools" → "Four tools" to match the new card count
+- Final CTA padding: changed p-8 sm:p-12 md:p-16 → p-6 sm:p-8 md:p-12 lg:p-16 (smaller on mobile, progressive)
+- Footer: reduced font sizes to text-xs sm:text-sm on quick links and contact, kept the same 3-column responsive grid
+- Final CTA button: added w-full sm:w-auto for full-width on mobile
+
+Issue 5 — Browse Marketplace allows non-registered users
+- Updated LandingPageProps interface to add 3 new required props: onRegister, onSignIn, onBrowseMarketplace (the parent page.tsx was already passing these but the interface didn't declare them — TS excess-property checks would have failed)
+- Used onSignIn for the explicit "Sign in" buttons (header + mobile drawer) — semantically more correct than the previous onEnter
+- Added a "Sign up free" button to the mobile drawer that calls onRegister (the drawer already had Sign in + Get Started Free; now also has Sign up free in cyan to clearly distinguish)
+- Changed the "Browse Marketplace" button (in the Marketplace highlight section) from onClick={onEnter} to onClick={onBrowseMarketplace}
+- Created new component: src/components/features/pages/PublicMarketplace.tsx
+  * Fetches /api/artists (the existing public GET endpoint — no auth required)
+  * Premium dark UI matching the landing page aesthetic (same #060814 bg, ambient orb, grid overlay, sticky backdrop-blur header)
+  * Header: "Back to home" button (→ onBack), Logo, "Public browse · no sign-up" amber badge, "Sign up free" CTA (→ onRegister)
+  * Artist cards in a responsive grid (1-col mobile, 2-col sm, 3-col lg): avatar, name, availability badge, rating + completed orders, bio (line-clamp-2), specialties chips (max 4), two-tier price row (Drawing only / Drawing + Writing), availability indicator, "Sign up to hire" button
+  * "Sign up to hire" button opens a custom RegistrationPrompt modal (framer-motion AnimatePresence + backdrop) that lists benefits and has "Sign up free" + "Maybe later" buttons — confirming calls onRegister
+  * Bottom info strip below the grid: "Want to commission one of these illustrators?" with a "Sign up free" CTA
+  * Loading skeletons (6 placeholder cards with animate-pulse), error state, and empty state all handled
+  * Footer with "Back to home" link
+- Modified src/app/page.tsx:
+  * Added `import { PublicMarketplace } from '@/components/features/pages/PublicMarketplace';`
+  * Added `const [viewPublicMarketplace, setViewPublicMarketplace] = useState(false);` state
+  * Added a new conditional render branch: `if (viewPublicMarketplace && !isAuthenticated) return <PublicMarketplace onRegister={...} onBack={() => setViewPublicMarketplace(false)} />;` (placed after the viewAuth branch so it has lower precedence than AuthPage)
+  * Updated the onBrowseMarketplace callback to set localStorage.app_current_view='artists' (preserved) AND set viewPublicMarketplace=true (instead of forcing auth via setViewAuth(true))
+  * The onRegister handler for PublicMarketplace sets authMode='register' + viewAuth=true (preserves viewPublicMarketplace so if the visitor closes AuthPage they fall back to the public marketplace instead of the landing page)
+  * Authenticated users never reach the public marketplace branch — they go to PortalConsole (which reads the localStorage value and opens to 'artists' directly)
+
+Stage Summary:
+- Calculus squared-grid surface animation (z = sin(x)·cos(y), 100 polygon cells, 3D rotation) is fully replaced by a Fourier series epicycle animation
+- 7 epicycles chained tip-to-center, each rotating at odd harmonic frequencies (1, 3, 5, 7, 9, 11, 13), trace a square wave
+- Right half of SVG shows the last 6s of the waveform, scrolling leftward, recomputed each frame
+- Live readout shows t and Σ (current sum); data table shows all 7 harmonic terms with amplitudes; AI verified chip says "Fourier series · square wave approximation with 7 harmonics"
+- Parallax effect fully restored — hero text moves up 210px, hero viz moves up 350px, background grid moves down 600px as user scrolls; section headings also drift ±40px
+- Mobile layout fixed — text is now first on mobile (badge → headline → subhead → CTAs → trust row), animation is below (order-2)
+- Premium mobile UI — smaller text/padding on mobile, full-width CTAs, hidden trust row, tighter section spacing (py-8 mobile), 4-col feature grid on desktop (Progress Tracking removed)
+- Browse Marketplace button now allows unauthenticated browsing — opens a new PublicMarketplace component that fetches /api/artists (public endpoint) and shows artist cards; "Sign up to hire" CTA opens a registration prompt that calls onRegister
+- ESLint: 0 errors, 0 warnings
+- Page renders HTTP 200
+- Files modified:
+  * src/components/features/pages/LandingPage.tsx (full rewrite — 1457 lines, replaced calculus animation + parallax + mobile UI + props interface)
+  * src/components/features/pages/PublicMarketplace.tsx (NEW — 380 lines, no-auth marketplace browse view with RegistrationPrompt modal)
+  * src/app/page.tsx (added PublicMarketplace import + viewPublicMarketplace state + new conditional render branch + updated onBrowseMarketplace callback to use viewPublicMarketplace instead of setViewAuth)

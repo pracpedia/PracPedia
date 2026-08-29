@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { motion, AnimatePresence, useInView, useScroll, useTransform } from 'framer-motion';
 import { gsap } from 'gsap';
 import {
   ShieldCheck,
@@ -13,7 +13,6 @@ import {
   Sparkles,
   MessageCircle,
   Palette,
-  Trophy,
   BookOpen,
   Atom,
   FlaskConical,
@@ -43,6 +42,9 @@ interface LandingPageProps {
   bannerConfig?: BannerConfig;
   folders?: any[];
   announcements?: any[];
+  onRegister: () => void;
+  onSignIn: () => void;
+  onBrowseMarketplace: () => void;
 }
 
 /* ---------------- helpers ---------------- */
@@ -92,12 +94,6 @@ const FEATURES = [
     desc: 'Commission experienced Bangladeshi artists to draw perfect diagrams in your physical notebook.',
     tint: 'from-amber-500 to-orange-500',
   },
-  {
-    Icon: Trophy,
-    title: 'Progress Tracking',
-    desc: 'Study time, completed modules, and AI credits visible to your teachers and parents.',
-    tint: 'from-violet-500 to-indigo-500',
-  },
 ];
 
 const HOW_IT_WORKS = [
@@ -134,6 +130,46 @@ const NAV_LINKS = [
   { href: '#faq', label: 'FAQ' },
 ];
 
+/* ---------------- Fourier series constants ---------------- */
+
+// Square wave Fourier series:  f(t) = (4/π) · Σ_{k=1..7} sin((2k-1)·ω·t) / (2k-1)
+// 7 harmonics — odd multiples of the base frequency (1, 3, 5, 7, 9, 11, 13).
+const HARMONIC_KS = [1, 3, 5, 7, 9, 11, 13];
+const HARMONIC_AMPS = HARMONIC_KS.map((k) => (4 / Math.PI) / k);
+
+const SUBSCRIPTS: Record<string, string> = {
+  '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+  '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+};
+
+const toSubscript = (n: number): string =>
+  String(n).split('').map((c) => SUBSCRIPTS[c] ?? c).join('');
+
+const HARMONIC_ROWS: Array<[string, string, string]> = HARMONIC_KS.map((k, i) => [
+  String(k),
+  `A${toSubscript(k)} sin(${k}ωt)`,
+  HARMONIC_AMPS[i].toFixed(3),
+]);
+
+// 7 epicycle stroke colors — smooth cyan → teal → indigo gradient.
+const CIRCLE_COLORS = [
+  '#22d3ee', // cyan-400
+  '#14b8a6', // teal-500
+  '#2dd4bf', // teal-400
+  '#5eead4', // teal-300
+  '#818cf8', // indigo-400
+  '#6366f1', // indigo-500
+  '#a78bfa', // violet-400
+];
+
+// Fourier analysis glyphs — ∑ (summation), π, ω (omega), ƒ (function).
+const GLYPHS = [
+  { glyph: '∑', className: 'absolute -top-3 -left-2 text-cyan-400 text-2xl sm:text-3xl lg:text-4xl' },
+  { glyph: 'π', className: 'absolute -top-1 right-2 text-indigo-300 text-xl sm:text-2xl lg:text-3xl' },
+  { glyph: 'ω', className: 'absolute bottom-6 -right-3 text-amber-300 text-sm sm:text-base lg:text-lg' },
+  { glyph: 'ƒ', className: 'absolute bottom-2 -left-1 text-emerald-300 text-xl sm:text-2xl lg:text-3xl' },
+];
+
 /* ---------------- AnimatedStat (kept — one-shot rAF count-up) ---------------- */
 
 const AnimatedStat: React.FC<{ value: number; className?: string }> = ({ value, className = '' }) => {
@@ -165,6 +201,22 @@ const AnimatedStat: React.FC<{ value: number; className?: string }> = ({ value, 
   return <span ref={ref} className={className}>{display}</span>;
 };
 
+/* ---------------- ParallaxSectionHeading ---------------- */
+
+const ParallaxSectionHeading: React.FC<{ children: React.ReactNode; className?: string }> = ({
+  children,
+  className,
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
+  const y = useTransform(scrollYProgress, [0, 1], [40, -40]);
+  return (
+    <motion.div ref={ref} style={{ y, willChange: 'transform' }} className={className}>
+      {children}
+    </motion.div>
+  );
+};
+
 /* ---------------- LandingPage ---------------- */
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -175,20 +227,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   bannerConfig,
   folders = [],
   announcements = [],
+  onRegister,
+  onSignIn,
+  onBrowseMarketplace,
 }) => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  /* GSAP refs for the 3D calculus surface animation */
+  /* GSAP refs for the Fourier series epicycle animation */
   const sceneRef = useRef<HTMLDivElement>(null);
-  const paraboloidRef = useRef<SVGGElement>(null);
-  const evalMarkerRef = useRef<SVGGElement>(null);
-  const axesRef = useRef<SVGGElement>(null);
-  const evalLabelRef = useRef<HTMLSpanElement>(null);
-  const evalValueRef = useRef<HTMLSpanElement>(null);
+  const circleRefs = useRef<Array<SVGCircleElement | null>>(Array(7).fill(null));
+  const lineRefs = useRef<Array<SVGLineElement | null>>(Array(7).fill(null));
+  const tipRef = useRef<SVGCircleElement>(null);
+  const trailLineRef = useRef<SVGLineElement>(null);
+  const waveformRef = useRef<SVGPolylineElement>(null);
+  const tLabelRef = useRef<HTMLSpanElement>(null);
+  const sumLabelRef = useRef<HTMLSpanElement>(null);
   const stepRowsRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
   const glyphRefs = useRef<Array<HTMLSpanElement | null>>([null, null, null, null]);
+
+  /* Parallax transforms — restore the hero parallax effect */
+  const { scrollY } = useScroll();
+  const heroTextY = useTransform(scrollY, [0, 700], [0, -210]);
+  const heroVizY = useTransform(scrollY, [0, 700], [0, -350]);
+  const bgGridY = useTransform(scrollY, [0, 4000], [0, 600]);
 
   /* Close mobile drawer on Escape */
   useEffect(() => {
@@ -200,7 +263,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => window.removeEventListener('keydown', handler);
   }, [mobileNavOpen]);
 
-  /* GSAP-animated 3D multivariable calculus surface — infinite rotation + eval cycling */
+  /* GSAP-animated Fourier series epicycles — infinite rotation */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const prefersReduced =
@@ -211,160 +274,114 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     const timelines: gsap.core.Timeline[] = [];
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Multivariable calculus surface:
-    //   z = sin(√(x²+y²)) · cos(x·y) / (1 + (x²+y²)/8)
-    // This has ripples, saddle behavior, and damping — a visually complex
-    // surface that's a classic multivariable calculus example.
+    // Fourier series for a square wave:
+    //   f(t) = (4/π) · Σ_{k=1..7} sin((2k-1)·ω·t) / (2k-1)
+    //
+    // 7 epicycles chained together. Each circle's center is the previous
+    // circle's tip; the tip of the last circle traces a complex curve whose
+    // y-coordinate equals the Fourier sum (≈ a square wave).
+    //
+    // The waveform on the right half of the SVG shows the last 6 seconds of
+    // the tip's y-position, recomputed each frame, scrolling leftward as t
+    // advances.
     // ─────────────────────────────────────────────────────────────────────────
-    function calcSurface(x: number, y: number): number {
-      const r = Math.sqrt(x * x + y * y);
-      const ripple = Math.sin(r);
-      const cross = Math.cos(x * y);
-      const damping = 1 + (x * x + y * y) / 8;
-      return (ripple * cross) / damping;
+
+    const FOURIER_SCALE = 16;       // px per unit of amplitude
+    const FOURIER_OMEGA_BASE = 1.4; // rad/s for the base frequency (k=1)
+    const WAVE_SAMPLES = 120;       // polyline resolution
+    const WAVE_WINDOW = 6;         // seconds of waveform visible on the right
+    const WAVE_X_START = 120;
+    const WAVE_X_END = 240;
+    const WAVE_X_RANGE = WAVE_X_END - WAVE_X_START;
+    const EPICYCLE_CENTER_X = 60;
+    const EPICYCLE_CENTER_Y = 80;
+
+    const omegas = HARMONIC_KS.map((k) => k * FOURIER_OMEGA_BASE);
+
+    function fourierSum(s: number): number {
+      let sum = 0;
+      for (let i = 0; i < HARMONIC_KS.length; i++) {
+        sum += HARMONIC_AMPS[i] * Math.sin(omegas[i] * s);
+      }
+      return sum;
     }
 
-    // 5 evaluation points to cycle through — visually interesting spots
-    const evalPoints: Array<{ x: number; y: number; label: string }> = [
-      { x: 0, y: 0, label: 'f(0, 0)' },
-      { x: 1.5, y: 1.0, label: 'f(1.5, 1.0)' },
-      { x: -1.2, y: 0.8, label: 'f(-1.2, 0.8)' },
-      { x: 2.0, y: -1.5, label: 'f(2.0, -1.5)' },
-      { x: -2.0, y: -1.0, label: 'f(-2.0, -1.0)' },
-    ];
+    let t = 0;
+    let lastFrameTime = performance.now();
 
-    // ── 3D projection with Z-axis rotation + X-axis tilt oscillation ──
-    const SVG_W = 240;
-    const SVG_H = 160;
-    const CX = SVG_W / 2;
-    const CY = SVG_H / 2 + 8;
-    const SCALE = 26; // px per math unit
-    const TILT_BASE = Math.PI / 6; // 30° base tilt
-    const Z_SCALE = 30; // px of elevation per z unit
+    function renderFrame(currentTime: number) {
+      // Clamp dt to 50ms to avoid huge jumps after tab-switch.
+      const dt = Math.min((currentTime - lastFrameTime) / 1000, 0.05);
+      lastFrameTime = currentTime;
+      t += dt;
 
-    const rotation = { angle: 0, tilt: 0 };
+      // Walk the epicycle chain — each tip becomes the next circle's center.
+      let prevX = EPICYCLE_CENTER_X;
+      let prevY = EPICYCLE_CENTER_Y;
+      let sumValue = 0;
 
-    function project(x: number, y: number, z: number, rotZ: number, tilt: number) {
-      // Rotate (x, y) around Z axis
-      const cosR = Math.cos(rotZ);
-      const sinR = Math.sin(rotZ);
-      const xR = x * cosR - y * sinR;
-      const yR = x * sinR + y * cosR;
-      // Tilt around X axis
-      const totalTilt = TILT_BASE + tilt;
-      const zPx = z * Z_SCALE;
-      const yTilted = yR * Math.cos(totalTilt) - zPx * Math.sin(totalTilt);
-      const zPrime = yR * Math.sin(totalTilt) + zPx * Math.cos(totalTilt);
-      return { x: CX + xR * SCALE, y: CY - yTilted * SCALE, depth: zPrime };
-    }
+      for (let i = 0; i < HARMONIC_KS.length; i++) {
+        const angle = omegas[i] * t;
+        const dx = HARMONIC_AMPS[i] * FOURIER_SCALE * Math.cos(angle);
+        // Negate sin for SVG y-down convention (positive sum → tip moves up).
+        const dy = -HARMONIC_AMPS[i] * FOURIER_SCALE * Math.sin(angle);
+        const tipX = prevX + dx;
+        const tipY = prevY + dy;
 
-    // ── Pre-compute wireframe sample points (math coords — static) ──
-    // 7 constant-x + 7 constant-y = 14 curves, each 30 samples
-    const wireframeCurves: Array<{ points: Array<{ x: number; y: number; z: number }>; axis: 'x' | 'y' }> = [];
-    const fixedValues = [-2, -1.33, -0.67, 0, 0.67, 1.33, 2];
-    fixedValues.forEach((fixed) => {
-      const pts: Array<{ x: number; y: number; z: number }> = [];
-      for (let i = 0; i <= 30; i++) {
-        const t = -2.5 + (5.0 * i) / 30;
-        const xx = fixed;
-        const yy = t;
-        pts.push({ x: xx, y: yy, z: calcSurface(xx, yy) });
-      }
-      wireframeCurves.push({ points: pts, axis: 'x' });
-    });
-    fixedValues.forEach((fixed) => {
-      const pts: Array<{ x: number; y: number; z: number }> = [];
-      for (let i = 0; i <= 30; i++) {
-        const t = -2.5 + (5.0 * i) / 30;
-        const xx = t;
-        const yy = fixed;
-        pts.push({ x: xx, y: yy, z: calcSurface(xx, yy) });
-      }
-      wireframeCurves.push({ points: pts, axis: 'y' });
-    });
-
-    // ── Re-project everything at the current rotation ──
-    let currentEvalIdx = 0;
-    function renderAtRotation(rotZ: number, tilt: number, evalIdx: number) {
-      // Wireframe curves
-      const pathEls = paraboloidRef.current?.querySelectorAll('path');
-      if (pathEls) {
-        wireframeCurves.forEach((curve, i) => {
-          const el = pathEls[i] as SVGPathElement | undefined;
-          if (!el) return;
-          let d = '';
-          let totalDepth = 0;
-          curve.points.forEach((p, j) => {
-            const sp = project(p.x, p.y, p.z, rotZ, tilt);
-            d += j === 0 ? `M${sp.x.toFixed(1)},${sp.y.toFixed(1)}` : ` L${sp.x.toFixed(1)},${sp.y.toFixed(1)}`;
-            totalDepth += sp.depth;
-          });
-          el.setAttribute('d', d);
-          const avgDepth = totalDepth / curve.points.length;
-          const normalizedDepth = Math.max(0, Math.min(1, (avgDepth + 40) / 80));
-          el.setAttribute('stroke-opacity', String((0.3 + 0.55 * (1 - normalizedDepth)).toFixed(2)));
-        });
-      }
-
-      // 3D coordinate system axes
-      if (axesRef.current) {
-        const origin = project(0, 0, 0, rotZ, tilt);
-        const xEnd = project(2.5, 0, 0, rotZ, tilt);
-        const yEnd = project(0, 2.5, 0, rotZ, tilt);
-        const zEnd = project(0, 0, 0.8, rotZ, tilt);
-        const axisLines = axesRef.current.querySelectorAll('.axis-line');
-        const axisLabels = axesRef.current.querySelectorAll('.axis-label');
-        const axisTicks = axesRef.current.querySelectorAll('.axis-tick');
-        if (axisLines.length >= 3) {
-          (axisLines[0] as SVGLineElement).setAttribute('x1', String(origin.x));
-          (axisLines[0] as SVGLineElement).setAttribute('y1', String(origin.y));
-          (axisLines[0] as SVGLineElement).setAttribute('x2', String(xEnd.x));
-          (axisLines[0] as SVGLineElement).setAttribute('y2', String(xEnd.y));
-          (axisLines[1] as SVGLineElement).setAttribute('x1', String(origin.x));
-          (axisLines[1] as SVGLineElement).setAttribute('y1', String(origin.y));
-          (axisLines[1] as SVGLineElement).setAttribute('x2', String(yEnd.x));
-          (axisLines[1] as SVGLineElement).setAttribute('y2', String(yEnd.y));
-          (axisLines[2] as SVGLineElement).setAttribute('x1', String(origin.x));
-          (axisLines[2] as SVGLineElement).setAttribute('y1', String(origin.y));
-          (axisLines[2] as SVGLineElement).setAttribute('x2', String(zEnd.x));
-          (axisLines[2] as SVGLineElement).setAttribute('y2', String(zEnd.y));
+        const circleEl = circleRefs.current[i];
+        if (circleEl) {
+          circleEl.setAttribute('cx', prevX.toFixed(2));
+          circleEl.setAttribute('cy', prevY.toFixed(2));
         }
-        if (axisTicks.length >= 6) {
-          for (let i = 0; i < 2; i++) {
-            const tickX = project(i + 1, 0, 0, rotZ, tilt);
-            const tickY = project(0, i + 1, 0, rotZ, tilt);
-            const tickZ = project(0, 0, (i + 1) * 0.4, rotZ, tilt);
-            (axisTicks[i * 3] as SVGCircleElement).setAttribute('cx', String(tickX.x));
-            (axisTicks[i * 3] as SVGCircleElement).setAttribute('cy', String(tickY.y));
-            (axisTicks[i * 3 + 1] as SVGCircleElement).setAttribute('cx', String(tickY.x));
-            (axisTicks[i * 3 + 1] as SVGCircleElement).setAttribute('cy', String(tickY.y));
-            (axisTicks[i * 3 + 2] as SVGCircleElement).setAttribute('cx', String(tickZ.x));
-            (axisTicks[i * 3 + 2] as SVGCircleElement).setAttribute('cy', String(tickZ.y));
-          }
+        const lineEl = lineRefs.current[i];
+        if (lineEl) {
+          lineEl.setAttribute('x1', prevX.toFixed(2));
+          lineEl.setAttribute('y1', prevY.toFixed(2));
+          lineEl.setAttribute('x2', tipX.toFixed(2));
+          lineEl.setAttribute('y2', tipY.toFixed(2));
         }
-        if (axisLabels.length >= 3) {
-          (axisLabels[0] as SVGTextElement).setAttribute('x', String(xEnd.x + 4));
-          (axisLabels[0] as SVGTextElement).setAttribute('y', String(xEnd.y + 2));
-          (axisLabels[1] as SVGTextElement).setAttribute('x', String(yEnd.x + 2));
-          (axisLabels[1] as SVGTextElement).setAttribute('y', String(yEnd.y + 8));
-          (axisLabels[2] as SVGTextElement).setAttribute('x', String(zEnd.x + 2));
-          (axisLabels[2] as SVGTextElement).setAttribute('y', String(zEnd.y - 2));
-        }
+
+        prevX = tipX;
+        prevY = tipY;
+        sumValue += HARMONIC_AMPS[i] * Math.sin(omegas[i] * t);
       }
 
-      // Evaluation marker
-      if (evalMarkerRef.current) {
-        const pt = evalPoints[evalIdx];
-        const z = calcSurface(pt.x, pt.y);
-        const sp = project(pt.x, pt.y, z, rotZ, tilt);
-        evalMarkerRef.current.setAttribute('transform', `translate(${sp.x.toFixed(1)},${sp.y.toFixed(1)})`);
-        if (evalLabelRef.current) evalLabelRef.current.textContent = pt.label;
-        if (evalValueRef.current) evalValueRef.current.textContent = z.toFixed(3);
+      // Tip marker
+      if (tipRef.current) {
+        tipRef.current.setAttribute('cx', prevX.toFixed(2));
+        tipRef.current.setAttribute('cy', prevY.toFixed(2));
       }
+
+      // Waveform polyline — recompute each frame from past time samples.
+      // x=240 is now (t), x=120 is WAVE_WINDOW seconds ago. As t advances,
+      // the entire waveform naturally scrolls leftward.
+      if (waveformRef.current) {
+        let points = '';
+        for (let i = 0; i < WAVE_SAMPLES; i++) {
+          const x = WAVE_X_START + (i / (WAVE_SAMPLES - 1)) * WAVE_X_RANGE;
+          const timeAtX = t - (1 - i / (WAVE_SAMPLES - 1)) * WAVE_WINDOW;
+          const y = EPICYCLE_CENTER_Y - fourierSum(timeAtX) * FOURIER_SCALE;
+          points += `${x.toFixed(1)},${y.toFixed(1)} `;
+        }
+        waveformRef.current.setAttribute('points', points.trim());
+      }
+
+      // Trail line — horizontal connector from the tip to the rightmost
+      // (newest) waveform sample.
+      if (trailLineRef.current) {
+        trailLineRef.current.setAttribute('x1', prevX.toFixed(2));
+        trailLineRef.current.setAttribute('y1', prevY.toFixed(2));
+        trailLineRef.current.setAttribute('x2', String(WAVE_X_END));
+        trailLineRef.current.setAttribute('y2', prevY.toFixed(2));
+      }
+
+      // Live readout
+      if (tLabelRef.current) tLabelRef.current.textContent = (t % 10).toFixed(2);
+      if (sumLabelRef.current) sumLabelRef.current.textContent = sumValue.toFixed(3);
     }
 
     // ── Initial render ──
-    renderAtRotation(0, 0, 0);
+    renderFrame(performance.now());
 
     // ── Entrance timeline (one-shot) ──
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
@@ -372,17 +389,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     if (sceneRef.current) {
       tl.fromTo(sceneRef.current, { scale: 0.92, opacity: 0, y: 24 }, { scale: 1, opacity: 1, y: 0, duration: 0.7 });
     }
-    // Wireframe curves draw via strokeDashoffset
-    if (paraboloidRef.current) {
-      const pathEls = paraboloidRef.current.querySelectorAll('path');
-      pathEls.forEach((path, idx) => {
-        const len = (path as SVGPathElement).getTotalLength();
-        gsap.set(path as SVGPathElement, { strokeDasharray: len, strokeDashoffset: len });
-        tl.to(path as SVGPathElement, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' }, 0.3 + idx * 0.04);
-      });
-      tl.add(() => {
-        pathEls.forEach((path) => gsap.set(path as SVGPathElement, { strokeDasharray: 'none', strokeDashoffset: 0 }));
-      });
+    // Epicycles fade in
+    const allCircleEls = circleRefs.current.filter(Boolean) as SVGCircleElement[];
+    const allLineEls = lineRefs.current.filter(Boolean) as SVGLineElement[];
+    if (allCircleEls.length) {
+      tl.fromTo(allCircleEls, { opacity: 0 }, { opacity: 1, duration: 0.5, stagger: 0.05, ease: 'power2.out' }, 0.2);
+    }
+    if (allLineEls.length) {
+      tl.fromTo(allLineEls, { opacity: 0 }, { opacity: 1, duration: 0.5, stagger: 0.05, ease: 'power2.out' }, 0.2);
     }
     // AI chip pops
     if (chipRef.current) {
@@ -391,36 +405,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     // Step rows slide in
     if (stepRowsRef.current) {
       const rows = gsap.utils.toArray<HTMLElement>(stepRowsRef.current.children);
-      tl.fromTo(rows, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.3, stagger: 0.06, ease: 'power2.out' }, '-=0.3');
+      tl.fromTo(rows, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.3, stagger: 0.05, ease: 'power2.out' }, '-=0.3');
     }
 
     // ── Infinite loops (only if motion is allowed) ──
     if (!prefersReduced) {
-      // Z-axis rotation: 360° per 12s
-      tweens.push(gsap.to(rotation, {
-        angle: Math.PI * 2, duration: 12, ease: 'none', repeat: -1,
-        onUpdate: () => renderAtRotation(rotation.angle, rotation.tilt, currentEvalIdx),
-      }));
-      // Tilt oscillation: ±10° per 6s yoyo
-      tweens.push(gsap.to(rotation, {
-        tilt: Math.PI / 18, duration: 6, ease: 'sine.inOut', repeat: -1, yoyo: true,
-      }));
-      // Eval point cycling: 5 points × 3.5s = 17.5s per full cycle
-      tweens.push(gsap.to({}, {
-        duration: 3.5, repeat: -1, ease: 'none',
-        onUpdate: () => {},
-        onRepeat: () => {
-          currentEvalIdx = (currentEvalIdx + 1) % evalPoints.length;
-          renderAtRotation(rotation.angle, rotation.tilt, currentEvalIdx);
-        },
-      }));
-      // Per-frame ticker for smooth rendering
-      const ticker = gsap.ticker.add(() => {
-        renderAtRotation(rotation.angle, rotation.tilt, currentEvalIdx);
-      });
-      tweens.push({ kill: () => gsap.ticker.remove(ticker) } as unknown as gsap.core.Tween);
+      // Per-frame ticker driving the Fourier animation
+      const tickerFn = () => renderFrame(performance.now());
+      gsap.ticker.add(tickerFn);
+      tweens.push({ kill: () => gsap.ticker.remove(tickerFn) } as unknown as gsap.core.Tween);
 
-      // Floating math glyphs
+      // Floating math glyphs (∑ π ω ƒ) drift on unique Lissajous paths.
       const glyphConfigs = [
         { xAmp: 12, yAmp: -14, xDur: 3.1, yDur: 4.3 },
         { xAmp: -14, yAmp: 10, xDur: 3.7, yDur: 4.9 },
@@ -437,9 +432,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     if (prefersReduced) {
       tl.progress(1);
-      renderAtRotation(0, 0, 0);
-      if (evalLabelRef.current) evalLabelRef.current.textContent = evalPoints[0].label;
-      if (evalValueRef.current) evalValueRef.current.textContent = calcSurface(evalPoints[0].x, evalPoints[0].y).toFixed(3);
+      renderFrame(performance.now());
     }
 
     return () => {
@@ -480,39 +473,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     { value: 3, label: 'Drawing specialists online', color: 'text-indigo-400', Icon: Palette },
   ];
 
-  /* Math glyphs array — gradient descent optimization symbols */
-  const glyphs = [
-    { glyph: '∇', className: 'absolute -top-3 -left-2 text-cyan-400 text-2xl sm:text-3xl lg:text-4xl' },
-    { glyph: 'η', className: 'absolute -top-1 right-2 text-indigo-300 text-xl sm:text-2xl lg:text-3xl' },
-    { glyph: '∂', className: 'absolute bottom-6 -right-3 text-amber-300 text-sm sm:text-base lg:text-lg' },
-    { glyph: 'θ', className: 'absolute bottom-2 -left-1 text-emerald-300 text-xl sm:text-2xl lg:text-3xl' },
-  ];
-
-  /* Calculus evaluation points for the data table */
-  const descentRows: Array<[string, string, string]> = [
-    ['f(0, 0)', 'sin(0)·cos(0)/(1+0)', '0.000'],
-    ['f(1.5, 1)', 'sin(1.8)·cos(1.5)/1.5', '0.276'],
-    ['f(-1.2, 0.8)', 'sin(1.44)·cos(-0.96)/1.3', '0.318'],
-    ['f(2, -1.5)', 'sin(2.5)·cos(-3)/2.2', '0.051'],
-    ['f(-2, -1)', 'sin(2.24)·cos(2)/1.7', '0.139'],
-  ];
-
   return (
     <div
       id="landing_page_container"
       className="w-full min-h-screen text-slate-200 bg-[#060814] relative font-sans flex flex-col overflow-y-auto overflow-x-hidden scroll-smooth selection:bg-cyan-500/20 selection:text-cyan-300"
     >
-      {/* Single ambient gradient orb — the ONLY page-wide infinite animation
-          (CSS keyframes, 20s loop, GPU-friendly transform). */}
+      {/* Ambient gradient orb — the only page-wide infinite CSS animation */}
       <div
         aria-hidden
         className="absolute top-[-15%] left-[-10%] w-[85%] h-[80%] rounded-full bg-gradient-to-br from-cyan-950/25 via-indigo-950/15 to-purple-950/10 blur-[180px] pointer-events-none select-none"
         style={{ animation: 'pp-orb-drift 20s ease-in-out infinite' }}
       />
 
-      {/* Grid overlay with radial mask */}
-      <div
+      {/* Grid overlay with radial mask — parallax (bgGridY) */}
+      <motion.div
         aria-hidden
+        style={{ y: bgGridY, willChange: 'transform' }}
         className="absolute inset-0 bg-[linear-gradient(to_right,#111827_1px,transparent_1px),linear-gradient(to_bottom,#111827_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_52%_at_50%_50%,#000_70%,transparent_100%)] opacity-25 pointer-events-none"
       />
 
@@ -550,7 +526,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         id="landing_header"
         className="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#060814]/70 border-b border-white/[0.06]"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 md:h-16 flex items-center justify-between gap-3">
           <a
             href="#hero"
             className="flex items-center gap-2 shrink-0 min-h-[40px]"
@@ -574,7 +550,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             {!isAuthenticated && (
               <button
-                onClick={onEnter}
+                onClick={onSignIn}
                 className="hidden sm:inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-colors cursor-pointer min-h-[40px]"
               >
                 Sign in
@@ -649,15 +625,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               ))}
               <div className="border-t border-white/10 my-3" />
               {!isAuthenticated && (
-                <button
-                  onClick={() => {
-                    setMobileNavOpen(false);
-                    onEnter();
-                  }}
-                  className="px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/5 transition-colors cursor-pointer min-h-[44px] text-left"
-                >
-                  Sign in
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      setMobileNavOpen(false);
+                      onSignIn();
+                    }}
+                    className="px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:text-white hover:bg-white/5 transition-colors cursor-pointer min-h-[44px] text-left"
+                  >
+                    Sign in
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMobileNavOpen(false);
+                      onRegister();
+                    }}
+                    className="px-4 py-3 rounded-xl text-sm font-semibold text-cyan-300 hover:text-cyan-200 hover:bg-white/5 transition-colors cursor-pointer min-h-[44px] text-left"
+                  >
+                    Sign up free
+                  </button>
+                </>
               )}
               <button
                 onClick={() => {
@@ -675,40 +662,44 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Main */}
       <main className="relative z-10 flex-1 flex flex-col">
-        {/* Hero — 2-column (text left, GSAP notebook right) */}
+        {/* Hero — 2-column (text left, Fourier animation right) */}
         <section
           id="hero"
-          className="relative max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20 grid md:grid-cols-2 gap-10 md:gap-12 items-center"
+          className="relative max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 grid md:grid-cols-2 gap-8 md:gap-12 items-center"
         >
-          <div className="text-center md:text-left space-y-6 order-2 md:order-1">
-            {/* Trust badge with avatar stack */}
+          {/* Text column — parallax (heroTextY), first on mobile AND first on desktop */}
+          <motion.div
+            style={{ y: heroTextY, willChange: 'transform' }}
+            className="text-center md:text-left space-y-6 order-1 md:order-1"
+          >
+            {/* Trust badge with avatar stack — smaller on mobile */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-3 px-3 py-1.5 rounded-full bg-slate-950/60 border border-white/10 backdrop-blur-md"
+              className="inline-flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-white/10 backdrop-blur-md"
             >
-              <div className="flex -space-x-2">
+              <div className="flex -space-x-1.5 sm:-space-x-2">
                 {AVATAR_INITIALS.map((i) => (
                   <span
                     key={i}
-                    className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-600 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[#060814]"
+                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-600 text-white text-[8px] sm:text-[9px] font-bold flex items-center justify-center border-2 border-[#060814]"
                   >
                     {i}
                   </span>
                 ))}
               </div>
-              <span className="text-[10px] sm:text-[11px] text-slate-300 uppercase tracking-wider font-bold">
+              <span className="text-[9px] sm:text-[11px] text-slate-300 uppercase tracking-wider font-bold">
                 Trusted by 2,400+ HSC students
               </span>
             </motion.div>
 
-            {/* Headline */}
+            {/* Headline — text-3xl on mobile, sm:text-5xl, lg:text-6xl */}
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.05]"
+              className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.05]"
             >
               Master your{' '}
               <span
@@ -727,12 +718,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               with AI precision.
             </motion.h1>
 
-            {/* Subhead — focuses on the 5 real features (no scanner mention) */}
+            {/* Subhead — text-xs on mobile, sm:text-sm, md:text-[13.5px] */}
             <motion.p
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.25 }}
-              className="text-slate-400 text-base sm:text-lg max-w-xl mx-auto md:mx-0 leading-relaxed"
+              className="text-slate-400 text-xs sm:text-sm md:text-[13.5px] max-w-xl mx-auto md:mx-0 leading-relaxed"
             >
               Ask Gemini questions 24/7 in Bangla or English, discuss with peers in live classroom
               chat, and commission pencil-shaded diagrams from Bangladeshi illustrators — all
@@ -740,7 +731,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               teachers.
             </motion.p>
 
-            {/* CTAs */}
+            {/* CTAs — full-width on mobile, side-by-side on sm+ */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -750,7 +741,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 id={heroCtaId}
                 onClick={heroCtaOnClick}
-                className="group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-sm tracking-wide shadow-[0_10px_30px_rgba(6,182,212,0.3)] hover:shadow-[0_14px_36px_rgba(6,182,212,0.45)] transition-all cursor-pointer min-h-[48px]"
+                className="group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-sm tracking-wide shadow-[0_10px_30px_rgba(6,182,212,0.3)] hover:shadow-[0_14px_36px_rgba(6,182,212,0.45)] transition-all cursor-pointer min-h-[48px] w-full sm:w-auto"
               >
                 {isAuthenticated ? <Layout className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                 <span>{heroCtaLabel}</span>
@@ -758,19 +749,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </button>
               <a
                 href="#subjects"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 font-semibold text-sm border border-white/10 hover:border-white/20 transition-all cursor-pointer min-h-[48px]"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 font-semibold text-sm border border-white/10 hover:border-white/20 transition-all cursor-pointer min-h-[48px] w-full sm:w-auto"
               >
                 <BookOpen className="w-4 h-4 text-cyan-400" />
                 <span>Browse subjects</span>
               </a>
             </motion.div>
 
-            {/* Mini trust row */}
+            {/* Mini trust row — hidden on mobile, shown on sm+ */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.5 }}
-              className="flex items-center justify-center md:justify-start gap-4 pt-2 text-[10px] text-slate-500 uppercase tracking-wider font-bold font-mono"
+              className="hidden sm:flex items-center justify-center md:justify-start gap-4 pt-2 text-[10px] text-slate-500 uppercase tracking-wider font-bold font-mono"
             >
               <span className="flex items-center gap-1.5">
                 <Activity className="w-3 h-3 text-emerald-400" /> Real-time sync
@@ -779,12 +770,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <CheckCircle2 className="w-3 h-3 text-cyan-400" /> NCTB 2026 verified
               </span>
             </motion.div>
-          </div>
+          </motion.div>
 
-          {/* GSAP-animated 3D gradient descent — fully responsive */}
-          <div
-            className="relative mx-auto w-full max-w-[280px] sm:max-w-[320px] md:max-w-[360px] lg:max-w-[440px] order-1 md:order-2"
-            style={{ perspective: '1200px' }}
+          {/* Fourier series animation — parallax (heroVizY), BELOW text on mobile, RIGHT on desktop */}
+          <motion.div
+            style={{ y: heroVizY, willChange: 'transform' }}
+            className="relative mx-auto w-full max-w-[260px] sm:max-w-[320px] md:max-w-[360px] lg:max-w-[440px] order-2 md:order-2"
           >
             {/* Soft static glow under the scene */}
             <div
@@ -792,8 +783,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="absolute -inset-6 bg-gradient-to-br from-cyan-500/20 via-indigo-500/10 to-transparent blur-2xl pointer-events-none"
             />
 
-            {/* Floating math glyphs — GSAP Lissajous float, each unique */}
-            {glyphs.map((g, i) => (
+            {/* Floating math glyphs — Fourier symbols */}
+            {GLYPHS.map((g, i) => (
               <span
                 key={g.glyph}
                 ref={(el) => {
@@ -806,86 +797,111 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </span>
             ))}
 
-            {/* The scene card itself — GSAP entrance + 3D tilt loop */}
+            {/* The scene card itself — GSAP entrance */}
             <div
               ref={sceneRef}
-              style={{ transformStyle: 'preserve-3d' }}
-              className="relative aspect-[4/5] rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 shadow-2xl shadow-cyan-950/40 overflow-hidden"
+              className="relative rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 shadow-2xl shadow-cyan-950/40 overflow-hidden"
             >
-              {/* Page content */}
               <div className="absolute inset-0 p-3 sm:p-4 flex flex-col gap-2 sm:gap-3">
                 <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-slate-500">
-                  <span>CALC · MULTIVARIABLE SURFACE</span>
-                  <span className="text-cyan-400">3D · infinite rotation</span>
+                  <span>FOURIER · EPICYCLES</span>
+                  <span className="text-cyan-400">7 harmonics · square wave</span>
                 </div>
-                <div className="text-[11px] sm:text-xs font-bold text-white">
-                  z = sin(√(x²+y²)) · cos(xy) / (1 + (x²+y²)/8)
+                <div className="text-[11px] sm:text-xs font-bold text-white truncate">
+                  f(t) = (4/π) · Σ sin((2k−1)ωt)/(2k−1)
                 </div>
 
-                {/* 3D multivariable calculus surface — SVG scales fluidly */}
+                {/* SVG — epicycles on left (0-120), waveform on right (120-240) */}
                 <div className="relative rounded-lg bg-slate-950/60 border border-white/5 p-1.5 sm:p-2 flex items-center justify-center overflow-hidden">
                   <svg viewBox="0 0 240 160" className="w-full h-auto" aria-hidden>
-                    {/* ── 3D coordinate system: x, y, z axes from origin ── */}
-                    <g ref={axesRef}>
-                      <line className="axis-line" x1="0" y1="0" x2="0" y2="0" stroke="#22d3ee" strokeWidth="1.2" strokeOpacity="0.85" />
-                      <line className="axis-line" x1="0" y1="0" x2="0" y2="0" stroke="#818cf8" strokeWidth="1.2" strokeOpacity="0.85" />
-                      <line className="axis-line" x1="0" y1="0" x2="0" y2="0" stroke="#fbbf24" strokeWidth="1.2" strokeOpacity="0.85" />
-                      {[0, 1, 2, 3, 4, 5].map((i) => (
-                        <circle key={`tick${i}`} className="axis-tick" cx="0" cy="0" r="1" fill="#475569" opacity="0.8" />
-                      ))}
-                      <text className="axis-label" x="0" y="0" fill="#22d3ee" fontSize="7" fontFamily="monospace" fontWeight="bold">x</text>
-                      <text className="axis-label" x="0" y="0" fill="#818cf8" fontSize="7" fontFamily="monospace" fontWeight="bold">y</text>
-                      <text className="axis-label" x="0" y="0" fill="#fbbf24" fontSize="7" fontFamily="monospace" fontWeight="bold">z</text>
-                    </g>
+                    {/* Separator between epicycle half and waveform half */}
+                    <line
+                      x1="120"
+                      y1="8"
+                      x2="120"
+                      y2="152"
+                      stroke="#1e293b"
+                      strokeDasharray="2 2"
+                      strokeWidth="0.4"
+                    />
 
-                    {/* ── 3D wireframe mesh — 14 empty paths populated by GSAP each frame ── */}
-                    <g ref={paraboloidRef}>
-                      {Array.from({ length: 7 }).map((_, i) => (
-                        <path key={`x${i}`} d="" fill="none" stroke="#22d3ee" strokeWidth={0.7} strokeOpacity={0.55} strokeLinecap="round" strokeLinejoin="round" />
-                      ))}
-                      {Array.from({ length: 7 }).map((_, i) => (
-                        <path key={`y${i}`} d="" fill="none" stroke="#818cf8" strokeWidth={0.7} strokeOpacity={0.55} strokeLinecap="round" strokeLinejoin="round" />
-                      ))}
-                    </g>
+                    {/* Center marker for the epicycle system */}
+                    <circle cx="60" cy="80" r="0.8" fill="#475569" />
 
-                    {/* Evaluation marker — positioned by GSAP each frame */}
-                    <g ref={evalMarkerRef}>
-                      <circle cx="0" cy="0" r="6" fill="#fbbf24" opacity="0.2" />
-                      <circle cx="0" cy="0" r="4" fill="#fbbf24" opacity="0.4" />
-                      <circle cx="0" cy="0" r="2.5" fill="#fde68a" stroke="#fbbf24" strokeWidth="0.5" />
-                    </g>
+                    {/* Waveform polyline — populated each frame */}
+                    <polyline
+                      ref={waveformRef}
+                      fill="none"
+                      stroke="#e0f2fe"
+                      strokeWidth="0.9"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      opacity="0.92"
+                    />
+
+                    {/* 7 epicycles — each circle + its radius line, populated each frame */}
+                    {HARMONIC_KS.map((k, i) => (
+                      <g key={`h${k}`}>
+                        <circle
+                          ref={(el) => { circleRefs.current[i] = el; }}
+                          r={HARMONIC_AMPS[i] * 16}
+                          fill="none"
+                          stroke={CIRCLE_COLORS[i]}
+                          strokeWidth="0.5"
+                          strokeOpacity="0.7"
+                        />
+                        <line
+                          ref={(el) => { lineRefs.current[i] = el; }}
+                          stroke={CIRCLE_COLORS[i]}
+                          strokeWidth="0.7"
+                          strokeOpacity="0.95"
+                        />
+                      </g>
+                    ))}
+
+                    {/* Trail line from last tip to the rightmost (newest) waveform sample */}
+                    <line
+                      ref={trailLineRef}
+                      stroke="#fbbf24"
+                      strokeWidth="0.6"
+                      strokeDasharray="1.5 1.5"
+                      strokeOpacity="0.85"
+                    />
+
+                    {/* Tip marker (last epicycle tip) */}
+                    <circle ref={tipRef} r="1.8" fill="#fde68a" stroke="#fbbf24" strokeWidth="0.4" />
                   </svg>
 
                   {/* Live readout — top-right corner */}
                   <div className="absolute top-2 right-2 sm:top-3 sm:right-3 px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/30 font-mono text-[7px] sm:text-[8px] text-cyan-300 leading-tight">
                     <div className="flex items-center gap-1">
                       <span className="inline-block w-1 h-1 bg-cyan-300 rounded-full animate-pulse" />
-                      <span ref={evalLabelRef}>f(0, 0)</span>
+                      <span>t = <span ref={tLabelRef}>0.00</span>s</span>
                     </div>
-                    <div>z = <span ref={evalValueRef}>0.000</span></div>
+                    <div>Σ = <span ref={sumLabelRef}>0.000</span></div>
                   </div>
                 </div>
 
-                {/* Data table — calculus evaluation points (rows slide in via GSAP) */}
-                <div className="rounded-lg border border-white/5 overflow-hidden text-[7px] sm:text-[8px] font-mono">
+                {/* Data table — harmonic terms (k, term expression, amplitude A_k) */}
+                <div className="rounded-lg border border-white/5 overflow-hidden text-[6px] sm:text-[7px] font-mono">
                   <div className="grid grid-cols-3 bg-slate-950/60 text-slate-400">
-                    <div className="px-1.5 sm:px-2 py-1 border-r border-white/5">Point</div>
-                    <div className="px-1.5 sm:px-2 py-1 border-r border-white/5">Expression</div>
-                    <div className="px-1.5 sm:px-2 py-1">Value</div>
+                    <div className="px-1.5 py-1 border-r border-white/5">k</div>
+                    <div className="px-1.5 py-1 border-r border-white/5">Term</div>
+                    <div className="px-1.5 py-1">A_k</div>
                   </div>
                   <div ref={stepRowsRef}>
-                    {descentRows.map((row, idx) => (
+                    {HARMONIC_ROWS.map((row, idx) => (
                       <div
                         key={idx}
                         className="grid grid-cols-3 text-slate-300 border-t border-white/5"
                       >
-                        <div className="px-1.5 sm:px-2 py-1 border-r border-white/5 truncate">
+                        <div className="px-1.5 py-0.5 border-r border-white/5 truncate">
                           {row[0]}
                         </div>
-                        <div className="px-1.5 sm:px-2 py-1 border-r border-white/5 truncate">
+                        <div className="px-1.5 py-0.5 border-r border-white/5 truncate">
                           {row[1]}
                         </div>
-                        <div className="px-1.5 sm:px-2 py-1 text-emerald-400 truncate">
+                        <div className="px-1.5 py-0.5 text-emerald-400 truncate">
                           {row[2]}
                         </div>
                       </div>
@@ -899,7 +915,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   className="mt-auto flex items-center gap-1.5 sm:gap-2 text-[8px] sm:text-[9px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-md px-2 sm:px-2.5 py-1.5"
                 >
                   <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  <span className="font-mono">Multivariable calculus · ∂z/∂x and ∂z/∂y computed analytically</span>
+                  <span className="font-mono">Fourier series · square wave approximation with 7 harmonics</span>
                 </div>
               </div>
 
@@ -912,7 +928,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 AI LIVE
               </div>
             </div>
-          </div>
+          </motion.div>
         </section>
 
         {/* Stats bar — one-shot count-up only, no infinite animations */}
@@ -925,7 +941,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-40px' }}
                 transition={{ duration: 0.4, delay: i * 0.08 }}
-                className="relative p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/10 backdrop-blur-md hover:border-white/20 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+                className="relative p-3 sm:p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/10 backdrop-blur-md hover:border-white/20 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
               >
                 <div className="flex items-center justify-between mb-2">
                   <stat.Icon className={`w-4 h-4 ${stat.color}`} />
@@ -944,8 +960,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* Subjects showcase */}
-        <section id="subjects" className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-          <div className="text-center space-y-2 max-w-2xl mx-auto mb-10">
+        <section id="subjects" className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
+          <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-10">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               Subjects
             </span>
@@ -955,7 +971,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <p className="text-sm text-slate-400">
               From Physics practicals to ICT programming — every experiment, organised.
             </p>
-          </div>
+          </ParallaxSectionHeading>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {displaySubjects.map((s, i) => (
@@ -987,12 +1003,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </section>
 
-        {/* Features — 5 cards, no scanner */}
+        {/* Features — 4 cards (Progress Tracking removed) */}
         <section
           id="features"
-          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
+          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
-          <div className="text-center space-y-3 max-w-2xl mx-auto mb-12">
+          <ParallaxSectionHeading className="text-center space-y-3 max-w-2xl mx-auto mb-12">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               Features
             </span>
@@ -1000,19 +1016,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Built for the 2026 HSC practical exam
             </h2>
             <p className="text-sm text-slate-400">
-              Five tools that replace the chaos of paper notebooks and guesswork — with one
+              Four tools that replace the chaos of paper notebooks and guesswork — with one
               verified workflow.
             </p>
-          </div>
+          </ParallaxSectionHeading>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {FEATURES.map((f, i) => (
               <motion.div
                 key={f.title}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-40px' }}
-                transition={{ duration: 0.4, delay: (i % 3) * 0.08 }}
+                transition={{ duration: 0.4, delay: (i % 4) * 0.08 }}
                 className="group relative rounded-2xl p-[1px] bg-gradient-to-br from-white/10 via-white/5 to-transparent hover:from-cyan-500/40 hover:to-indigo-500/40 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
               >
                 <div className="relative rounded-2xl bg-slate-950/70 backdrop-blur-md p-6 h-full flex flex-col gap-3">
@@ -1040,19 +1056,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* How it works — 3-step timeline with CSS-keyframe flowing dashed line */}
         <section
           id="how-it-works"
-          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
+          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
-          <div className="text-center space-y-2 max-w-2xl mx-auto mb-12">
+          <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-12">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               How it works
             </span>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
               Three steps to a perfect notebook
             </h2>
-          </div>
+          </ParallaxSectionHeading>
 
           <div className="relative grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4">
-            {/* Flowing dashed connector (desktop only) — CSS keyframes, not framer-motion */}
+            {/* Flowing dashed connector (desktop only) — CSS keyframes */}
             <svg
               aria-hidden
               className="hidden md:block absolute top-7 left-[16.66%] right-[16.66%] h-px w-[66.66%]"
@@ -1096,10 +1112,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* Announcements — keep existing logic, no infinite per-card animations */}
         <section
           id="announcements"
-          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
+          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
           <div id="bulletin_announcements_section" className="space-y-10">
-            <div className="text-center md:text-left space-y-2">
+            <ParallaxSectionHeading className="text-center md:text-left space-y-2">
               <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-indigo-400 font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" />
                 Notice board
@@ -1111,7 +1127,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Recent circulars, schedule adjustments, and bulletin notices published live by senior
                 administrators.
               </p>
-            </div>
+            </ParallaxSectionHeading>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {announcements && announcements.length > 0 ? (
@@ -1167,10 +1183,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </section>
 
-        {/* Marketplace highlight — buttons now both call onEnter */}
+        {/* Marketplace highlight — "Browse Marketplace" now uses onBrowseMarketplace */}
         <section
           id="marketplace"
-          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
+          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1213,7 +1229,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={onEnter}
+                  onClick={onBrowseMarketplace}
                   className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-semibold tracking-wide rounded-xl hover:-translate-y-0.5 cursor-pointer min-h-[48px] transition-all"
                 >
                   Browse Marketplace
@@ -1223,19 +1239,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </motion.div>
         </section>
 
-        {/* FAQ — accordion with 4 items (no scanner question) */}
+        {/* FAQ — accordion with 4 items */}
         <section
           id="faq"
-          className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24 border-t border-white/[0.06]"
+          className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
-          <div className="text-center space-y-2 max-w-2xl mx-auto mb-10">
+          <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-10">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               FAQ
             </span>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
               Frequently asked questions
             </h2>
-          </div>
+          </ParallaxSectionHeading>
 
           <div className="space-y-3">
             {FAQ_ITEMS.map((item, i) => {
@@ -1298,16 +1314,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* Final CTA */}
         <section
           id="final-cta"
-          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 md:py-24"
+          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24"
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.97 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: '-80px' }}
             transition={{ duration: 0.6 }}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-8 sm:p-12 md:p-16 text-center"
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-6 sm:p-8 md:p-12 lg:p-16 text-center"
           >
-            {/* Static decorative dot pattern (no infinite animation) */}
+            {/* Static decorative dot pattern */}
             <div
               aria-hidden
               className="absolute inset-0 opacity-25 pointer-events-none"
@@ -1338,7 +1354,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <button
                   id="cta_final_btn"
                   onClick={heroCtaOnClick}
-                  className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-xl bg-white text-slate-900 font-bold text-sm tracking-wide shadow-2xl hover:bg-slate-100 hover:-translate-y-0.5 transition-all cursor-pointer min-h-[48px]"
+                  className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-xl bg-white text-slate-900 font-bold text-sm tracking-wide shadow-2xl hover:bg-slate-100 hover:-translate-y-0.5 transition-all cursor-pointer min-h-[48px] w-full sm:w-auto"
                 >
                   {isAuthenticated ? (
                     <Layout className="w-4 h-4" />
@@ -1387,7 +1403,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <h4 className="text-[11px] text-slate-300 font-bold uppercase tracking-wider font-mono">
               Quick links
             </h4>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-2 text-xs sm:text-sm">
               {NAV_LINKS.map((l) => (
                 <li key={l.href}>
                   <a
@@ -1407,21 +1423,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </h4>
             <a
               href="mailto:hello@pracpedia.bd"
-              className="flex items-center gap-2 text-sm text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px]"
+              className="flex items-center gap-2 text-xs sm:text-sm text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px]"
             >
               <Mail className="w-4 h-4" /> hello@pracpedia.bd
             </a>
             <button
               type="button"
               onClick={onEnter}
-              className="block text-sm text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px] text-left"
+              className="block text-xs sm:text-sm text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px] text-left"
             >
               Privacy
             </button>
             <button
               type="button"
               onClick={onEnter}
-              className="block text-sm text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px] text-left"
+              className="block text-xs sm:text-sm text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px] text-left"
             >
               Terms
             </button>
