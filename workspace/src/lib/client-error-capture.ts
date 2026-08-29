@@ -105,11 +105,70 @@ export function installErrorCapture(): void {
   if (installed || typeof window === 'undefined') return;
   installed = true;
 
+  // 0. CHUNK-LOAD-ERROR AUTO-RELOAD
+  // ─────────────────────────────────────────────────────────────────────────
+  // When the dev server restarts (e.g. after a session wipe), the OLD JS
+  // chunks (with their old hashes) are no longer on disk. The browser —
+  // which still has the OLD HTML cached from a previous visit — tries to
+  // load chunks by their old hashes, gets a 404/error, and the resulting
+  // ChunkLoadError prevents React from ever hydrating. The user sees a
+  // frozen loading screen forever.
+  //
+  // Fix: detect ChunkLoadError on the page and AUTO-RELOAD ONCE with cache
+  // busting. The reload fetches fresh HTML which references the NEW chunk
+  // hashes — they exist on disk, so React hydrates normally.
+  let chunkReloaded = false;
+  const handleChunkError = (msg: string): boolean => {
+    if (chunkReloaded) return false;
+    // Match both "ChunkLoadError" (the actual class name) and the common
+    // substrings it appears with in different bundlers/versions.
+    const isChunkError =
+      /ChunkLoadError/i.test(msg) ||
+      /Failed to load chunk/i.test(msg) ||
+      /Loading chunk .+ failed/i.test(msg) ||
+      /Loading CSS chunk .+ failed/i.test(msg);
+    if (!isChunkError) return false;
+    chunkReloaded = true;
+    // Append a cache-bust query so the reload doesn't reuse the stale HTML
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('__chunk_retry', String(Date.now()));
+      window.location.replace(url.toString());
+    } catch {
+      window.location.reload();
+    }
+    return true;
+  };
+  // ChunkLoadError usually surfaces as an unhandled promise rejection
+  // (dynamic import()) but can also throw synchronously during HMR.
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason;
+    const msg =
+      reason instanceof Error ? `${reason.name}: ${reason.message}` :
+      typeof reason === 'string' ? reason :
+      (() => { try { return JSON.stringify(reason); } catch { return String(reason); } })();
+    if (handleChunkError(msg)) {
+      // Prevent the rejection from also being reported as a regular error
+      event.preventDefault();
+    }
+  });
+  // Also catch synchronous script-load failures (e.g., a <script src="..."> 404)
+  window.addEventListener('error', (event) => {
+    // The `event.error` may be null for cross-origin script failures, but the
+    // `event.message` is usually "Failed to load a dynamic import" or similar.
+    const candidate = `${event.message || ''} ${event.error?.name || ''} ${event.error?.message || ''}`;
+    if (handleChunkError(candidate)) {
+      event.preventDefault();
+    }
+  }, true); // capture phase so we see script-load errors before the page
+
   // 1. Synchronous runtime errors
   window.addEventListener('error', (event) => {
     // Skip cross-origin script errors — they only give "Script error." with no
     // stack, so reporting them is noise.
     if (event.message === 'Script error.' && !event.filename) return;
+    // Skip ChunkLoadError — already handled above with auto-reload
+    if (event.error?.name === 'ChunkLoadError' || /ChunkLoadError|Failed to load chunk/i.test(event.message || '')) return;
     reportError({
       type: 'window_error',
       message: event.message || '(no message)',
@@ -128,6 +187,8 @@ export function installErrorCapture(): void {
       typeof reason === 'string' ? reason :
       (() => { try { return JSON.stringify(reason); } catch { return String(reason); } })();
     const stack = reason instanceof Error ? reason.stack || '' : '';
+    // Skip ChunkLoadError — already handled above with auto-reload
+    if (reason?.name === 'ChunkLoadError' || /ChunkLoadError|Failed to load chunk/i.test(message || '')) return;
     reportError({
       type: 'unhandledrejection',
       message: message || '(unhandled rejection)',

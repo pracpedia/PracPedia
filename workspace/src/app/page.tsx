@@ -2805,7 +2805,14 @@ function PortalConsole() {
 export default function Home() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [viewAuth, setViewAuth] = useState(false);
+  // Initial mode for the AuthPage when it's shown — 'login' (default) or
+  // 'register' (when triggered from a "Sign up to do X" prompt on the landing).
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [landingBanner, setLandingBanner] = useState<any>(null);
+  // Local fallback so the loading screen NEVER gets stuck even if AuthContext
+  // hangs (e.g., dev server HMR restart mid-fetch, or an unreadable stale
+  // localStorage entry).
+  const [forceLoaded, setForceLoaded] = useState(false);
 
   // Fetch banner config for landing page (public, no auth needed)
   useEffect(() => {
@@ -2815,14 +2822,55 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
+  // Safety timeout — force-load after 4s no matter what (covers the case
+  // where the JS bundle DID load but AuthContext's fetch is hanging).
+  useEffect(() => {
+    if (!isLoading) return;
+    const t = setTimeout(() => setForceLoaded(true), 4000);
+    return () => clearTimeout(t);
+  }, [isLoading]);
+
   // Suppress unused-warning for `user` — referenced to keep the hook contract explicit.
   void user;
 
-  if (isLoading) {
+  if (isLoading && !forceLoaded) {
     return (
-      <div className="fixed inset-0 bg-[#020617] flex flex-col items-center justify-center gap-4 text-slate-300 font-sans p-4 z-50">
+      <div
+        id="pracpedia-initial-loader"
+        className="fixed inset-0 bg-[#020617] flex flex-col items-center justify-center gap-4 text-slate-300 font-sans p-4 z-50"
+      >
         <div className="w-10 h-10 rounded-full border-t-2 border-b-2 border-cyan-400 animate-spin" />
         <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500 text-center">Loading PracPedia…</p>
+        {/* SSR-level safety net — runs even if React fails to hydrate
+            (e.g., after a dev server restart when the old JS chunks are
+            no longer on disk → ChunkLoadError prevents hydration).
+            After 6 seconds of no hydration, force a cache-busted reload
+            so the browser fetches fresh HTML with current chunk URLs. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                if (typeof window === 'undefined') return;
+                setTimeout(function() {
+                  // If React hydrated, the #pracpedia-initial-loader div would
+                  // be gone. If it's still in the DOM after 6s, the JS bundle
+                  // failed to load — force a cache-busted reload.
+                  var loaderStillVisible = !!document.getElementById('pracpedia-initial-loader');
+                  if (!loaderStillVisible) return;
+                  if (window.__pracpedia_chunk_retry__) return;
+                  window.__pracpedia_chunk_retry__ = true;
+                  try {
+                    var u = new URL(window.location.href);
+                    u.searchParams.set('__chunk_retry', String(Date.now()));
+                    window.location.replace(u.toString());
+                  } catch (e) {
+                    window.location.reload();
+                  }
+                }, 6000);
+              })();
+            `,
+          }}
+        />
       </div>
     );
   }
@@ -2834,6 +2882,7 @@ export default function Home() {
   if (viewAuth && !isAuthenticated) {
     return (
       <AuthPage
+        initialMode={authMode}
         onSuccess={() => {
           setViewAuth(false);
         }}
@@ -2849,6 +2898,36 @@ export default function Home() {
           // Already authenticated (e.g. silent refresh) — no-op, the outer branch will render PortalConsole.
           return;
         }
+        setAuthMode('login');
+        setViewAuth(true);
+      }}
+      onRegister={() => {
+        // Triggered by the marketplace "Hire" registration prompt — starts in
+        // register mode instead of login mode.
+        if (isAuthenticated) return;
+        setAuthMode('register');
+        setViewAuth(true);
+      }}
+      onSignIn={() => {
+        // Same as onEnter — opens AuthPage in login mode.
+        if (isAuthenticated) return;
+        setAuthMode('login');
+        setViewAuth(true);
+      }}
+      onBrowseMarketplace={() => {
+        // Browse without registration — goes straight to the dashboard's
+        // marketplace view. We pre-set the localStorage value so when
+        // PortalConsole mounts, it opens directly to 'artists' (the marketplace).
+        // If the user isn't authenticated, they hit AuthPage first; after they
+        // log in, PortalConsole will read the localStorage value and open to
+        // the marketplace.
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem('app_current_view', 'artists');
+          } catch { /* ignore */ }
+        }
+        if (isAuthenticated) return;
+        setAuthMode('login');
         setViewAuth(true);
       }}
       isAuthenticated={isAuthenticated}
@@ -2857,6 +2936,7 @@ export default function Home() {
         if (isAuthenticated) {
           return;
         }
+        setAuthMode('login');
         setViewAuth(true);
       }}
       subjects={[]}
