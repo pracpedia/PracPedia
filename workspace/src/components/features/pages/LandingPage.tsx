@@ -304,7 +304,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     // advances.
     // ─────────────────────────────────────────────────────────────────────────
 
-    const FOURIER_SCALE = 16;       // px per unit of amplitude
+    const FOURIER_SCALE = 36;       // px per unit of amplitude (large enough to see)
     const FOURIER_OMEGA_BASE = 1.4; // rad/s for the base frequency (k=1)
     const WAVE_SAMPLES = 120;       // polyline resolution
     const WAVE_WINDOW = 6;         // seconds of waveform visible on the right
@@ -840,7 +840,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       y2="152"
                       stroke="#1e293b"
                       strokeDasharray="2 2"
-                      strokeWidth="0.4"
+                      strokeWidth="0.8"
                     />
 
                     {/* Center marker for the epicycle system */}
@@ -851,10 +851,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       ref={waveformRef}
                       fill="none"
                       stroke="#e0f2fe"
-                      strokeWidth="0.9"
+                      strokeWidth="1.5"
                       strokeLinejoin="round"
                       strokeLinecap="round"
-                      opacity="0.92"
+                      opacity="0.95"
                     />
 
                     {/* 7 epicycles — each circle + its radius line, populated each frame */}
@@ -862,16 +862,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       <g key={`h${k}`}>
                         <circle
                           ref={(el) => { circleRefs.current[i] = el; }}
-                          r={HARMONIC_AMPS[i] * 16}
-                          fill="none"
+                          r={HARMONIC_AMPS[i] * 36}
+                          fill={CIRCLE_COLORS[i]}
+                          fillOpacity="0.05"
                           stroke={CIRCLE_COLORS[i]}
-                          strokeWidth="0.5"
-                          strokeOpacity="0.7"
+                          strokeWidth="1.5"
+                          strokeOpacity="0.8"
                         />
                         <line
                           ref={(el) => { lineRefs.current[i] = el; }}
                           stroke={CIRCLE_COLORS[i]}
-                          strokeWidth="0.7"
+                          strokeWidth="1.2"
                           strokeOpacity="0.95"
                         />
                       </g>
@@ -881,13 +882,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     <line
                       ref={trailLineRef}
                       stroke="#fbbf24"
-                      strokeWidth="0.6"
+                      strokeWidth="1.0"
                       strokeDasharray="1.5 1.5"
                       strokeOpacity="0.85"
                     />
 
                     {/* Tip marker (last epicycle tip) */}
-                    <circle ref={tipRef} r="1.8" fill="#fde68a" stroke="#fbbf24" strokeWidth="0.4" />
+                    <circle ref={tipRef} r="3" fill="#fde68a" stroke="#fbbf24" strokeWidth="1" />
                   </svg>
 
                   {/* Live readout — top-right corner */}
