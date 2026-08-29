@@ -435,10 +435,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       // Floating math glyphs (∑ π ω ƒ) drift on unique Lissajous paths.
       const glyphConfigs = [
-        { xAmp: 12, yAmp: -14, xDur: 3.1, yDur: 4.3 },
-        { xAmp: -14, yAmp: 10, xDur: 3.7, yDur: 4.9 },
-        { xAmp: 8, yAmp: -10, xDur: 2.6, yDur: 3.4 },
-        { xAmp: -10, yAmp: -8, xDur: 4.1, yDur: 5.2 },
+        { xAmp: 12, yAmp: -14, xDur: 2.0, yDur: 2.8 },
+        { xAmp: -14, yAmp: 10, xDur: 2.4, yDur: 3.2 },
+        { xAmp: 8, yAmp: -10, xDur: 1.7, yDur: 2.2 },
+        { xAmp: -10, yAmp: -8, xDur: 2.7, yDur: 3.5 },
       ];
       glyphConfigs.forEach((cfg, i) => {
         const el = glyphRefs.current[i];

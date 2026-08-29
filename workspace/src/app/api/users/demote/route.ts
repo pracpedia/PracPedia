@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { isPlatformOwner } from '@/lib/platform-owner';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest) {
     if (!u) {
       return NextResponse.json({ error: 'User not found.' }, { status: 404 });
     }
+    // Platform owners cannot be demoted by anyone
+    if (isPlatformOwner(u.email)) {
+      return NextResponse.json({ error: 'Platform owner cannot be demoted.' }, { status: 403 });
+    }
     // Super admins cannot be demoted by regular admins
     if (u.role === 'super_admin' && requester.role !== 'super_admin') {
       return NextResponse.json({ error: 'Super admin role is protected.' }, { status: 403 });
@@ -30,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
     const updated = await db.user.update({
       where: { id: u.id },
-      data: { role: 'user' },
+      data: { role: 'user', permissionsJson: '[]' },
     });
     return NextResponse.json({ message: `Demoted ${updated.email}.`, userId: updated.id });
   } catch (err: any) {

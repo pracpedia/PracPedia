@@ -8,6 +8,10 @@ export async function GET(request: NextRequest) {
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // Only admins/super_admins can list other admins (prevents phishing target lists)
+    if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Admin only.' }, { status: 403 });
+    }
     // Return both admin and super_admin role users
     const admins = await db.user.findMany({
       where: {

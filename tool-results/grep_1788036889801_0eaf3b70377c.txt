@@ -1,0 +1,253 @@
+/home/z/my-project/workspace/src/app/admin/login/page.tsx:40:      const res = await fetch('/api/auth/login', {
+/home/z/my-project/workspace/src/app/api/settings/landing/route.ts:6: * GET /api/settings/landing
+/home/z/my-project/workspace/src/app/api/settings/landing/route.ts:10: *   - useCustomCount: boolean (false = fetch real user count from /api/stats)
+/home/z/my-project/workspace/src/app/api/settings/landing/route.ts:33:    console.error('GET /api/settings/landing error:', err);
+/home/z/my-project/workspace/src/app/api/settings/landing/route.ts:39: * PUT /api/settings/landing
+/home/z/my-project/workspace/src/app/api/settings/landing/route.ts:80:    console.error('PUT /api/settings/landing error:', err);
+/home/z/my-project/workspace/src/app/api/settings/banner/route.ts:6: * GET /api/settings/banner
+/home/z/my-project/workspace/src/app/api/settings/banner/route.ts:34:    console.error('GET /api/settings/banner error:', err);
+/home/z/my-project/workspace/src/app/api/settings/banner/route.ts:40: * PUT /api/settings/banner
+/home/z/my-project/workspace/src/app/api/settings/banner/route.ts:75:    console.error('PUT /api/settings/banner error:', err);
+/home/z/my-project/workspace/src/app/api/stats/route.ts:39:    console.error('GET /api/stats error:', err);
+/home/z/my-project/workspace/src/app/api/academy/cq/route.ts:58:    console.error('POST /api/academy/cq error:', err);
+/home/z/my-project/workspace/src/app/api/academy/mcq/route.ts:60:    console.error('POST /api/academy/mcq error:', err);
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:142:        'POST /api/auth/login',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:143:        'POST /api/auth/register',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:144:        'GET  /api/auth/me',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:145:        'POST /api/auth/track-time',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:146:        'GET  /api/subjects',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:147:        'POST /api/subjects',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:148:        'GET  /api/folders',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:149:        'POST /api/folders',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:150:        'GET  /api/announcements',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:151:        'POST /api/announcements',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:152:        'GET  /api/stats',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:153:        'POST /api/images',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:154:        'DELETE /api/images/[folderId]/[imgIndex]',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:155:        'GET  /api/users/admins',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:156:        'GET  /api/users/super-admins',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:157:        'GET  /api/users/students',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:158:        'POST /api/users/promote',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:159:        'POST /api/users/demote',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:160:        'POST /api/users/promote-super',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:161:        'GET  /api/users/scare-status',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:162:        'POST /api/users/clear-scare',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:163:        'POST /api/users/clear-cat',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:164:        'GET  /api/chat',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:165:        'POST /api/chat',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:166:        'DELETE /api/chat?id=...',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:167:        'GET  /api/chat/[subjectId]',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:168:        'GET  /api/hire',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:169:        'POST /api/hire',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:170:        'PUT  /api/profile',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:171:        'GET  /api/bookings?scope=client|artist',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:172:        'POST /api/bookings',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:173:        'GET  /api/bookings/[id]',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:174:        'PUT  /api/bookings/[id]',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:175:        'DELETE /api/bookings/[id]',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:176:        'POST /api/bookings/[id]/rate',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:177:        'GET  /api/portfolio?artistId=...',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:178:        'POST /api/portfolio',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:179:        'DELETE /api/portfolio/[id]',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:180:        'GET  /api/artists',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:181:        'GET  /api/artists/[id]',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:182:        'POST /api/artists/register',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:183:        'PUT  /api/artists/register',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:184:        'GET  /api/credentials (super admin + test-mode flag)',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:185:        'POST /api/academy/lesson',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:186:        'POST /api/academy/chat',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:187:        'POST /api/academy/mcq',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:188:        'POST /api/academy/cq',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:189:        'GET  /api/health',
+/home/z/my-project/workspace/src/app/api/credentials/route.ts:193:    console.error('GET /api/credentials error:', err);
+/home/z/my-project/workspace/src/app/api/academy/chat/route.ts:55:    console.error('POST /api/academy/chat error:', err);
+/home/z/my-project/workspace/src/app/api/academy/lesson/route.ts:64:    console.error('POST /api/academy/lesson error:', err);
+/home/z/my-project/workspace/src/app/api/health/route.ts:17: *   - Docker: HEALTHCHECK CMD curl -f http://localhost:3000/api/health || exit 1
+/home/z/my-project/workspace/src/app/api/health/route.ts:19: *   - UptimeRobot: monitor https://yourapp.com/api/health
+/home/z/my-project/workspace/src/app/api/subjects/route.ts:12:    console.error('GET /api/subjects error:', err);
+/home/z/my-project/workspace/src/app/api/subjects/route.ts:33:    console.error('POST /api/subjects error:', err);
+/home/z/my-project/workspace/src/app/api/subjects/[id]/route.ts:33:    console.error('PUT /api/subjects/[id] error:', err);
+/home/z/my-project/workspace/src/app/api/subjects/[id]/route.ts:48:    console.error('DELETE /api/subjects/[id] error:', err);
+/home/z/my-project/workspace/src/app/api/activity-log/route.ts:6: * GET /api/activity-log
+/home/z/my-project/workspace/src/app/api/activity-log/route.ts:62:    console.error('GET /api/activity-log error:', err);
+/home/z/my-project/workspace/src/app/api/images/route.ts:43:    console.error('POST /api/images error:', err);
+/home/z/my-project/workspace/src/app/api/auth/google/route.ts:13: * The standard /api/auth/register endpoint blocks Gmail addresses (test-mode
+/home/z/my-project/workspace/src/app/api/images/upload-file/route.ts:9: * Returns the URL so the client can then call POST /api/images (with folderId
+/home/z/my-project/workspace/src/app/api/images/upload-file/route.ts:42:    console.error('POST /api/images/upload-file error:', err);
+/home/z/my-project/workspace/src/app/api/auth/me/route.ts:44:    console.error('GET /api/auth/me error:', err);
+/home/z/my-project/workspace/src/app/api/images/[folderId]/[imgIndex]/route.ts:41:    console.error('DELETE /api/images/[folderId]/[imgIndex] error:', err);
+/home/z/my-project/workspace/src/app/api/bookings/route.ts:48:    console.error('GET /api/bookings error:', err);
+/home/z/my-project/workspace/src/app/api/bookings/route.ts:127:    console.error('POST /api/bookings error:', err);
+/home/z/my-project/workspace/src/app/api/profile/route.ts:50:    console.error('PUT /api/profile error:', err);
+/home/z/my-project/workspace/src/app/api/folders/route.ts:19:    console.error('GET /api/folders error:', err);
+/home/z/my-project/workspace/src/app/api/folders/route.ts:52:    console.error('POST /api/folders error:', err);
+/home/z/my-project/workspace/src/app/api/folders/[id]/route.ts:47:    console.error('PUT /api/folders/[id] error:', err);
+/home/z/my-project/workspace/src/app/api/folders/[id]/route.ts:62:    console.error('DELETE /api/folders/[id] error:', err);
+/home/z/my-project/workspace/src/app/api/bookings/[id]/route.ts:149:    console.error('PUT /api/bookings/[id] error:', err);
+/home/z/my-project/workspace/src/app/api/bookings/[id]/route.ts:190:    console.error('DELETE /api/bookings/[id] error:', err);
+/home/z/my-project/workspace/src/app/api/error-log/route.ts:140:    console.error('GET /api/error-log error:', err);
+/home/z/my-project/workspace/src/app/api/bookings/[id]/rate/route.ts:6: * POST /api/bookings/[id]/rate
+/home/z/my-project/workspace/src/app/api/bookings/[id]/rate/route.ts:91:    console.error('POST /api/bookings/[id]/rate error:', err);
+/home/z/my-project/workspace/src/app/api/portfolio/route.ts:28:    console.error('GET /api/portfolio error:', err);
+/home/z/my-project/workspace/src/app/api/portfolio/route.ts:73:    console.error('POST /api/portfolio error:', err);
+/home/z/my-project/workspace/src/app/api/users/recharge-trial/route.ts:28:    console.error('POST /api/users/recharge-trial error:', err);
+/home/z/my-project/workspace/src/app/api/users/permissions/route.ts:8: * GET /api/users/permissions
+/home/z/my-project/workspace/src/app/api/users/permissions/route.ts:36:    console.error('GET /api/users/permissions error:', err);
+/home/z/my-project/workspace/src/app/api/users/permissions/route.ts:42: * PUT /api/users/permissions
+/home/z/my-project/workspace/src/app/api/users/permissions/route.ts:94:    console.error('PUT /api/users/permissions error:', err);
+/home/z/my-project/workspace/src/app/api/portfolio/[id]/route.ts:26:    console.error('DELETE /api/portfolio/[id] error:', err);
+/home/z/my-project/workspace/src/app/api/users/students/route.ts:28:    console.error('GET /api/users/students error:', err);
+/home/z/my-project/workspace/src/app/api/users/admins/route.ts:29:    console.error('GET /api/users/admins error:', err);
+/home/z/my-project/workspace/src/app/api/users/promote-super/route.ts:34:    console.error('POST /api/users/promote-super error:', err);
+/home/z/my-project/workspace/src/app/api/chat/route.ts:16:    // Long-polling mode (kept for backward compat — prefer /api/chat/general)
+/home/z/my-project/workspace/src/app/api/chat/route.ts:51:    console.error('GET /api/chat error:', err);
+/home/z/my-project/workspace/src/app/api/chat/route.ts:96:    console.error('POST /api/chat error:', err);
+/home/z/my-project/workspace/src/app/api/chat/route.ts:122:    console.error('DELETE /api/chat error:', err);
+/home/z/my-project/workspace/src/app/api/users/resign/route.ts:53:    console.error('POST /api/users/resign error:', err);
+/home/z/my-project/workspace/src/app/api/users/promote/route.ts:40:    console.error('POST /api/users/promote error:', err);
+/home/z/my-project/workspace/src/app/api/chat/[subjectId]/route.ts:6: * GET /api/chat/[subjectId]
+/home/z/my-project/workspace/src/app/api/chat/[subjectId]/route.ts:84:    console.error('GET /api/chat/[subjectId] error:', err);
+/home/z/my-project/workspace/src/app/api/users/super-admins/route.ts:19:    console.error('GET /api/users/super-admins error:', err);
+/home/z/my-project/workspace/src/app/api/hire/route.ts:14:    console.error('GET /api/hire error:', err);
+/home/z/my-project/workspace/src/app/api/hire/route.ts:37:    console.error('POST /api/hire error:', err);
+/home/z/my-project/workspace/src/app/api/users/demote/route.ts:37:    console.error('POST /api/users/demote error:', err);
+/home/z/my-project/workspace/src/app/api/announcements/route.ts:6: * GET /api/announcements
+/home/z/my-project/workspace/src/app/api/announcements/route.ts:38:    console.error('GET /api/announcements error:', err);
+/home/z/my-project/workspace/src/app/api/announcements/route.ts:44: * POST /api/announcements
+/home/z/my-project/workspace/src/app/api/announcements/route.ts:95:    console.error('POST /api/announcements error:', err);
+/home/z/my-project/workspace/src/app/page.tsx:410:        const res = await apiFetch('/api/auth/track-time', {
+/home/z/my-project/workspace/src/app/page.tsx:440:      const subRes = await apiFetch('/api/subjects');
+/home/z/my-project/workspace/src/app/page.tsx:445:      const fRes = await apiFetch('/api/folders');
+/home/z/my-project/workspace/src/app/page.tsx:451:        const annRes = await apiFetch('/api/announcements');
+/home/z/my-project/workspace/src/app/page.tsx:462:        const bannerRes = await fetch('/api/settings/banner');
+/home/z/my-project/workspace/src/app/page.tsx:472:        const admRes = await apiFetch('/api/users/admins');
+/home/z/my-project/workspace/src/app/page.tsx:482:      const statRes = await apiFetch('/api/stats');
+/home/z/my-project/workspace/src/app/page.tsx:489:          const studRes = await apiFetch('/api/users/students');
+/home/z/my-project/workspace/src/app/page.tsx:871:        const res = await apiFetch('/api/users/scare-status');
+/home/z/my-project/workspace/src/app/page.tsx:878:            await apiFetch('/api/users/clear-scare', { method: 'POST' });
+/home/z/my-project/workspace/src/app/page.tsx:904:            await apiFetch('/api/users/clear-cat', { method: 'POST' });
+/home/z/my-project/workspace/src/app/page.tsx:1072:        const res = await apiFetch(`/api/folders/${editFolderData.id}`, {
+/home/z/my-project/workspace/src/app/page.tsx:1083:        const res = await apiFetch('/api/folders', {
+/home/z/my-project/workspace/src/app/page.tsx:1103:      const res = await apiFetch(`/api/folders/${id}`, {
+/home/z/my-project/workspace/src/app/page.tsx:1128:      const res = await apiFetch('/api/users/promote', {
+/home/z/my-project/workspace/src/app/page.tsx:1167:      const res = await apiFetch('/api/announcements', {
+/home/z/my-project/workspace/src/app/page.tsx:1207:      const res = await apiFetch(`/api/announcements/${id}`, {
+/home/z/my-project/workspace/src/app/page.tsx:1233:      const res = await apiFetch('/api/images', {
+/home/z/my-project/workspace/src/app/page.tsx:1256:      const res = await apiFetch(`/api/images/${selectedFolderId}/${imgIndex}`, {
+/home/z/my-project/workspace/src/app/page.tsx:1996:                                              const res = await apiFetch(`/api/subjects/${sub.id}`, { method: 'DELETE' });
+/home/z/my-project/workspace/src/app/page.tsx:2825:    fetch('/api/settings/banner')
+/home/z/my-project/workspace/src/app/api/announcements/[id]/route.ts:15:    console.error('DELETE /api/announcements/[id] error:', err);
+/home/z/my-project/workspace/src/contexts/AuthContext.tsx:72:        const res = await fetch('/api/auth/me', {
+/home/z/my-project/workspace/src/contexts/AuthContext.tsx:179:        const res = await apiFetch('/api/auth/track-time', {
+/home/z/my-project/workspace/src/app/api/artists/route.ts:14:    console.error('GET /api/artists error:', err);
+/home/z/my-project/workspace/src/components/features/Lightbox.tsx:65:      const res = await apiFetch('/api/users/recharge-trial', {
+/home/z/my-project/workspace/src/components/features/Lightbox.tsx:144:      const res = await apiFetch('/api/scan/analyze-page', {
+/home/z/my-project/workspace/src/components/features/Lightbox.tsx:187:      const res = await apiFetch('/api/scan/analyze-page', {
+/home/z/my-project/workspace/src/components/features/GeminiKeyModal.tsx:54:      const res = await fetch('/api/health', {
+/home/z/my-project/workspace/src/components/features/Sidebar.tsx:154:                        const res = await apiFetch('/api/users/resign', {
+/home/z/my-project/workspace/src/app/api/artists/register/route.ts:17:    // Gmail addresses must use the /api/auth/google endpoint, not this one.
+/home/z/my-project/workspace/src/app/api/artists/register/route.ts:56:    console.error('POST /api/artists/register error:', err);
+/home/z/my-project/workspace/src/app/api/artists/register/route.ts:88:    console.error('PUT /api/artists/register error:', err);
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:11: * Plus a prominent availability toggle (PUT /api/profile) and a 4-tile stats
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:1355:      const res = await apiFetch('/api/bookings?scope=artist');
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:1384:      const res = await apiFetch('/api/portfolio');
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:1502:        const res = await apiFetch(`/api/bookings/${id}`, {
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:1551:        const res = await apiFetch(`/api/bookings/${booking.id}`, {
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:1579:        const res = await apiFetch(`/api/bookings/${id}`, {
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:1614:        const res = await apiFetch(`/api/bookings/${id}`, {
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:1654:        const res = await apiFetch('/api/portfolio', {
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:1688:        const res = await apiFetch(`/api/portfolio/${item.id}`, {
+/home/z/my-project/workspace/src/components/features/pages/ArtistDashboard.tsx:1714:        const res = await apiFetch('/api/profile', {
+/home/z/my-project/workspace/src/components/features/pages/AuthPage.tsx:148:      const res = await apiFetch('/api/auth/google', {
+/home/z/my-project/workspace/src/components/features/pages/AuthPage.tsx:204:        const res = await apiFetch('/api/auth/login', {
+/home/z/my-project/workspace/src/components/features/pages/AuthPage.tsx:230:        const endpoint = authType === 'artist' ? '/api/artists/register' : '/api/auth/register';
+/home/z/my-project/workspace/src/app/api/scan/detect-corners/route.ts:82:    console.error('POST /api/scan/detect-corners error:', err);
+/home/z/my-project/workspace/src/components/features/pages/ProfilePage.tsx:18: * attached. PUT /api/profile returns `{ token, user }` and we call
+/home/z/my-project/workspace/src/components/features/pages/ProfilePage.tsx:1254:      const res = await apiFetch(`/api/bookings/${bookingId}/rate`, {
+/home/z/my-project/workspace/src/components/features/pages/ProfilePage.tsx:1773:      const res = await apiFetch('/api/portfolio');
+/home/z/my-project/workspace/src/components/features/pages/ProfilePage.tsx:1796:      const res = await apiFetch('/api/bookings?scope=client');
+/home/z/my-project/workspace/src/components/features/pages/ProfilePage.tsx:1838:      const res = await apiFetch('/api/profile', {
+/home/z/my-project/workspace/src/components/features/pages/ProfilePage.tsx:1880:      const res = await apiFetch('/api/profile', {
+/home/z/my-project/workspace/src/components/features/pages/ProfilePage.tsx:1906:      const res = await apiFetch('/api/profile', {
+/home/z/my-project/workspace/src/components/features/pages/ArtistsPage.tsx:7: * lightbox, and a 5-step booking modal that POSTs to /api/bookings.
+/home/z/my-project/workspace/src/components/features/pages/ArtistsPage.tsx:1072:      const res = await apiFetch('/api/bookings', {
+/home/z/my-project/workspace/src/components/features/pages/ArtistsPage.tsx:1601:        const res = await fetch('/api/artists');
+/home/z/my-project/workspace/src/components/features/pages/ArtistsPage.tsx:1611:        // /api/artists/[id] endpoint. This populates the mini-grid thumbnails
+/home/z/my-project/workspace/src/components/features/pages/ArtistsPage.tsx:1617:                const r = await fetch(`/api/artists/${a.id}`);
+/home/z/my-project/workspace/src/components/features/pages/ArtistsPage.tsx:1729:        const r = await fetch(`/api/artists/${artist.id}`);
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:196:    if (lower.startsWith('/api/auth')) key = 'auth';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:197:    else if (lower.startsWith('/api/subjects')) key = 'subjects';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:198:    else if (lower.startsWith('/api/folders')) key = 'folders';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:199:    else if (lower.startsWith('/api/images')) key = 'images';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:200:    else if (lower.startsWith('/api/announcements')) key = 'announcements';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:201:    else if (lower.startsWith('/api/users')) key = 'users';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:202:    else if (lower.startsWith('/api/bookings')) key = 'bookings';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:203:    else if (lower.startsWith('/api/portfolio')) key = 'portfolio';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:204:    else if (lower.startsWith('/api/artists')) key = 'artists';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:205:    else if (lower.startsWith('/api/chat')) key = 'chat';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:206:    else if (lower.startsWith('/api/hire')) key = 'hire';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:207:    else if (lower.startsWith('/api/profile')) key = 'profile';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:208:    else if (lower.startsWith('/api/academy')) key = 'academy';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:209:    else if (lower.startsWith('/api/credentials')) key = 'credentials';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:210:    else if (lower.startsWith('/api/stats')) key = 'stats';
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:281:      const res = await apiFetch('/api/credentials');
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:317:          const res = await apiFetch('/api/credentials');
+/home/z/my-project/workspace/src/components/features/pages/CredentialsView.tsx:413:            If you believe this is an error, please contact the platform owner (the first super admin) and request elevation via <code className="px-1.5 py-0.5 bg-slate-900 rounded text-cyan-300 font-mono">POST /api/users/promote-super</code>.
+/home/z/my-project/workspace/src/components/features/pages/PublicMarketplace.tsx:5: * marketplace. Fetches `/api/artists` (a public GET endpoint that requires
+/home/z/my-project/workspace/src/components/features/pages/PublicMarketplace.tsx:98:    fetch('/api/artists')
+/home/z/my-project/workspace/src/app/api/scan/analyze-page/route.ts:95:    console.error('POST /api/scan/analyze-page error:', err);
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:192:      const res = await apiFetch('/api/activity-log?limit=100');
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:212:        const res = await apiFetch('/api/activity-log?limit=100');
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:392:/* ── Bug Monitor Tab — shows recent client-side errors reported via /api/error-log ── */
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:421:      const res = await apiFetch('/api/error-log?limit=100');
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:628:        const res = await fetch('/api/settings/banner');
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:641:      const res = await apiFetch('/api/settings/banner', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:763:          fetch('/api/settings/landing'),
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:764:          fetch('/api/stats'),
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:788:      const res = await apiFetch('/api/settings/landing', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:947:      const res = await apiFetch('/api/users/students');
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:959:      const res = await apiFetch('/api/users/super-admins');
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:971:      const res = await apiFetch('/api/bookings');
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1025:        const res = await apiFetch(`/api/subjects/${editingSubject.id}`, {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1040:        const res = await apiFetch('/api/subjects', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1065:      const res = await apiFetch(`/api/subjects/${subject.id}`, { method: 'DELETE' });
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1108:        const res = await apiFetch(`/api/folders/${editingFolder.id}`, {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1122:        const res = await apiFetch('/api/folders', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1151:      const res = await apiFetch(`/api/folders/${folder.id}`, { method: 'DELETE' });
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1180:        const uploadRes = await apiFetch('/api/images/upload-file', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1208:      const res = await apiFetch('/api/images', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1240:      const res = await apiFetch(`/api/images/${folderId}/${imageIndex}`, { method: 'DELETE' });
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1263:      const res = await apiFetch('/api/users/promote', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1292:      const res = await apiFetch('/api/users/promote-super', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1318:      const res = await apiFetch('/api/users/promote-super', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1358:      const res = await apiFetch('/api/announcements', {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1417:      const res = await apiFetch(`/api/announcements/${id}`, { method: 'DELETE' });
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1441:      const res = await apiFetch(`/api/bookings/${bookingId}`, {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1468:      const res = await apiFetch(`/api/bookings/${bookingId}`, {
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:1518:  // Filtered Users — adminsList is the union of admin + super_admin per the /api/users/admins route.
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:2375:                  <p className="text-xs text-slate-400 mt-1 break-words">Platform owners with full system access. Fetched live from /api/users/super-admins.</p>
+/home/z/my-project/workspace/src/components/features/pages/AdminCmsPage.tsx:2619:                                const res = await apiFetch('/api/users/demote', {
+/home/z/my-project/workspace/src/components/features/ClassroomDiscussion.tsx:96:      // Always use /api/chat/[subjectId] — 'general' maps to global (null subjectId)
+/home/z/my-project/workspace/src/components/features/ClassroomDiscussion.tsx:97:      const endpoint = `/api/chat/${subjId}` + (since ? `?since=${encodeURIComponent(since)}` : '');
+/home/z/my-project/workspace/src/components/features/ClassroomDiscussion.tsx:179:      // Next.js /api/chat expects { text, subjectId, imageUrl } — pass null for general lounge
+/home/z/my-project/workspace/src/components/features/ClassroomDiscussion.tsx:181:      const res = await apiFetch('/api/chat', {
+/home/z/my-project/workspace/src/components/features/ClassroomDiscussion.tsx:238:      // Next.js /api/chat delete via ?id= query param
+/home/z/my-project/workspace/src/components/features/ClassroomDiscussion.tsx:239:      const res = await apiFetch(`/api/chat?id=${msgId}`, {
+/home/z/my-project/workspace/src/components/features/UploadModal.tsx:162:      const res = await apiFetch('/api/scan/detect-corners', {
+/home/z/my-project/workspace/src/components/features/UploadModal.tsx:373:      const uploadRes = await apiFetch('/api/images/upload-file', {
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:604:      const res = await apiFetch('/api/users/recharge-trial', {
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:634:        const res = await apiFetch('/api/subjects');
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:987:      // Remap original /api/academy/learn call to mode-specific Next.js academy endpoints:
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:988:      //   concept            -> POST /api/academy/lesson  { prompt, subject, topic, language } -> { content }
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:989:      //   mcq                -> POST /api/academy/mcq      { subject, topic, count, language }  -> { questions: [...] }
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:990:      //   creative_question  -> POST /api/academy/cq       { subject, topic, question, language } -> { content }
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:991:      let endpoint = '/api/academy/lesson';
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:1000:        endpoint = '/api/academy/mcq';
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:1008:        endpoint = '/api/academy/cq';
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:1098:      // Remap original /api/academy/learn (mode=ask_ai) to Next.js /api/academy/chat
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:1099:      //   POST /api/academy/chat { prompt, subject, language } -> { content }
+/home/z/my-project/workspace/src/components/features/AiAcademyRoom.tsx:1100:      const res = await apiFetch('/api/academy/chat', {
+/home/z/my-project/workspace/src/components/features/ErrorBoundary/ErrorBoundary.tsx:22: *   1. Reports it to /api/error-log (with type='react_error')
+/home/z/my-project/workspace/src/lib/client-error-capture.ts:13: * Reports to /api/error-log with a small payload. Debounced per (message+stack)
+/home/z/my-project/workspace/src/lib/client-error-capture.ts:21:const REPORT_URL = '/api/error-log';
+/home/z/my-project/workspace/src/lib/test-mode.ts:4: * When PRACPEDIA_TEST_PASSWORDS_VISIBLE=true, the /api/credentials endpoint

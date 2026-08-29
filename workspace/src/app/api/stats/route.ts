@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getUserFromRequest } from '@/lib/auth';
 
-export async function GET(_req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
+    // Public-safe subset (no auth needed): subjects, folders, artists, announcements
     const subjects = await db.subject.count();
     const folders = await db.folder.count();
-    const users = await db.user.count();
-    const announcements = await db.announcement.count();
-    const bookings = await db.booking.count();
     const artists = await db.user.count({ where: { role: 'artist' } });
-    const portfolioItems = await db.portfolioItem.count();
-    const chatMessages = await db.chatMessage.count();
-    const hireRequests = await db.hireRequest.count();
+    const announcements = await db.announcement.count();
+
+    // Sensitive counts — only returned to authenticated users
+    const payload = await getUserFromRequest(request);
+    const users = payload ? await db.user.count() : 0;
+    const bookings = payload ? await db.booking.count() : 0;
+    const portfolioItems = payload ? await db.portfolioItem.count() : 0;
+    const chatMessages = payload ? await db.chatMessage.count() : 0;
+    const hireRequests = payload ? await db.hireRequest.count() : 0;
 
     // Count images stored inside folder.imagesJson
     const allFolders = await db.folder.findMany({ select: { imagesJson: true } });

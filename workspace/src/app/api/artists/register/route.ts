@@ -3,10 +3,23 @@ import { db } from '@/lib/db';
 import { signToken, getUserFromRequest } from '@/lib/auth';
 import { serializeUser } from '@/lib/user-serializer';
 import { shouldBlockEmail, GMAIL_BLOCK_ERROR } from '@/lib/gmail-check';
+import { registerLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Artist registration with two-tier pricing and portfolio setup
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 3 registrations / 10 minutes / IP
+    const ip = getClientIp(request);
+    const rl = registerLimiter.check(ip);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many registration attempts. Please try again later.' },
+        { status: 429, headers: rateLimitHeaders(rl) }
+      );
+    }
+
     const body = await request.json();
     const { email, password, name, phoneNumber, profilePic, bio, rateDrawingOnly, rateDrawingWriting, notebookCost, specialties, isAvailable } = body;
 
@@ -14,8 +27,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
     }
 
+    // Email format validation
+    if (!EMAIL_RE.test(String(email))) {
+      return NextResponse.json({ error: 'Please provide a valid email address.' }, { status: 400 });
+    }
+
+    // Password strength: minimum 4 characters (test mode)
+    if (String(password).length < 4) {
+      return NextResponse.json({ error: 'Password must be at least 4 characters long.' }, { status: 400 });
+    }
+
     // Gmail addresses must use the /api/auth/google endpoint, not this one.
-    // This keeps artist registration consistent with the standard student form.
     if (shouldBlockEmail(String(email))) {
       return NextResponse.json({ error: GMAIL_BLOCK_ERROR }, { status: 403 });
     }
