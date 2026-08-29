@@ -818,7 +818,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* The scene card itself — GSAP entrance */}
             <div
               ref={sceneRef}
-              className="relative rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 shadow-2xl shadow-cyan-950/40 overflow-hidden"
+              className="relative aspect-[4/5] rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 shadow-2xl shadow-cyan-950/40 overflow-hidden"
             >
               <div className="absolute inset-0 p-3 sm:p-4 flex flex-col gap-2 sm:gap-3">
                 <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-slate-500">
