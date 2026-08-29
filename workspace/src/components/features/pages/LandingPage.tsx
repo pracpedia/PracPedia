@@ -179,13 +179,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  /* GSAP refs for the 3D gradient-descent animation */
+  /* GSAP refs for the 3D calculus surface animation */
   const sceneRef = useRef<HTMLDivElement>(null);
   const paraboloidRef = useRef<SVGGElement>(null);
-  const ballRef = useRef<SVGGElement>(null);
-  const trailRef = useRef<SVGGElement>(null);
-  const lossLabelRef = useRef<HTMLSpanElement>(null);
-  const stepLabelRef = useRef<HTMLSpanElement>(null);
+  const evalMarkerRef = useRef<SVGGElement>(null);
+  const axesRef = useRef<SVGGElement>(null);
+  const evalLabelRef = useRef<HTMLSpanElement>(null);
+  const evalValueRef = useRef<HTMLSpanElement>(null);
   const stepRowsRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
   const glyphRefs = useRef<Array<HTMLSpanElement | null>>([null, null, null, null]);
@@ -200,7 +200,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => window.removeEventListener('keydown', handler);
   }, [mobileNavOpen]);
 
-  /* GSAP-animated 3D gradient descent — entrance + looping animations */
+  /* GSAP-animated 3D multivariable calculus surface — infinite rotation + eval cycling */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const prefersReduced =
@@ -211,286 +211,216 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     const timelines: gsap.core.Timeline[] = [];
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Gradient descent trajectory: a ball rolling down a paraboloid bowl.
-    // We model the loss as L(x,y) = x² + y² (perfect circular bowl) and
-    // run gradient descent: θ ← θ − η ∇L  with η = 0.35 and a touch of momentum
-    // for a smooth, organic path. The trajectory is projected from 3D
-    // (x, y, L) into 2D screen coords using an orthographic projection tilted
-    // by 30° around the X axis — that's what makes it look 3D.
+    // Multivariable calculus surface:
+    //   z = sin(√(x²+y²)) · cos(x·y) / (1 + (x²+y²)/8)
+    // This has ripples, saddle behavior, and damping — a visually complex
+    // surface that's a classic multivariable calculus example.
     // ─────────────────────────────────────────────────────────────────────────
-
-    // Build a list of descent steps in 3D space, then project to 2D.
-    type Step = { x: number; y: number; loss: number };
-
-    const start: Step = { x: 2.6, y: 1.8, loss: 0 }; // start near the rim
-    // Compute initial loss (L = x² + y²)
-    start.loss = start.x * start.x + start.y * start.y;
-
-    const steps: Step[] = [start];
-    const lr = 0.35; // learning rate
-    const momentum = 0.55; // momentum coefficient for smooth path
-    let vx = 0;
-    let vy = 0;
-    let cur = { ...start };
-    for (let i = 0; i < 9; i++) {
-      // ∇L = (2x, 2y)
-      const gx = 2 * cur.x;
-      const gy = 2 * cur.y;
-      vx = momentum * vx - lr * gx;
-      vy = momentum * vy - lr * gy;
-      cur = {
-        x: cur.x + vx,
-        y: cur.y + vy,
-        loss: 0,
-      };
-      cur.loss = cur.x * cur.x + cur.y * cur.y;
-      steps.push({ ...cur });
+    function calcSurface(x: number, y: number): number {
+      const r = Math.sqrt(x * x + y * y);
+      const ripple = Math.sin(r);
+      const cross = Math.cos(x * y);
+      const damping = 1 + (x * x + y * y) / 8;
+      return (ripple * cross) / damping;
     }
-    // Force the last step to land near (0, 0) — gradient descent converges
-    steps[steps.length - 1] = { x: 0.02, y: 0.01, loss: 0.0005 };
 
-    // ── Project a 3D point (x, y, loss) to 2D screen coordinates ──
-    // We rotate around the X axis by 30° (tilt the bowl toward the viewer):
-    //   y' = y·cos(θ) - z·sin(θ)
-    //   z' = y·sin(θ) + z·cos(θ)   (unused — we drop z' for orthographic)
-    // Then map the math grid (-3..3 x, -3..3 y) onto the SVG canvas
-    // (0..240, 0..160), with the paraboloid's lowest point at the centre.
+    // 5 evaluation points to cycle through — visually interesting spots
+    const evalPoints: Array<{ x: number; y: number; label: string }> = [
+      { x: 0, y: 0, label: 'f(0, 0)' },
+      { x: 1.5, y: 1.0, label: 'f(1.5, 1.0)' },
+      { x: -1.2, y: 0.8, label: 'f(-1.2, 0.8)' },
+      { x: 2.0, y: -1.5, label: 'f(2.0, -1.5)' },
+      { x: -2.0, y: -1.0, label: 'f(-2.0, -1.0)' },
+    ];
+
+    // ── 3D projection with Z-axis rotation + X-axis tilt oscillation ──
     const SVG_W = 240;
     const SVG_H = 160;
     const CX = SVG_W / 2;
-    const CY = SVG_H / 2 + 12; // a bit below center, to give tilt room
-    const SCALE = 22; // px per math unit
-    const TILT = Math.PI / 6; // 30°
+    const CY = SVG_H / 2 + 8;
+    const SCALE = 26; // px per math unit
+    const TILT_BASE = Math.PI / 6; // 30° base tilt
+    const Z_SCALE = 30; // px of elevation per z unit
 
-    // Loss height for visual projection — we exaggerate it so the bowl has depth
-    const LOSS_SCALE = 5; // px of "elevation" per loss unit
+    const rotation = { angle: 0, tilt: 0 };
 
-    function project(x: number, y: number, loss: number) {
-      // Standard tilt: positive z (high loss) goes UP on screen (because SVG y
-      // is inverted, we subtract).
-      const z = loss * LOSS_SCALE;
-      const yTilted = y * Math.cos(TILT) - z * Math.sin(TILT);
-      // Map (x, yTilted) → SVG pixels
-      return {
-        x: CX + x * SCALE,
-        y: CY - yTilted * SCALE,
-      };
+    function project(x: number, y: number, z: number, rotZ: number, tilt: number) {
+      // Rotate (x, y) around Z axis
+      const cosR = Math.cos(rotZ);
+      const sinR = Math.sin(rotZ);
+      const xR = x * cosR - y * sinR;
+      const yR = x * sinR + y * cosR;
+      // Tilt around X axis
+      const totalTilt = TILT_BASE + tilt;
+      const zPx = z * Z_SCALE;
+      const yTilted = yR * Math.cos(totalTilt) - zPx * Math.sin(totalTilt);
+      const zPrime = yR * Math.sin(totalTilt) + zPx * Math.cos(totalTilt);
+      return { x: CX + xR * SCALE, y: CY - yTilted * SCALE, depth: zPrime };
     }
 
-    // ── Pre-render trail dots — they'll fade in during entrance ──
-    if (trailRef.current) {
-      // Clear existing dots
-      while (trailRef.current.firstChild) trailRef.current.removeChild(trailRef.current.firstChild);
-      steps.forEach((s, i) => {
-        if (i === 0 || i === steps.length - 1) return; // skip start & final (final is the ball's home)
-        const p = project(s.x, s.y, s.loss);
-        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        dot.setAttribute('cx', String(p.x));
-        dot.setAttribute('cy', String(p.y));
-        dot.setAttribute('r', String(1.5 + i * 0.1));
-        dot.setAttribute('fill', '#22d3ee');
-        dot.setAttribute('opacity', '0.7');
-        trailRef.current!.appendChild(dot);
-      });
+    // ── Pre-compute wireframe sample points (math coords — static) ──
+    // 7 constant-x + 7 constant-y = 14 curves, each 30 samples
+    const wireframeCurves: Array<{ points: Array<{ x: number; y: number; z: number }>; axis: 'x' | 'y' }> = [];
+    const fixedValues = [-2, -1.33, -0.67, 0, 0.67, 1.33, 2];
+    fixedValues.forEach((fixed) => {
+      const pts: Array<{ x: number; y: number; z: number }> = [];
+      for (let i = 0; i <= 30; i++) {
+        const t = -2.5 + (5.0 * i) / 30;
+        const xx = fixed;
+        const yy = t;
+        pts.push({ x: xx, y: yy, z: calcSurface(xx, yy) });
+      }
+      wireframeCurves.push({ points: pts, axis: 'x' });
+    });
+    fixedValues.forEach((fixed) => {
+      const pts: Array<{ x: number; y: number; z: number }> = [];
+      for (let i = 0; i <= 30; i++) {
+        const t = -2.5 + (5.0 * i) / 30;
+        const xx = t;
+        const yy = fixed;
+        pts.push({ x: xx, y: yy, z: calcSurface(xx, yy) });
+      }
+      wireframeCurves.push({ points: pts, axis: 'y' });
+    });
+
+    // ── Re-project everything at the current rotation ──
+    let currentEvalIdx = 0;
+    function renderAtRotation(rotZ: number, tilt: number, evalIdx: number) {
+      // Wireframe curves
+      const pathEls = paraboloidRef.current?.querySelectorAll('path');
+      if (pathEls) {
+        wireframeCurves.forEach((curve, i) => {
+          const el = pathEls[i] as SVGPathElement | undefined;
+          if (!el) return;
+          let d = '';
+          let totalDepth = 0;
+          curve.points.forEach((p, j) => {
+            const sp = project(p.x, p.y, p.z, rotZ, tilt);
+            d += j === 0 ? `M${sp.x.toFixed(1)},${sp.y.toFixed(1)}` : ` L${sp.x.toFixed(1)},${sp.y.toFixed(1)}`;
+            totalDepth += sp.depth;
+          });
+          el.setAttribute('d', d);
+          const avgDepth = totalDepth / curve.points.length;
+          const normalizedDepth = Math.max(0, Math.min(1, (avgDepth + 40) / 80));
+          el.setAttribute('stroke-opacity', String((0.3 + 0.55 * (1 - normalizedDepth)).toFixed(2)));
+        });
+      }
+
+      // 3D coordinate system axes
+      if (axesRef.current) {
+        const origin = project(0, 0, 0, rotZ, tilt);
+        const xEnd = project(2.5, 0, 0, rotZ, tilt);
+        const yEnd = project(0, 2.5, 0, rotZ, tilt);
+        const zEnd = project(0, 0, 0.8, rotZ, tilt);
+        const axisLines = axesRef.current.querySelectorAll('.axis-line');
+        const axisLabels = axesRef.current.querySelectorAll('.axis-label');
+        const axisTicks = axesRef.current.querySelectorAll('.axis-tick');
+        if (axisLines.length >= 3) {
+          (axisLines[0] as SVGLineElement).setAttribute('x1', String(origin.x));
+          (axisLines[0] as SVGLineElement).setAttribute('y1', String(origin.y));
+          (axisLines[0] as SVGLineElement).setAttribute('x2', String(xEnd.x));
+          (axisLines[0] as SVGLineElement).setAttribute('y2', String(xEnd.y));
+          (axisLines[1] as SVGLineElement).setAttribute('x1', String(origin.x));
+          (axisLines[1] as SVGLineElement).setAttribute('y1', String(origin.y));
+          (axisLines[1] as SVGLineElement).setAttribute('x2', String(yEnd.x));
+          (axisLines[1] as SVGLineElement).setAttribute('y2', String(yEnd.y));
+          (axisLines[2] as SVGLineElement).setAttribute('x1', String(origin.x));
+          (axisLines[2] as SVGLineElement).setAttribute('y1', String(origin.y));
+          (axisLines[2] as SVGLineElement).setAttribute('x2', String(zEnd.x));
+          (axisLines[2] as SVGLineElement).setAttribute('y2', String(zEnd.y));
+        }
+        if (axisTicks.length >= 6) {
+          for (let i = 0; i < 2; i++) {
+            const tickX = project(i + 1, 0, 0, rotZ, tilt);
+            const tickY = project(0, i + 1, 0, rotZ, tilt);
+            const tickZ = project(0, 0, (i + 1) * 0.4, rotZ, tilt);
+            (axisTicks[i * 3] as SVGCircleElement).setAttribute('cx', String(tickX.x));
+            (axisTicks[i * 3] as SVGCircleElement).setAttribute('cy', String(tickY.y));
+            (axisTicks[i * 3 + 1] as SVGCircleElement).setAttribute('cx', String(tickY.x));
+            (axisTicks[i * 3 + 1] as SVGCircleElement).setAttribute('cy', String(tickY.y));
+            (axisTicks[i * 3 + 2] as SVGCircleElement).setAttribute('cx', String(tickZ.x));
+            (axisTicks[i * 3 + 2] as SVGCircleElement).setAttribute('cy', String(tickZ.y));
+          }
+        }
+        if (axisLabels.length >= 3) {
+          (axisLabels[0] as SVGTextElement).setAttribute('x', String(xEnd.x + 4));
+          (axisLabels[0] as SVGTextElement).setAttribute('y', String(xEnd.y + 2));
+          (axisLabels[1] as SVGTextElement).setAttribute('x', String(yEnd.x + 2));
+          (axisLabels[1] as SVGTextElement).setAttribute('y', String(yEnd.y + 8));
+          (axisLabels[2] as SVGTextElement).setAttribute('x', String(zEnd.x + 2));
+          (axisLabels[2] as SVGTextElement).setAttribute('y', String(zEnd.y - 2));
+        }
+      }
+
+      // Evaluation marker
+      if (evalMarkerRef.current) {
+        const pt = evalPoints[evalIdx];
+        const z = calcSurface(pt.x, pt.y);
+        const sp = project(pt.x, pt.y, z, rotZ, tilt);
+        evalMarkerRef.current.setAttribute('transform', `translate(${sp.x.toFixed(1)},${sp.y.toFixed(1)})`);
+        if (evalLabelRef.current) evalLabelRef.current.textContent = pt.label;
+        if (evalValueRef.current) evalValueRef.current.textContent = z.toFixed(3);
+      }
     }
 
-    // ── Initial ball position (at the starting step) ──
-    if (ballRef.current) {
-      const p = project(steps[0].x, steps[0].y, steps[0].loss);
-      gsap.set(ballRef.current, { x: p.x, y: p.y });
-    }
+    // ── Initial render ──
+    renderAtRotation(0, 0, 0);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Entrance timeline (one-shot)
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Entrance timeline (one-shot) ──
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
     timelines.push(tl);
-
-    // Scene fades + scales in
     if (sceneRef.current) {
-      tl.fromTo(
-        sceneRef.current,
-        { scale: 0.92, opacity: 0, y: 24 },
-        { scale: 1, opacity: 1, y: 0, duration: 0.7 },
-      );
+      tl.fromTo(sceneRef.current, { scale: 0.92, opacity: 0, y: 24 }, { scale: 1, opacity: 1, y: 0, duration: 0.7 });
     }
-
-    // Paraboloid contour lines draw themselves via strokeDashoffset
+    // Wireframe curves draw via strokeDashoffset
     if (paraboloidRef.current) {
-      const contourPaths = paraboloidRef.current.querySelectorAll('ellipse');
-      contourPaths.forEach((path, idx) => {
-        const len = (path as SVGEllipseElement).getTotalLength();
-        gsap.set(path as SVGEllipseElement, {
-          strokeDasharray: len,
-          strokeDashoffset: len,
-        });
-        tl.to(
-          path as SVGEllipseElement,
-          { strokeDashoffset: 0, duration: 0.6, ease: 'power2.inOut' },
-          idx * 0.08,
-        );
+      const pathEls = paraboloidRef.current.querySelectorAll('path');
+      pathEls.forEach((path, idx) => {
+        const len = (path as SVGPathElement).getTotalLength();
+        gsap.set(path as SVGPathElement, { strokeDasharray: len, strokeDashoffset: len });
+        tl.to(path as SVGPathElement, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' }, 0.3 + idx * 0.04);
+      });
+      tl.add(() => {
+        pathEls.forEach((path) => gsap.set(path as SVGPathElement, { strokeDasharray: 'none', strokeDashoffset: 0 }));
       });
     }
-
-    // Trail dots fade in
-    if (trailRef.current) {
-      tl.fromTo(
-        trailRef.current.children,
-        { opacity: 0, scale: 0.3 },
-        { opacity: 0.7, scale: 1, duration: 0.35, stagger: 0.06, ease: 'power2.out', svgOrigin: '50% 50%' },
-        '-=0.3',
-      );
+    // AI chip pops
+    if (chipRef.current) {
+      tl.fromTo(chipRef.current, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(1.7)' }, '-=0.1');
     }
-
     // Step rows slide in
     if (stepRowsRef.current) {
       const rows = gsap.utils.toArray<HTMLElement>(stepRowsRef.current.children);
-      tl.fromTo(
-        rows,
-        { opacity: 0, x: -10 },
-        { opacity: 1, x: 0, duration: 0.3, stagger: 0.08, ease: 'power2.out' },
-        '-=0.3',
-      );
+      tl.fromTo(rows, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.3, stagger: 0.06, ease: 'power2.out' }, '-=0.3');
     }
 
-    // AI chip pops
-    if (chipRef.current) {
-      tl.fromTo(
-        chipRef.current,
-        { scale: 0.6, opacity: 0 },
-        { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(1.7)' },
-        '-=0.1',
-      );
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Gradient descent ball drop — runs as part of the entrance timeline
-    // ─────────────────────────────────────────────────────────────────────────
-    if (ballRef.current && !prefersReduced) {
-      // Ball moves through each step position, with the loss label updating
-      const stepCount = steps.length;
-      const lossProxy = { val: steps[0].loss };
-      const stepProxy = { val: 0 };
-
-      // Add ball movement
-      steps.forEach((s, i) => {
-        if (i === 0) return; // skip the start, ball is already there
-        const p = project(s.x, s.y, s.loss);
-        tl.to(
-          ballRef.current!,
-          { x: p.x, y: p.y, duration: 0.45, ease: 'power1.inOut' },
-          0.7 + (i - 1) * 0.45,
-        );
-        // Update labels at each step
-        tl.to(
-          lossProxy,
-          {
-            val: s.loss,
-            duration: 0.45,
-            ease: 'none',
-            onUpdate: () => {
-              if (lossLabelRef.current) {
-                lossLabelRef.current.textContent = lossProxy.val.toFixed(3);
-              }
-            },
-          },
-          0.7 + (i - 1) * 0.45,
-        );
-        tl.to(
-          stepProxy,
-          {
-            val: i,
-            duration: 0.05,
-            ease: 'none',
-            onUpdate: () => {
-              if (stepLabelRef.current) {
-                stepLabelRef.current.textContent = String(Math.round(stepProxy.val));
-              }
-            },
-          },
-          0.7 + (i - 1) * 0.45,
-        );
-      });
-
-      // Pulse the ball at the minimum (scale bump)
-      tl.to(
-        ballRef.current!,
-        { scale: 1.5, duration: 0.25, ease: 'back.out(2)', transformOrigin: '50% 50%' },
-        0.7 + (stepCount - 1) * 0.45,
-      );
-      tl.to(
-        ballRef.current!,
-        { scale: 1.0, duration: 0.4, ease: 'power2.out' },
-        0.7 + (stepCount - 1) * 0.45 + 0.25,
-      );
-
-      tweens.push(tl as unknown as gsap.core.Tween);
-    }
-
-    if (prefersReduced) {
-      tl.progress(1);
-      // Position ball at minimum
-      if (ballRef.current) {
-        const p = project(steps[steps.length - 1].x, steps[steps.length - 1].y, steps[steps.length - 1].loss);
-        gsap.set(ballRef.current, { x: p.x, y: p.y });
-      }
-      if (lossLabelRef.current) lossLabelRef.current.textContent = '0.001';
-      if (stepLabelRef.current) stepLabelRef.current.textContent = String(steps.length - 1);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Loops (only if motion is allowed)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    // Loop 1: gentle 3D scene tilt (rotateY -3° ↔ 3°, 6s yoyo)
-    if (sceneRef.current && !prefersReduced) {
-      const turnTl = gsap.timeline({
-        repeat: -1,
-        yoyo: true,
-        delay: 1.5,
-        defaults: { ease: 'sine.inOut' },
-      });
-      turnTl.fromTo(
-        sceneRef.current,
-        { rotateY: -3 },
-        { rotateY: 3, duration: 6 },
-      );
-      timelines.push(turnTl);
-    }
-
-    // Loop 2: ball pulse at the minimum (subtle scale 1.0 ↔ 1.15)
-    if (ballRef.current && !prefersReduced) {
-      tweens.push(
-        gsap.to(ballRef.current, {
-          scale: 1.15,
-          duration: 1.8,
-          repeat: -1,
-          yoyo: true,
-          ease: 'sine.inOut',
-          transformOrigin: '50% 50%',
-          delay: 1.5,
-        }),
-      );
-    }
-
-    // Loop 3: paraboloid contour hue shift (cyan ↔ indigo, 4s yoyo)
-    if (paraboloidRef.current && !prefersReduced) {
-      const contourPaths = paraboloidRef.current.querySelectorAll('ellipse');
-      contourPaths.forEach((path, idx) => {
-        tweens.push(
-          gsap.to(path, {
-            stroke: '#818cf8',
-            duration: 4 + idx * 0.2,
-            repeat: -1,
-            yoyo: true,
-            ease: 'sine.inOut',
-          }),
-        );
-      });
-    }
-
-    // Loop 4: floating math glyphs (∇, η, ∂, θ) — Lissajous drift, each unique
+    // ── Infinite loops (only if motion is allowed) ──
     if (!prefersReduced) {
+      // Z-axis rotation: 360° per 12s
+      tweens.push(gsap.to(rotation, {
+        angle: Math.PI * 2, duration: 12, ease: 'none', repeat: -1,
+        onUpdate: () => renderAtRotation(rotation.angle, rotation.tilt, currentEvalIdx),
+      }));
+      // Tilt oscillation: ±10° per 6s yoyo
+      tweens.push(gsap.to(rotation, {
+        tilt: Math.PI / 18, duration: 6, ease: 'sine.inOut', repeat: -1, yoyo: true,
+      }));
+      // Eval point cycling: 5 points × 3.5s = 17.5s per full cycle
+      tweens.push(gsap.to({}, {
+        duration: 3.5, repeat: -1, ease: 'none',
+        onUpdate: () => {},
+        onRepeat: () => {
+          currentEvalIdx = (currentEvalIdx + 1) % evalPoints.length;
+          renderAtRotation(rotation.angle, rotation.tilt, currentEvalIdx);
+        },
+      }));
+      // Per-frame ticker for smooth rendering
+      const ticker = gsap.ticker.add(() => {
+        renderAtRotation(rotation.angle, rotation.tilt, currentEvalIdx);
+      });
+      tweens.push({ kill: () => gsap.ticker.remove(ticker) } as unknown as gsap.core.Tween);
+
+      // Floating math glyphs
       const glyphConfigs = [
         { xAmp: 12, yAmp: -14, xDur: 3.1, yDur: 4.3 },
         { xAmp: -14, yAmp: 10, xDur: 3.7, yDur: 4.9 },
@@ -500,25 +430,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       glyphConfigs.forEach((cfg, i) => {
         const el = glyphRefs.current[i];
         if (!el) return;
-        tweens.push(
-          gsap.to(el, {
-            x: cfg.xAmp,
-            duration: cfg.xDur,
-            repeat: -1,
-            yoyo: true,
-            ease: 'sine.inOut',
-          }),
-        );
-        tweens.push(
-          gsap.to(el, {
-            y: cfg.yAmp,
-            duration: cfg.yDur,
-            repeat: -1,
-            yoyo: true,
-            ease: 'sine.inOut',
-          }),
-        );
+        tweens.push(gsap.to(el, { x: cfg.xAmp, duration: cfg.xDur, repeat: -1, yoyo: true, ease: 'sine.inOut' }));
+        tweens.push(gsap.to(el, { y: cfg.yAmp, duration: cfg.yDur, repeat: -1, yoyo: true, ease: 'sine.inOut' }));
       });
+    }
+
+    if (prefersReduced) {
+      tl.progress(1);
+      renderAtRotation(0, 0, 0);
+      if (evalLabelRef.current) evalLabelRef.current.textContent = evalPoints[0].label;
+      if (evalValueRef.current) evalValueRef.current.textContent = calcSurface(evalPoints[0].x, evalPoints[0].y).toFixed(3);
     }
 
     return () => {
@@ -567,13 +488,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     { glyph: 'θ', className: 'absolute bottom-2 -left-1 text-emerald-300 text-xl sm:text-2xl lg:text-3xl' },
   ];
 
-  /* Gradient descent optimization rows for the data table */
+  /* Calculus evaluation points for the data table */
   const descentRows: Array<[string, string, string]> = [
-    ['Init', 'θ₀ = (2.6, 1.8)', '9.000'],
-    ['Step 1', 'η · ∇L', '4.095'],
-    ['Step 2', 'θ ← θ − η∇L', '1.494'],
-    ['Step 3', 'momentum update', '0.387'],
-    ['Converge', '‖∇L‖ < ε', '0.001'],
+    ['f(0, 0)', 'sin(0)·cos(0)/(1+0)', '0.000'],
+    ['f(1.5, 1)', 'sin(1.8)·cos(1.5)/1.5', '0.276'],
+    ['f(-1.2, 0.8)', 'sin(1.44)·cos(-0.96)/1.3', '0.318'],
+    ['f(2, -1.5)', 'sin(2.5)·cos(-3)/2.2', '0.051'],
+    ['f(-2, -1)', 'sin(2.24)·cos(2)/1.7', '0.139'],
   ];
 
   return (
@@ -894,99 +815,63 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               {/* Page content */}
               <div className="absolute inset-0 p-3 sm:p-4 flex flex-col gap-2 sm:gap-3">
                 <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-slate-500">
-                  <span>OPT-07 · GRADIENT DESCENT</span>
-                  <span className="text-cyan-400">3D · η = 0.35</span>
+                  <span>CALC · MULTIVARIABLE SURFACE</span>
+                  <span className="text-cyan-400">3D · infinite rotation</span>
                 </div>
                 <div className="text-[11px] sm:text-xs font-bold text-white">
-                  Gradient descent on L(θ) = x² + y²
+                  z = sin(√(x²+y²)) · cos(xy) / (1 + (x²+y²)/8)
                 </div>
 
-                {/* 3D paraboloid bowl + ball + trail — SVG scales fluidly */}
+                {/* 3D multivariable calculus surface — SVG scales fluidly */}
                 <div className="relative rounded-lg bg-slate-950/60 border border-white/5 p-1.5 sm:p-2 flex items-center justify-center overflow-hidden">
                   <svg viewBox="0 0 240 160" className="w-full h-auto" aria-hidden>
-                    {/* ── 3D paraboloid — concentric tilted ellipse contours ──
-                        Each contour is at a fixed loss level; the ellipse radii
-                        shrink with sqrt(loss) because L = x² + y². We tilt
-                        everything by 30° around the X axis (handled by the
-                        GSAP `project()` function in JS) and use SVG <ellipse>
-                        elements with their `cy` computed from the loss height. */}
+                    {/* ── 3D coordinate system: x, y, z axes from origin ── */}
+                    <g ref={axesRef}>
+                      <line className="axis-line" x1="0" y1="0" x2="0" y2="0" stroke="#22d3ee" strokeWidth="1.2" strokeOpacity="0.85" />
+                      <line className="axis-line" x1="0" y1="0" x2="0" y2="0" stroke="#818cf8" strokeWidth="1.2" strokeOpacity="0.85" />
+                      <line className="axis-line" x1="0" y1="0" x2="0" y2="0" stroke="#fbbf24" strokeWidth="1.2" strokeOpacity="0.85" />
+                      {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <circle key={`tick${i}`} className="axis-tick" cx="0" cy="0" r="1" fill="#475569" opacity="0.8" />
+                      ))}
+                      <text className="axis-label" x="0" y="0" fill="#22d3ee" fontSize="7" fontFamily="monospace" fontWeight="bold">x</text>
+                      <text className="axis-label" x="0" y="0" fill="#818cf8" fontSize="7" fontFamily="monospace" fontWeight="bold">y</text>
+                      <text className="axis-label" x="0" y="0" fill="#fbbf24" fontSize="7" fontFamily="monospace" fontWeight="bold">z</text>
+                    </g>
+
+                    {/* ── 3D wireframe mesh — 14 empty paths populated by GSAP each frame ── */}
                     <g ref={paraboloidRef}>
-                      {/* Contour levels: 0.4, 1.6, 3.6, 6.4, 10 (computed as 0.4·k² for k=1..5) */}
-                      {/* We project each contour: ellipse rx = scale * sqrt(loss), ry = scale * sqrt(loss) * cos(tilt) */}
-                      {/* cy is shifted UP by loss * LOSS_SCALE * sin(tilt) */}
-                      {(() => {
-                        const SCALE = 22;
-                        const TILT = Math.PI / 6;
-                        const LOSS_SCALE = 5;
-                        const CX = 120;
-                        const CY = 80 + 12;
-                        const levels = [10, 6.4, 3.6, 1.6, 0.4];
-                        const colors = ['#0e7490', '#0891b2', '#06b6d4', '#22d3ee', '#67e8f9'];
-                        return levels.map((loss, i) => {
-                          const r = Math.sqrt(loss);
-                          const rx = SCALE * r;
-                          // SVG y is inverted: low-loss contours are at the bottom (higher y on screen),
-                          // high-loss contours are at the top. We tilt the ellipse's center upward
-                          // by loss * LOSS_SCALE * sin(tilt) to fake 3D perspective.
-                          const elevationPx = loss * LOSS_SCALE * Math.sin(TILT);
-                          const cy = CY - elevationPx;
-                          // ry is the same as rx (circular bowl) but flattened by cos(tilt) on screen
-                          const ry = SCALE * r * Math.cos(TILT);
-                          return (
-                            <ellipse
-                              key={i}
-                              cx={CX}
-                              cy={cy}
-                              rx={rx}
-                              ry={ry}
-                              fill="none"
-                              stroke={colors[i]}
-                              strokeWidth={0.7}
-                              strokeOpacity={0.7 - i * 0.05}
-                            />
-                          );
-                        });
-                      })()}
+                      {Array.from({ length: 7 }).map((_, i) => (
+                        <path key={`x${i}`} d="" fill="none" stroke="#22d3ee" strokeWidth={0.7} strokeOpacity={0.55} strokeLinecap="round" strokeLinejoin="round" />
+                      ))}
+                      {Array.from({ length: 7 }).map((_, i) => (
+                        <path key={`y${i}`} d="" fill="none" stroke="#818cf8" strokeWidth={0.7} strokeOpacity={0.55} strokeLinecap="round" strokeLinejoin="round" />
+                      ))}
                     </g>
 
-                    {/* Minimum target marker — pulsing dot at the bowl's bottom */}
-                    <circle cx="120" cy="92" r="2" fill="#fbbf24" opacity="0.9" />
-                    <circle cx="120" cy="92" r="4" fill="none" stroke="#fbbf24" strokeWidth="0.5" opacity="0.5" />
-
-                    {/* Trail dots — populated by GSAP on mount */}
-                    <g ref={trailRef} />
-
-                    {/* Ball — the descent trajectory, GSAP-animated */}
-                    <g ref={ballRef}>
-                      {/* Soft glow around the ball */}
-                      <circle cx="0" cy="0" r="6" fill="#22d3ee" opacity="0.25" />
-                      <circle cx="0" cy="0" r="4" fill="#22d3ee" opacity="0.45" />
-                      {/* Ball core */}
-                      <circle cx="0" cy="0" r="2.5" fill="#67e8f9" stroke="#22d3ee" strokeWidth="0.5" />
+                    {/* Evaluation marker — positioned by GSAP each frame */}
+                    <g ref={evalMarkerRef}>
+                      <circle cx="0" cy="0" r="6" fill="#fbbf24" opacity="0.2" />
+                      <circle cx="0" cy="0" r="4" fill="#fbbf24" opacity="0.4" />
+                      <circle cx="0" cy="0" r="2.5" fill="#fde68a" stroke="#fbbf24" strokeWidth="0.5" />
                     </g>
-
-                    {/* Axes labels */}
-                    <text x="6" y="146" fill="#64748b" fontSize="6" fontFamily="monospace">θ₁</text>
-                    <text x="216" y="146" fill="#64748b" fontSize="6" fontFamily="monospace">θ₂</text>
-                    <text x="200" y="20" fill="#a78bfa" fontSize="7" fontFamily="monospace">L(θ)</text>
                   </svg>
 
-                  {/* Live readout — positioned over the SVG, top-right corner */}
+                  {/* Live readout — top-right corner */}
                   <div className="absolute top-2 right-2 sm:top-3 sm:right-3 px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/30 font-mono text-[7px] sm:text-[8px] text-cyan-300 leading-tight">
                     <div className="flex items-center gap-1">
                       <span className="inline-block w-1 h-1 bg-cyan-300 rounded-full animate-pulse" />
-                      <span>step <span ref={stepLabelRef}>0</span></span>
+                      <span ref={evalLabelRef}>f(0, 0)</span>
                     </div>
-                    <div>loss = <span ref={lossLabelRef}>9.000</span></div>
+                    <div>z = <span ref={evalValueRef}>0.000</span></div>
                   </div>
                 </div>
 
-                {/* Data table — gradient descent steps (rows slide in via GSAP) */}
+                {/* Data table — calculus evaluation points (rows slide in via GSAP) */}
                 <div className="rounded-lg border border-white/5 overflow-hidden text-[7px] sm:text-[8px] font-mono">
                   <div className="grid grid-cols-3 bg-slate-950/60 text-slate-400">
-                    <div className="px-1.5 sm:px-2 py-1 border-r border-white/5">Phase</div>
-                    <div className="px-1.5 sm:px-2 py-1 border-r border-white/5">Update</div>
-                    <div className="px-1.5 sm:px-2 py-1">Loss</div>
+                    <div className="px-1.5 sm:px-2 py-1 border-r border-white/5">Point</div>
+                    <div className="px-1.5 sm:px-2 py-1 border-r border-white/5">Expression</div>
+                    <div className="px-1.5 sm:px-2 py-1">Value</div>
                   </div>
                   <div ref={stepRowsRef}>
                     {descentRows.map((row, idx) => (
@@ -1014,7 +899,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   className="mt-auto flex items-center gap-1.5 sm:gap-2 text-[8px] sm:text-[9px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-md px-2 sm:px-2.5 py-1.5"
                 >
                   <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  <span className="font-mono">AI verified · converged in 9 steps</span>
+                  <span className="font-mono">Multivariable calculus · ∂z/∂x and ∂z/∂y computed analytically</span>
                 </div>
               </div>
 
