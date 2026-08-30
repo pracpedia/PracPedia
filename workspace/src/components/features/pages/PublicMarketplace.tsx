@@ -159,13 +159,9 @@ export const PublicMarketplace: React.FC<PublicMarketplaceProps> = ({ onRegister
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] sm:text-xs text-amber-300 bg-amber-400/10 border border-amber-400/20 px-2.5 py-1.5 rounded-full font-mono uppercase tracking-wider font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-              Public browse · no sign-up
-            </span>
             <button
               onClick={onRegister}
-              className="group inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-sm font-bold tracking-wide shadow-lg shadow-cyan-500/20 transition-all cursor-pointer min-h-[40px]"
+              className="group inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-sm font-bold tracking-wide shadow-lg shadow-cyan-500/20 transition-colors cursor-pointer min-h-[40px]"
             >
               <Sparkles className="w-4 h-4" />
               <span className="hidden sm:inline">Sign up free</span>
@@ -179,9 +175,6 @@ export const PublicMarketplace: React.FC<PublicMarketplaceProps> = ({ onRegister
       <main className="relative z-10 flex-1 flex flex-col max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 lg:py-16">
         {/* Heading */}
         <div className="space-y-3 mb-8 md:mb-10">
-          <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-amber-400 font-bold">
-            Marketplace · public preview
-          </span>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
             Browse our{' '}
             <span

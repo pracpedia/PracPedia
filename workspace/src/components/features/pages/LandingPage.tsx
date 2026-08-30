@@ -501,10 +501,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     // ── Infinite loops (only if motion is allowed) ──
     if (!prefersReduced) {
-      // Per-frame ticker driving the Fourier animation
-      const tickerFn = () => renderFrame(performance.now());
+      // Per-frame ticker driving the Fourier animation — but PAUSE when the
+      // card is scrolled off-screen to save CPU/battery on long pages.
+      let fourierVisible = true;
+      const fourierObserver = new IntersectionObserver(
+        (entries) => {
+          fourierVisible = entries[0]?.isIntersecting ?? false;
+        },
+        { threshold: 0.01 },
+      );
+      if (sceneRef.current) fourierObserver.observe(sceneRef.current);
+
+      const tickerFn = () => {
+        if (fourierVisible) renderFrame(performance.now());
+      };
       gsap.ticker.add(tickerFn);
-      tweens.push({ kill: () => gsap.ticker.remove(tickerFn) } as unknown as gsap.core.Tween);
+      tweens.push({
+        kill: () => {
+          gsap.ticker.remove(tickerFn);
+          fourierObserver.disconnect();
+        },
+      } as unknown as gsap.core.Tween);
 
       // Floating math glyphs (∑ π ω ƒ) drift on unique Lissajous paths.
       const glyphConfigs = [
@@ -679,7 +696,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   return (
     <div
       id="landing_page_container"
-      className="w-full min-h-screen text-slate-200 bg-[#060814] relative font-sans flex flex-col overflow-x-hidden scroll-smooth selection:bg-cyan-500/20 selection:text-cyan-300"
+      className="w-full min-h-screen text-slate-200 bg-[#060814] relative font-sans flex flex-col overflow-x-hidden selection:bg-cyan-500/20 selection:text-cyan-300"
     >
       {/* Ambient gradient orb — the only page-wide infinite CSS animation */}
       <div
