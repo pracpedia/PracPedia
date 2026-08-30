@@ -1129,15 +1129,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <span className="font-mono">Fourier series · square wave approximation with 7 harmonics</span>
                 </div>
               </div>
-
-              {/* Floating status indicator — static (no CSS pulse) */}
-              <div
-                aria-hidden
-                className="absolute right-2 sm:right-3 top-2 sm:top-3 flex items-center gap-1 text-[7px] sm:text-[8px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-full px-2 py-0.5"
-              >
-                <span className="inline-block w-1.5 h-1.5 bg-cyan-300 rounded-full" />
-                AI LIVE
-              </div>
             </div>
           </motion.div>
         </section>
