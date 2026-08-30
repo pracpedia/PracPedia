@@ -796,3 +796,86 @@ Stage Summary:
   * src/components/features/pages/LandingPage.tsx (full rewrite — 1457 lines, replaced calculus animation + parallax + mobile UI + props interface)
   * src/components/features/pages/PublicMarketplace.tsx (NEW — 380 lines, no-auth marketplace browse view with RegistrationPrompt modal)
   * src/app/page.tsx (added PublicMarketplace import + viewPublicMarketplace state + new conditional render branch + updated onBrowseMarketplace callback to use viewPublicMarketplace instead of setViewAuth)
+
+---
+Task ID: 22
+Agent: frontend-styling-expert
+Task: Redesign LandingPage cards + add GSAP SplitText/ScrollTrigger-free animations + fix landing page lag (replace 7 framer-motion whileInView observers + 9 backdrop-blur + 5 animate-pulse + 30 transition-all with a single GSAP IntersectionObserver batch reveal)
+
+Work Log:
+
+Issue 1 — Eliminated landing page lag sources (was 42 heavy animation declarations)
+- Replaced all 7 framer-motion `whileInView` entrance triggers (each creating its own IntersectionObserver) with ONE shared IntersectionObserver driving GSAP tweens for every `.gsap-reveal` element via `gsap.utils.toArray()`-style batch in a single useEffect
+- Removed 9 `backdrop-blur`/`backdrop-blur-md`/`backdrop-blur-sm` instances — kept ONLY `backdrop-blur-xl` on the sticky header (1 instance, the maximum allowed). All other cards / drawer / footer now use solid `bg-slate-950/80` (or existing `bg-[#060814]/80` for footer) — visually similar, 10× cheaper to render
+- Removed all 5 `animate-pulse` CSS classes (banner dot, live readout dot, AI LIVE chip, stats card dot, footer dot) — replaced with static solid dots since the CTA glows are now driven by GSAP yoyo pulses instead
+- Replaced every `transition-all` declaration (hero header CTA, hero CTA, Browse subjects, stats card, subject card + its ArrowRight, feature card, announcement card, marketplace consult + browse buttons, final CTA button) with specific `transition-colors` (for buttons with only bg/border hover) or `transition-transform` (for cards/buttons with hover translate)
+
+Issue 2 — GSAP SplitText char stagger on headings (ScrollTrigger-free)
+- Imported `SplitText` from `'gsap/SplitText'` (already in the gsap package at node_modules/gsap/SplitText.js — no new npm install)
+- Registered the plugin via `gsap.registerPlugin(SplitText)` inside the helper component
+- Added new helper `GsapHeading` (polymorphic `as: 'h1' | 'h2'`) that:
+  * Lazily creates a SplitText instance on first scroll-into-view via its own IntersectionObserver (`rootMargin: '-40px'`)
+  * Splits the heading into chars+words (`type: 'chars,words'`) and runs `gsap.from(split.chars, { opacity: 0, y: 8, duration: 0.3, stagger: 0.015, ease: 'power2.out' })`
+  * Stores the SplitText instance in a ref and calls `splitRef.current.revert()` on cleanup to restore the original innerHTML (avoids the user's spec'd `SplitText.revert(el)` static call which doesn't exist in the type defs)
+  * Adds `aria-label` to the heading automatically (SplitText sets it) so screen readers still read the full text while visible chars are `aria-hidden`
+- Replaced the hero `<motion.h1>` with `<GsapHeading as="h1">` — the gradient `<span>` (with `WebkitBackgroundClip: 'text'`, `WebkitTextFillColor: 'transparent'`) is preserved by SplitText; verified post-render that the gradient span still has `background: linear-gradient(...)` and `-webkit-text-fill-color: rgba(0,0,0,0)`
+- Replaced every section H2 (Subjects, Features, How it works, Announcements, FAQ) and the final CTA H2 with `<GsapHeading as="h2">`
+
+Issue 3 — Cards redesigned with GSAP entrance (one-shot, no infinite loops)
+- Added a single useEffect inside LandingPage that runs once after mount:
+  * Collects every `.gsap-reveal` element and every `.feature-card` element
+  * Creates a `cardObserver` (IntersectionObserver, rootMargin -40px) that runs `gsap.fromTo(target, {opacity:0, y:24}, {opacity:1, y:0, duration:0.5, ease:'power2.out', onComplete: () => target.style.willChange='auto'})` then unobserves
+  * Creates a separate `featureObserver` that, when the FIRST feature card intersects, batch-animates ALL feature cards at once with `gsap.fromTo(featureCards, {opacity:0, y:30}, {opacity:1, y:0, duration:0.5, stagger:0.08, ease:'power2.out', onComplete: () => featureCards.forEach(c => c.style.willChange='auto')})` then unobserves all
+  * Sets `will-change: opacity, transform` on every reveal element up-front (cleared via `onComplete` to avoid permanent GPU layer promotion)
+- Added `.gsap-reveal` class + `style={{opacity: 0}}` to: hero trust badge, hero subhead, hero CTAs container, hero mini trust row, every stats card, every subject card, every feature card (also gets `.feature-card`), every how-it-works step, every announcement card, the marketplace highlight, the final CTA container
+- Removed every `initial`/`whileInView`/`viewport`/`transition` prop from the cards/hero entrance reveals (the motion.div parallax wrappers, mobile drawer AnimatePresence panels, and FAQ accordion AnimatePresence panel still use framer-motion — these are interactive/exit animations, not entrance reveals)
+
+Issue 4 — Infinite GSAP animations on the final CTA (the only infinite loops alongside the Fourier ticker)
+- Added 3 refs: `ctaDotsRef`, `ctaGlow1Ref`, `ctaGlow2Ref` on the final CTA's dot pattern div + the two soft glow divs
+- Added a dedicated useEffect that registers 3 infinite tweens:
+  * `gsap.to(ctaDotsRef, { backgroundPosition: '24px 24px', duration: 2, repeat: -1, ease: 'none' })` — shifts the radial-gradient dot pattern by one tile size (24px) in a continuous loop, looks like the dots are scrolling diagonally
+  * `gsap.to(ctaGlow1Ref, { opacity: 0.4, duration: 3, repeat: -1, yoyo: true, ease: 'sine.inOut' })` — cyan glow opacity pulses 1 → 0.4 → 1 → ...
+  * `gsap.to(ctaGlow2Ref, { opacity: 0.4, duration: 4, repeat: -1, yoyo: true, ease: 'sine.inOut', delay: 1.5 })` — purple glow opacity pulses 1 → 0.4 → 1 → ..., offset by 1.5s from the cyan so they don't sync
+  * Cleanup kills all 3 tweens on unmount
+- Removed the misleading "Static" comments above these divs and replaced with "GSAP-animated" / "GSAP glow pulses (infinite yoyo)"
+
+Issue 5 — Simplified ParallaxSectionHeading (removed framer-motion dependency)
+- Replaced the framer-motion `useScroll({target: ref})` + `useTransform(scrollYProgress, [0,1], [40,-40])` + `<motion.div style={{y, willChange}}>` with a plain `<div ref>` driven by a manual scroll listener
+- The new implementation uses an rAF-throttled `scroll` listener that computes `progress = (rect.top + rect.height/2 - viewportH/2) / viewportH` (clamped to [-1, 1]) and sets `el.style.transform = translateY(-progress * 40px)` — equivalent math to the old useTransform but with zero framer-motion observer overhead per heading
+- Still gated by `isDesktop` (≥768px) — on mobile, the scroll listener is not attached and no transform is set (prevents the will-change:transform scroll jank that originally motivated the desktop-only gate)
+- Net effect: 5 ParallaxSectionHeading instances (Subjects, Features, How it works, Announcements, FAQ) no longer create 5 framer-motion useScroll targets + 5 useTransform subscriptions
+
+Issue 6 — Preserved everything that was working
+- Kept the Fourier series epicycle animation entirely untouched (GSAP ticker + 7 epicycles + waveform polyline + glyph Lissajous drifts + entrance timeline) — still the only other infinite animation besides the new CTA dots/glows
+- Kept the parallax `motion.div` wrappers for the bg grid (bgGridY), hero text column (heroTextY), and hero viz column (heroVizY) — these are desktop-only via the `isDesktop` check and `parallaxWillChange` constant, as before
+- Kept the `AnimatedStat` count-up component (uses `useInView` from framer-motion — that hook is cheap and the count-up is one-shot per stat)
+- Kept the `RegistrationPrompt` marketplace flow (PublicMarketplace.tsx, `onBrowseMarketplace` callback) — no changes to props or page.tsx
+- Kept the mobile drawer AnimatePresence (backdrop fade + drawer slide) and the FAQ accordion AnimatePresence (height animation) — these are conditional exit animations, not one-shot entrance reveals, so they stay on framer-motion
+- Kept the EXACT `LandingPageProps` interface, all section IDs (`landing_page_container`, `landing_header`, `landing_footer`, `hero`, `stats`, `subjects`, `features`, `marketplace`, `faq`, `final-cta`, `bulletin_announcements_section`, `cta_final_btn`, `cta_dashboard_btn`, `cta_authenticate_btn`, `stats_counter_banner`), all button onClick handlers, all content text, all icon imports
+- `'use client'` directive preserved at the top of the file
+
+Issue 7 — Performance audit verification (post-render)
+- DOM query counts after a fresh page load (via headless browser eval):
+  * `.gsap-reveal` elements: 22 (every card + every hero element + marketplace + CTA)
+  * `.feature-card` elements: 4 (exactly the 4 FEATURES)
+  * `.backdrop-blur-md` elements: 0 (all removed)
+  * `.backdrop-blur-xl` elements: 1 (sticky header only — the maximum allowed)
+  * `[class*="animate-pulse"]` elements: 0 (all removed)
+  * `[class*="transition-all"]` elements: 0 (all replaced with transition-colors / transition-transform)
+  * `<h2>` elements: 6 (Subjects, Features, How it works, Announcements, FAQ, final CTA — all GsapHeading)
+  * `<h1>` element: 1 (hero GsapHeading, gradient span preserved with -webkit-text-fill-color: transparent)
+
+Stage Summary:
+- Replaced 7 framer-motion whileInView IntersectionObservers with 1 shared IntersectionObserver (per card-reveal batch) + 1 dedicated IntersectionObserver for the feature-card staggered batch
+- Reduced backdrop-blur from 9 instances to 1 (sticky header only) — eliminates 8 expensive GPU compositing layers
+- Eliminated all 5 animate-pulse CSS keyframe animations
+- Replaced all transition-all with specific transition-colors/transition-transform (no more broad transition-property: all)
+- Added GSAP SplitText char stagger on the hero H1 + 6 section H2s (one-shot on scroll-into-view, reverted on unmount)
+- Added 3 infinite GSAP tweens on the final CTA (dots scroll loop + cyan glow yoyo + purple glow yoyo with 1.5s offset)
+- Removed framer-motion useScroll/useTransform from ParallaxSectionHeading (replaced with rAF-throttled scroll listener) — 5 fewer useScroll subscriptions
+- Fourier epicycle animation, parallax motion.div wrappers, AnimatedStat count-up, mobile drawer, FAQ accordion, RegistrationPrompt marketplace flow all preserved
+- ESLint: 0 errors, 0 warnings
+- HTTP 200 on `curl http://localhost:3000/`
+- No console errors in headless browser render
+- Files modified:
+  * src/components/features/pages/LandingPage.tsx (1633 lines — added SplitText import, added GsapHeading helper, simplified ParallaxSectionHeading, added CTA refs + 2 useEffects, converted 13 motion.* elements to plain elements with .gsap-reveal, replaced 7 H2s + 1 H1 with GsapHeading, removed 8 backdrop-blur + 5 animate-pulse + 11 transition-all)

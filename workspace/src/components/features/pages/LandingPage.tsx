@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useInView, useScroll, useTransform } from 'framer-motion';
 import { gsap } from 'gsap';
+import { SplitText } from 'gsap/SplitText';
 import {
   ShieldCheck,
   ArrowRight,
@@ -201,16 +202,14 @@ const AnimatedStat: React.FC<{ value: number; className?: string }> = ({ value, 
   return <span ref={ref} className={className}>{display}</span>;
 };
 
-/* ---------------- ParallaxSectionHeading (desktop only — prevents mobile scroll jank) ---------------- */
+/* ---------------- ParallaxSectionHeading (desktop only — GSAP scroll-linked transform, no framer-motion) ---------------- */
 
 const ParallaxSectionHeading: React.FC<{ children: React.ReactNode; className?: string }> = ({
   children,
   className,
 }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
-  const y = useTransform(scrollYProgress, [0, 1], [40, -40]);
-  // Only apply parallax on desktop — on mobile, will-change:transform causes scroll jank
+  // Only apply parallax on desktop — on mobile, scroll listeners + transforms cause scroll jank
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 768);
@@ -218,10 +217,79 @@ const ParallaxSectionHeading: React.FC<{ children: React.ReactNode; className?: 
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+  useEffect(() => {
+    if (!isDesktop) return;
+    const el = ref.current;
+    if (!el) return;
+    let raf = 0;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      const viewportH = window.innerHeight;
+      const center = rect.top + rect.height / 2 - viewportH / 2;
+      const progress = Math.max(-1, Math.min(1, center / viewportH));
+      el.style.transform = `translateY(${-progress * 40}px)`;
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, [isDesktop]);
   return (
-    <motion.div ref={ref} style={{ y: isDesktop ? y : 0, willChange: isDesktop ? 'transform' as const : undefined }} className={className}>
+    <div ref={ref} className={className}>
       {children}
-    </motion.div>
+    </div>
+  );
+};
+
+/* ---------------- GsapHeading (SplitText char stagger on scroll-in — one-shot) ---------------- */
+
+const GsapHeading: React.FC<{
+  as: 'h1' | 'h2';
+  children: React.ReactNode;
+  className?: string;
+}> = ({ as, children, className }) => {
+  const ref = useRef<HTMLHeadingElement>(null);
+  const splitRef = useRef<SplitText | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    gsap.registerPlugin(SplitText);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const split = new SplitText(el, { type: 'chars,words' });
+            splitRef.current = split;
+            gsap.from(split.chars, {
+              opacity: 0,
+              y: 8,
+              duration: 0.3,
+              stagger: 0.015,
+              ease: 'power2.out',
+            });
+            observer.unobserve(el);
+          }
+        });
+      },
+      { rootMargin: '-40px' },
+    );
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      if (splitRef.current) splitRef.current.revert();
+    };
+  }, []);
+  const Tag = as;
+  return (
+    <Tag ref={ref} className={className}>
+      {children}
+    </Tag>
   );
 };
 
@@ -254,6 +322,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const stepRowsRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
   const glyphRefs = useRef<Array<HTMLSpanElement | null>>([null, null, null, null]);
+
+  /* CTA dots + glow animation refs */
+  const ctaDotsRef = useRef<HTMLDivElement>(null);
+  const ctaGlow1Ref = useRef<HTMLDivElement>(null);
+  const ctaGlow2Ref = useRef<HTMLDivElement>(null);
 
   /* Parallax transforms — only on desktop (≥768px) to prevent mobile scroll jank.
      On mobile, will-change:transform + useScroll listeners cause the scroll to
@@ -459,6 +532,118 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     };
   }, []);
 
+  /* GSAP batch reveal — a single IntersectionObserver drives ALL .gsap-reveal cards
+     at once (replaces 7 framer-motion whileInView triggers + their observers).
+     Feature cards get a dedicated stagger entrance (when the first one intersects,
+     ALL feature cards animate together with stagger 0.08s). */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const reveals = Array.from(document.querySelectorAll<HTMLElement>('.gsap-reveal'));
+    const featureCards = Array.from(document.querySelectorAll<HTMLElement>('.feature-card'));
+
+    const cardObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            gsap.fromTo(
+              entry.target,
+              { opacity: 0, y: 24 },
+              {
+                opacity: 1,
+                y: 0,
+                duration: 0.5,
+                ease: 'power2.out',
+                onComplete: () => {
+                  (entry.target as HTMLElement).style.willChange = 'auto';
+                },
+              },
+            );
+            cardObserver.unobserve(entry.target);
+          }
+        });
+      },
+      { rootMargin: '-40px' },
+    );
+
+    const featureObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          gsap.fromTo(
+            featureCards,
+            { opacity: 0, y: 30 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.5,
+              stagger: 0.08,
+              ease: 'power2.out',
+              onComplete: () => {
+                featureCards.forEach((c) => (c.style.willChange = 'auto'));
+              },
+            },
+          );
+          featureCards.forEach((c) => featureObserver.unobserve(c));
+        }
+      },
+      { rootMargin: '-40px' },
+    );
+
+    reveals.forEach((el) => {
+      el.style.willChange = 'opacity, transform';
+      if (featureCards.includes(el)) {
+        featureObserver.observe(el);
+      } else {
+        cardObserver.observe(el);
+      }
+    });
+
+    return () => {
+      cardObserver.disconnect();
+      featureObserver.disconnect();
+    };
+  }, []);
+
+  /* GSAP infinite animations for the final CTA — dots scroll loop + glow pulses.
+     These are the only infinite loops alongside the Fourier ticker. */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const tweens: gsap.core.Tween[] = [];
+    if (ctaDotsRef.current) {
+      tweens.push(
+        gsap.to(ctaDotsRef.current, {
+          backgroundPosition: '24px 24px',
+          duration: 2,
+          repeat: -1,
+          ease: 'none',
+        }),
+      );
+    }
+    if (ctaGlow1Ref.current) {
+      tweens.push(
+        gsap.to(ctaGlow1Ref.current, {
+          opacity: 0.4,
+          duration: 3,
+          repeat: -1,
+          yoyo: true,
+          ease: 'sine.inOut',
+        }),
+      );
+    }
+    if (ctaGlow2Ref.current) {
+      tweens.push(
+        gsap.to(ctaGlow2Ref.current, {
+          opacity: 0.4,
+          duration: 4,
+          repeat: -1,
+          yoyo: true,
+          ease: 'sine.inOut',
+          delay: 1.5,
+        }),
+      );
+    }
+    return () => tweens.forEach((t) => t.kill());
+  }, []);
+
   /* Compute dynamic contextual statistics (preserves existing logic) */
   const physicsCount =
     folders.filter(
@@ -530,7 +715,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             style={{ color: bannerConfig?.textColor || '#22d3ee' }}
           >
             <span
-              className="w-1.5 h-1.5 rounded-full animate-pulse inline-block"
+              className="w-1.5 h-1.5 rounded-full inline-block"
               style={{ backgroundColor: bannerConfig?.textColor || '#22d3ee' }}
             />
             {bannerConfig?.text ||
@@ -576,7 +761,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             )}
             <button
               onClick={heroCtaOnClick}
-              className="group inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-sm font-bold tracking-wide shadow-lg shadow-cyan-500/20 transition-all cursor-pointer min-h-[40px]"
+              className="group inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-sm font-bold tracking-wide shadow-lg shadow-cyan-500/20 transition-colors cursor-pointer min-h-[40px]"
             >
               {isAuthenticated && <Layout className="w-4 h-4" />}
               <span>{isAuthenticated ? 'Dashboard' : 'Get Started'}</span>
@@ -606,7 +791,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden"
+              className="fixed inset-0 z-50 bg-black/60 md:hidden"
               onClick={() => setMobileNavOpen(false)}
               aria-hidden
             />
@@ -691,11 +876,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             className="text-center md:text-left space-y-6 order-1 md:order-1"
           >
             {/* Trust badge with avatar stack — smaller on mobile */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-white/10 backdrop-blur-md"
+            <div
+              className="gsap-reveal inline-flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/80 border border-white/10"
+              style={{ opacity: 0 }}
             >
               <div className="flex -space-x-1.5 sm:-space-x-2">
                 {AVATAR_INITIALS.map((i) => (
@@ -710,13 +893,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="text-[9px] sm:text-[11px] text-slate-300 uppercase tracking-wider font-bold">
                 Trusted by 2,400+ HSC students
               </span>
-            </motion.div>
+            </div>
 
             {/* Headline — text-3xl on mobile, sm:text-5xl, lg:text-6xl */}
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+            <GsapHeading
+              as="h1"
               className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.05]"
             >
               Master your{' '}
@@ -734,32 +915,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 HSC science practicals
               </span>{' '}
               with AI precision.
-            </motion.h1>
+            </GsapHeading>
 
             {/* Subhead — text-xs on mobile, sm:text-sm, md:text-[13.5px] */}
-            <motion.p
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.25 }}
-              className="text-slate-400 text-xs sm:text-sm md:text-[13.5px] max-w-xl mx-auto md:mx-0 leading-relaxed"
+            <p
+              className="gsap-reveal text-slate-400 text-xs sm:text-sm md:text-[13.5px] max-w-xl mx-auto md:mx-0 leading-relaxed"
+              style={{ opacity: 0 }}
             >
               Ask Gemini questions 24/7 in Bangla or English, discuss with peers in live classroom
               chat, and commission pencil-shaded diagrams from Bangladeshi illustrators — all
               aligned with the verified NCTB 2026 syllabus, with your progress visible to your
               teachers.
-            </motion.p>
+            </p>
 
             {/* CTAs — full-width on mobile, side-by-side on sm+ */}
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.35 }}
-              className="flex flex-col sm:flex-row gap-3 sm:justify-center md:justify-start"
+            <div
+              className="gsap-reveal flex flex-col sm:flex-row gap-3 sm:justify-center md:justify-start"
+              style={{ opacity: 0 }}
             >
               <button
                 id={heroCtaId}
                 onClick={heroCtaOnClick}
-                className="group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-sm tracking-wide shadow-[0_10px_30px_rgba(6,182,212,0.3)] hover:shadow-[0_14px_36px_rgba(6,182,212,0.45)] transition-all cursor-pointer min-h-[48px] w-full sm:w-auto"
+                className="group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-sm tracking-wide shadow-[0_10px_30px_rgba(6,182,212,0.3)] hover:shadow-[0_14px_36px_rgba(6,182,212,0.45)] transition-colors cursor-pointer min-h-[48px] w-full sm:w-auto"
               >
                 {isAuthenticated ? <Layout className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                 <span>{heroCtaLabel}</span>
@@ -767,19 +944,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </button>
               <a
                 href="#subjects"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 font-semibold text-sm border border-white/10 hover:border-white/20 transition-all cursor-pointer min-h-[48px] w-full sm:w-auto"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 font-semibold text-sm border border-white/10 hover:border-white/20 transition-colors cursor-pointer min-h-[48px] w-full sm:w-auto"
               >
                 <BookOpen className="w-4 h-4 text-cyan-400" />
                 <span>Browse subjects</span>
               </a>
-            </motion.div>
+            </div>
 
             {/* Mini trust row — hidden on mobile, shown on sm+ */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-              className="hidden sm:flex items-center justify-center md:justify-start gap-4 pt-2 text-[10px] text-slate-500 uppercase tracking-wider font-bold font-mono"
+            <div
+              className="gsap-reveal hidden sm:flex items-center justify-center md:justify-start gap-4 pt-2 text-[10px] text-slate-500 uppercase tracking-wider font-bold font-mono"
+              style={{ opacity: 0 }}
             >
               <span className="flex items-center gap-1.5">
                 <Activity className="w-3 h-3 text-emerald-400" /> Real-time sync
@@ -787,7 +962,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-3 h-3 text-cyan-400" /> NCTB 2026 verified
               </span>
-            </motion.div>
+            </div>
           </motion.div>
 
           {/* Fourier series animation — parallax (heroVizY), BELOW text on mobile, RIGHT on desktop */}
@@ -894,7 +1069,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   {/* Live readout — top-right corner */}
                   <div className="absolute top-2 right-2 sm:top-3 sm:right-3 px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/30 font-mono text-[7px] sm:text-[8px] text-cyan-300 leading-tight">
                     <div className="flex items-center gap-1">
-                      <span className="inline-block w-1 h-1 bg-cyan-300 rounded-full animate-pulse" />
+                      <span className="inline-block w-1 h-1 bg-cyan-300 rounded-full" />
                       <span>t = <span ref={tLabelRef}>0.00</span>s</span>
                     </div>
                     <div>Σ = <span ref={sumLabelRef}>0.000</span></div>
@@ -938,10 +1113,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
               </div>
 
-              {/* Floating status indicator — CSS opacity pulse */}
+              {/* Floating status indicator — static (no CSS pulse) */}
               <div
                 aria-hidden
-                className="absolute right-2 sm:right-3 top-2 sm:top-3 flex items-center gap-1 text-[7px] sm:text-[8px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-full px-2 py-0.5 animate-pulse [animation-duration:1s]"
+                className="absolute right-2 sm:right-3 top-2 sm:top-3 flex items-center gap-1 text-[7px] sm:text-[8px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-full px-2 py-0.5"
               >
                 <span className="inline-block w-1.5 h-1.5 bg-cyan-300 rounded-full" />
                 AI LIVE
@@ -953,18 +1128,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* Stats bar — one-shot count-up only, no infinite animations */}
         <section id="stats" className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
           <div id="stats_counter_banner" className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            {stats.map((stat, i) => (
-              <motion.div
+            {stats.map((stat) => (
+              <div
                 key={stat.label}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-40px' }}
-                transition={{ duration: 0.4, delay: i * 0.08 }}
-                className="relative p-3 sm:p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/10 backdrop-blur-md hover:border-white/20 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+                className="gsap-reveal relative p-3 sm:p-4 sm:p-5 rounded-2xl bg-slate-950/80 border border-white/10 hover:border-white/20 hover:-translate-y-0.5 transition-transform duration-200 overflow-hidden"
+                style={{ opacity: 0 }}
               >
                 <div className="flex items-center justify-between mb-2">
                   <stat.Icon className={`w-4 h-4 ${stat.color}`} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 </div>
                 <AnimatedStat
                   value={stat.value}
@@ -973,7 +1145,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <span className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-bold tracking-wider block mt-1">
                   {stat.label}
                 </span>
-              </motion.div>
+              </div>
             ))}
           </div>
         </section>
@@ -984,26 +1156,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               Subjects
             </span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
+            <GsapHeading as="h2" className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
               Master every HSC science subject
-            </h2>
+            </GsapHeading>
             <p className="text-sm text-slate-400">
               From Physics practicals to ICT programming — every experiment, organised.
             </p>
           </ParallaxSectionHeading>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            {displaySubjects.map((s, i) => (
-              <motion.a
+            {displaySubjects.map((s) => (
+              <a
                 key={s.id}
                 href="#features"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-40px' }}
-                transition={{ duration: 0.4, delay: i * 0.06 }}
-                className="group relative block rounded-2xl p-[1px] bg-gradient-to-br from-white/5 via-white/5 to-white/5 hover:from-cyan-500/30 hover:via-teal-500/30 hover:to-indigo-500/30 hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden"
+                className="gsap-reveal group relative block rounded-2xl p-[1px] bg-gradient-to-br from-white/5 via-white/5 to-white/5 hover:from-cyan-500/30 hover:via-teal-500/30 hover:to-indigo-500/30 hover:-translate-y-1 transition-transform duration-300 cursor-pointer overflow-hidden"
+                style={{ opacity: 0 }}
               >
-                <div className="relative rounded-2xl bg-slate-950/70 backdrop-blur-md p-5 h-full flex items-start gap-4">
+                <div className="relative rounded-2xl bg-slate-950/80 p-5 h-full flex items-start gap-4">
                   <div
                     className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${s.tint} border border-white/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}
                   >
@@ -1015,9 +1184,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       {s.count} folders
                     </p>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-300 group-hover:translate-x-1 transition-all shrink-0 mt-1" />
+                  <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-300 group-hover:translate-x-1 transition-transform shrink-0 mt-1" />
                 </div>
-              </motion.a>
+              </a>
             ))}
           </div>
         </section>
@@ -1031,9 +1200,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               Features
             </span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
+            <GsapHeading as="h2" className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
               Built for the 2026 HSC practical exam
-            </h2>
+            </GsapHeading>
             <p className="text-sm text-slate-400">
               Four tools that replace the chaos of paper notebooks and guesswork — with one
               verified workflow.
@@ -1041,16 +1210,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </ParallaxSectionHeading>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            {FEATURES.map((f, i) => (
-              <motion.div
+            {FEATURES.map((f) => (
+              <div
                 key={f.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-40px' }}
-                transition={{ duration: 0.4, delay: (i % 4) * 0.08 }}
-                className="group relative rounded-2xl p-[1px] bg-gradient-to-br from-white/10 via-white/5 to-transparent hover:from-cyan-500/40 hover:to-indigo-500/40 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                className="gsap-reveal feature-card group relative rounded-2xl p-[1px] bg-gradient-to-br from-white/10 via-white/5 to-transparent hover:from-cyan-500/40 hover:to-indigo-500/40 hover:-translate-y-1 transition-transform duration-300 overflow-hidden"
+                style={{ opacity: 0 }}
               >
-                <div className="relative rounded-2xl bg-slate-950/70 backdrop-blur-md p-6 h-full flex flex-col gap-3">
+                <div className="relative rounded-2xl bg-slate-950/80 p-6 h-full flex flex-col gap-3">
                   <div
                     className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${f.tint} flex items-center justify-center shadow-lg`}
                   >
@@ -1067,7 +1233,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </section>
@@ -1081,9 +1247,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               How it works
             </span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
+            <GsapHeading as="h2" className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
               Three steps to a perfect notebook
-            </h2>
+            </GsapHeading>
           </ParallaxSectionHeading>
 
           <div className="relative grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4">
@@ -1107,14 +1273,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               />
             </svg>
 
-            {HOW_IT_WORKS.map((step, i) => (
-              <motion.div
+            {HOW_IT_WORKS.map((step) => (
+              <div
                 key={step.n}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-40px' }}
-                transition={{ duration: 0.4, delay: i * 0.12 }}
-                className="relative text-center space-y-3 px-4"
+                className="gsap-reveal relative text-center space-y-3 px-4"
+                style={{ opacity: 0 }}
               >
                 <div className="relative mx-auto w-14 h-14 rounded-full bg-slate-950 border-2 border-cyan-500/40 flex items-center justify-center text-xl font-black font-mono text-cyan-400 shadow-lg shadow-cyan-500/20">
                   {step.n}
@@ -1123,7 +1286,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <p className="text-[13px] text-slate-400 leading-relaxed max-w-xs mx-auto">
                   {step.desc}
                 </p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </section>
@@ -1139,9 +1302,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" />
                 Notice board
               </span>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
+              <GsapHeading as="h2" className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
                 Live educator notice board
-              </h2>
+              </GsapHeading>
               <p className="text-sm text-slate-400 max-w-xl">
                 Recent circulars, schedule adjustments, and bulletin notices published live by senior
                 administrators.
@@ -1151,13 +1314,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {announcements && announcements.length > 0 ? (
                 announcements.slice(0, 3).map((ann: any, i: number) => (
-                  <motion.article
+                  <article
                     key={ann.id ?? i}
-                    initial={{ opacity: 0, y: 16 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: '-40px' }}
-                    transition={{ duration: 0.4, delay: i * 0.08 }}
-                    className="relative overflow-hidden rounded-2xl bg-slate-950/60 border border-white/10 backdrop-blur-md p-5 flex flex-col gap-4 hover:border-white/20 hover:-translate-y-0.5 transition-all"
+                    className="gsap-reveal relative overflow-hidden rounded-2xl bg-slate-950/80 border border-white/10 p-5 flex flex-col gap-4 hover:border-white/20 hover:-translate-y-0.5 transition-transform"
+                    style={{ opacity: 0 }}
                   >
                     <div className="relative flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1 text-[8px] bg-indigo-500/15 text-indigo-300 font-bold uppercase py-0.5 px-2 rounded-md border border-indigo-500/25 font-mono tracking-wider">
@@ -1183,7 +1343,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         </span>
                       )}
                     </div>
-                  </motion.article>
+                  </article>
                 ))
               ) : (
                 <div className="col-span-1 sm:col-span-2 lg:col-span-3 rounded-2xl bg-slate-950/40 border border-dashed border-white/10 p-10 text-center">
@@ -1207,12 +1367,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           id="marketplace"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-40px' }}
-            transition={{ duration: 0.5 }}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-950 to-indigo-950/40 border border-indigo-500/20 p-6 sm:p-8 md:p-10 hover:-translate-y-1 transition-transform duration-300"
+          <div
+            className="gsap-reveal relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-950 to-indigo-950/40 border border-indigo-500/20 p-6 sm:p-8 md:p-10 hover:-translate-y-1 transition-transform duration-300"
+            style={{ opacity: 0 }}
           >
             {/* Static decorative glow (no infinite animation) */}
             <div
@@ -1242,20 +1399,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="flex flex-col sm:flex-row md:flex-col gap-3 shrink-0 w-full md:w-auto">
                 <button
                   onClick={onEnter}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-sm font-bold tracking-wide rounded-xl shadow-lg shadow-amber-500/20 hover:-translate-y-0.5 cursor-pointer min-h-[48px] transition-all"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-sm font-bold tracking-wide rounded-xl shadow-lg shadow-amber-500/20 hover:-translate-y-0.5 cursor-pointer min-h-[48px] transition-transform"
                 >
                   Consult Sketch Artists
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
                   onClick={onBrowseMarketplace}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-semibold tracking-wide rounded-xl hover:-translate-y-0.5 cursor-pointer min-h-[48px] transition-all"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-semibold tracking-wide rounded-xl hover:-translate-y-0.5 cursor-pointer min-h-[48px] transition-transform"
                 >
                   Browse Marketplace
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
         </section>
 
         {/* FAQ — accordion with 4 items */}
@@ -1267,9 +1424,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               FAQ
             </span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
+            <GsapHeading as="h2" className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight">
               Frequently asked questions
-            </h2>
+            </GsapHeading>
           </ParallaxSectionHeading>
 
           <div className="space-y-3">
@@ -1278,7 +1435,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               return (
                 <div
                   key={i}
-                  className={`rounded-2xl border backdrop-blur-md overflow-hidden transition-colors ${
+                  className={`rounded-2xl border overflow-hidden transition-colors ${
                     isOpen
                       ? 'bg-slate-950/70 border-white/15'
                       : 'bg-slate-950/50 border-white/[0.06] hover:border-white/10'
@@ -1335,15 +1492,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           id="final-cta"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24"
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.6 }}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-6 sm:p-8 md:p-12 lg:p-16 text-center"
+          <div
+            className="gsap-reveal relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-6 sm:p-8 md:p-12 lg:p-16 text-center"
+            style={{ opacity: 0 }}
           >
-            {/* Static decorative dot pattern */}
+            {/* GSAP-animated decorative dot pattern (infinite loop) */}
             <div
+              ref={ctaDotsRef}
               aria-hidden
               className="absolute inset-0 opacity-25 pointer-events-none"
               style={{
@@ -1351,20 +1506,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 backgroundSize: '24px 24px',
               }}
             />
-            {/* Static soft glows */}
+            {/* GSAP glow pulses (infinite yoyo) */}
             <div
+              ref={ctaGlow1Ref}
               aria-hidden
               className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none"
             />
             <div
+              ref={ctaGlow2Ref}
               aria-hidden
               className="absolute -bottom-20 -right-20 w-72 h-72 rounded-full bg-purple-500/20 blur-3xl pointer-events-none"
             />
 
             <div className="relative z-10 space-y-5 max-w-2xl mx-auto">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
+              <GsapHeading as="h2" className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
                 Ready to ace your HSC practical exam?
-              </h2>
+              </GsapHeading>
               <p className="text-cyan-100 text-base sm:text-lg leading-relaxed">
                 Join 2,400+ Bangladeshi students who trust PracPedia for verified procedures,
                 Gemini-powered help, and pro illustrations. Free to start — no credit card required.
@@ -1373,7 +1530,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <button
                   id="cta_final_btn"
                   onClick={heroCtaOnClick}
-                  className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-xl bg-white text-slate-900 font-bold text-sm tracking-wide shadow-2xl hover:bg-slate-100 hover:-translate-y-0.5 transition-all cursor-pointer min-h-[48px] w-full sm:w-auto"
+                  className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-xl bg-white text-slate-900 font-bold text-sm tracking-wide shadow-2xl hover:bg-slate-100 hover:-translate-y-0.5 transition-transform cursor-pointer min-h-[48px] w-full sm:w-auto"
                 >
                   {isAuthenticated ? (
                     <Layout className="w-4 h-4" />
@@ -1396,14 +1553,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </span>
               </div>
             </div>
-          </motion.div>
+          </div>
         </section>
       </main>
 
       {/* Footer (3-column) */}
       <footer
         id="landing_footer"
-        className="relative z-10 border-t border-white/[0.06] bg-[#060814]/80 backdrop-blur-md"
+        className="relative z-10 border-t border-white/[0.06] bg-[#060814]/80"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-3">
@@ -1413,7 +1570,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               AI-assisted, and pro-illustrated.
             </p>
             <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono uppercase tracking-wider">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               Officially linked with student communities
             </div>
           </div>
