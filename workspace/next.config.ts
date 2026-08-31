@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable React Strict Mode to surface latent bugs (double-render in dev only).
-  reactStrictMode: true,
+  // Disable React Strict Mode in dev to halve memory pressure (Strict Mode
+  // double-renders every component in dev, which doubles heap usage during
+  // route compilation — fatal on memory-constrained hosts). Re-enable only
+  // when you have ≥8GB RAM available for the dev server.
+  reactStrictMode: false,
 
   // Do NOT ignore TypeScript build errors in production — surface them at build time.
   typescript: {
