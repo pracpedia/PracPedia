@@ -1191,7 +1191,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
           return;
         }
       } catch (e) {
-        console.warn('Image file upload endpoint not yet implemented in Next.js backend:', e);
+        console.warn('Image file upload failed:', e);
         showError("File upload network error.");
         setIsActionLoading(false);
         return;
