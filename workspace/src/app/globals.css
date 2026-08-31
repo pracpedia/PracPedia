@@ -231,7 +231,7 @@ body {
 
   /* ── BRIGHT / WARM THEMES ── */
 
-  .theme-islamic-green {
+  .theme-botanic-green {
     --theme-accent: #4ade80;
     --theme-glow: rgba(0, 200, 80, 0.28);
     background:
@@ -241,7 +241,7 @@ body {
       #021a0e !important;
   }
 
-  .theme-golden-mosque {
+  .theme-saffron-gold {
     --theme-accent: #fbbf24;
     --theme-glow: rgba(212, 175, 55, 0.28);
     background:
@@ -309,6 +309,41 @@ body {
       radial-gradient(ellipse 55% 45% at 85% 85%, rgba(236, 72, 153, 0.14) 0%, transparent 50%),
       radial-gradient(ellipse 80% 60% at 50% 100%, rgba(249, 168, 212, 0.10) 0%, transparent 60%),
       #14010a !important;
+  }
+
+  /* ── IMMERSIVE / HEAVY THEMES ── */
+
+  .theme-abyss-violet {
+    --theme-accent: #c084fc;
+    --theme-glow: rgba(168, 85, 247, 0.40);
+    background:
+      radial-gradient(ellipse 70% 60% at 12% 8%, rgba(168, 85, 247, 0.45) 0%, transparent 55%),
+      radial-gradient(ellipse 65% 55% at 88% 92%, rgba(217, 70, 239, 0.28) 0%, transparent 50%),
+      radial-gradient(ellipse 90% 70% at 50% 50%, rgba(124, 58, 237, 0.18) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 50% at 30% 80%, rgba(99, 102, 241, 0.20) 0%, transparent 60%),
+      #0a0118 !important;
+  }
+
+  .theme-obsidian-gold {
+    --theme-accent: #fbbf24;
+    --theme-glow: rgba(250, 204, 21, 0.38);
+    background:
+      radial-gradient(ellipse 75% 60% at 15% 10%, rgba(250, 204, 21, 0.32) 0%, transparent 50%),
+      radial-gradient(ellipse 65% 55% at 85% 90%, rgba(212, 175, 55, 0.22) 0%, transparent 50%),
+      radial-gradient(ellipse 90% 70% at 50% 50%, rgba(245, 158, 11, 0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 55% 45% at 70% 25%, rgba(251, 191, 36, 0.14) 0%, transparent 60%),
+      #050402 !important;
+  }
+
+  .theme-plasma-storm {
+    --theme-accent: #f0abfc;
+    --theme-glow: rgba(232, 121, 249, 0.42);
+    background:
+      radial-gradient(ellipse 70% 60% at 10% 20%, rgba(232, 121, 249, 0.40) 0%, transparent 55%),
+      radial-gradient(ellipse 60% 50% at 90% 80%, rgba(34, 211, 238, 0.24) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 65% at 50% 50%, rgba(168, 85, 247, 0.20) 0%, transparent 65%),
+      radial-gradient(ellipse 55% 45% at 75% 15%, rgba(236, 72, 153, 0.18) 0%, transparent 60%),
+      #0a0414 !important;
   }
 
   .glass-sidebar {
@@ -481,6 +516,29 @@ body::before {
 @keyframes pp-orb-drift {
   0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.45; }
   50%      { transform: translate(6%, -4%) scale(1.08); opacity: 0.7; }
+}
+
+/* ── DEEP SPACE ATMOSPHERE ── */
+
+/* Twinkle for the static star field — gentle, staggered by animationDelay */
+@keyframes pp-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.1);  }
+}
+
+/* Slow drift for nebula clouds */
+@keyframes pp-nebula-drift {
+  0%   { transform: translate(0, 0) scale(1);    opacity: 0.35; }
+  50%  { transform: translate(3%, -2%) scale(1.05); opacity: 0.5; }
+  100% { transform: translate(0, 0) scale(1);    opacity: 0.35; }
+}
+
+/* Shooting star — 1px streak travels a fixed distance, head + tail fade in then out */
+@keyframes pp-shooting-star {
+  0%   { transform: translateX(0) translateY(0);   opacity: 0; width: 0; }
+  8%   { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { transform: translateX(var(--ss-distance)) translateY(0); opacity: 0; }
 }
 
 /* Landing page — How It Works flowing dashed connector */

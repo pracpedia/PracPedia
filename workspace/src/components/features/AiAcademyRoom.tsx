@@ -593,7 +593,7 @@ const PREDEFINED_QUIZZES: Record<string, PredefinedQuiz[]> = {
 };
 
 export const AiAcademyRoom: React.FC = () => {
-  const { apiFetch, user, setUser } = useAuth();
+  const { apiFetch, user, setUser, geminiApiKey, setGeminiApiKey, isKeyModalOpen, setIsKeyModalOpen } = useAuth();
   const { t, language } = useLanguage();
 
   const [rechargingCredits, setRechargingCredits] = useState(false);
@@ -718,10 +718,16 @@ export const AiAcademyRoom: React.FC = () => {
   const [showingSolutions, setShowingSolutions] = useState<Record<number, boolean>>({});
 
   // Google Account AI Credits Key Integration (BYOK model)
-  const [googleApiKey, setGoogleApiKey] = useState<string>(() => safeLocalStorage.getItem('user_gemini_key') || '');
-  const [googleApiKeyInput, setGoogleApiKeyInput] = useState<string>(() => safeLocalStorage.getItem('user_gemini_key') || '');
-  const [isKeyModalOpen, setIsKeyModalOpen] = useState<boolean>(false);
+  // The key lives in AuthContext (persisted to localStorage). The local
+  // `googleApiKeyInput` is just for the inline modal text input — seeded
+  // from the AuthContext value.
+  const [googleApiKeyInput, setGoogleApiKeyInput] = useState<string>(geminiApiKey || '');
   const [keyStatusMessage, setKeyStatusMessage] = useState<string | null>(null);
+
+  // Keep the inline modal input in sync when the AuthContext key changes.
+  useEffect(() => {
+    setGoogleApiKeyInput(geminiApiKey || '');
+  }, [geminiApiKey]);
 
   const handleSaveGoogleKey = () => {
     const trimmed = googleApiKeyInput.trim();
@@ -729,8 +735,7 @@ export const AiAcademyRoom: React.FC = () => {
       setKeyStatusMessage(language === 'bn' ? 'অনুগ্রহ করে একটি সঠিক জেমিনাই এপিআই কি দিন' : 'Please provide a valid Gemini API key');
       return;
     }
-    safeLocalStorage.setItem('user_gemini_key', trimmed);
-    setGoogleApiKey(trimmed);
+    setGeminiApiKey(trimmed);
     setKeyStatusMessage(language === 'bn' ? 'গুগল অ্যাকাউন্ট সফলভাবে সংযুক্ত হয়েছে! এখন থেকে আপনার ক্রেডিট ব্যবহার হবে।' : 'Google Account connected! Personal AI credits active.');
     setTimeout(() => {
       setIsKeyModalOpen(false);
@@ -739,8 +744,7 @@ export const AiAcademyRoom: React.FC = () => {
   };
 
   const handleDisconnectGoogleKey = () => {
-    safeLocalStorage.removeItem('user_gemini_key');
-    setGoogleApiKey('');
+    setGeminiApiKey('');
     setGoogleApiKeyInput('');
   };
   const [diagramStyle, setDiagramStyle] = useState<string>(() => {
@@ -949,7 +953,7 @@ export const AiAcademyRoom: React.FC = () => {
     // ── BYOK gate — block AI features until the user connects a Gemini API key ──
     // This runs on every AI button click (Concept Desk, NCTB CQ, Ask Scholar,
     // Interactive Mocks). If no key is set, we open the key modal and bail out.
-    if (!googleApiKey || !googleApiKey.trim()) {
+    if (!geminiApiKey || !geminiApiKey.trim()) {
       setIsKeyModalOpen(true);
       setErrorMessage(
         language === 'bn'
@@ -1022,7 +1026,7 @@ export const AiAcademyRoom: React.FC = () => {
           // call the Gemini API on their behalf. Without this header, the
           // server falls back to its own GEMINI_API_KEY env var (if set) or
           // returns a fallback template response.
-          'x-gemini-api-key': googleApiKey,
+          'x-gemini-api-key': geminiApiKey,
         },
         body: JSON.stringify(body)
       });
@@ -1082,6 +1086,18 @@ export const AiAcademyRoom: React.FC = () => {
     const textToSend = chatInput.trim();
     if (!textToSend || isAnswering) return;
 
+    // ── BYOK gate — block AI chat until the user connects a Gemini API key ──
+    if (!geminiApiKey || !geminiApiKey.trim()) {
+      setIsKeyModalOpen(true);
+      setErrorMessage(
+        language === 'bn'
+          ? 'এই ফিচারটি ব্যবহার করতে Gemini API কী সংযুক্ত করুন। আপনার নিজস্ব API কী দিন (BYOK) অথবা https://aistudio.google.com/app/apikey থেকে বিনামূল্যে একটি তৈরি করুন।'
+          : 'Connect your Gemini API key to use this feature. Bring Your Own Key (BYOK) — get a free one at https://aistudio.google.com/app/apikey'
+      );
+      setTimeout(() => setErrorMessage(null), 6000);
+      return;
+    }
+
     const finalTopic = customTopic.trim() || selectedTopic || SYLLABUS_BLUEPRINTS[selectedSubject]?.[selectedPaper]?.[curriculum]?.[0]?.topics[0] || 'Core Concepts';
     const newStudentMsg: ChatMessage = {
       id: Math.random().toString(),
@@ -1101,7 +1117,7 @@ export const AiAcademyRoom: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-gemini-api-key': googleApiKey,
+          'x-gemini-api-key': geminiApiKey,
         },
         body: JSON.stringify({
           prompt: textToSend,
@@ -1324,7 +1340,7 @@ export const AiAcademyRoom: React.FC = () => {
               <span>{language === 'bn' ? 'গুগল অ্যাকাউন্ট সংযোগ' : 'GOOGLE ACCOUNT INTEGRATION'}</span>
             </span>
             <h3 className="text-base sm:text-lg md:text-xl font-black text-white flex items-center gap-2 flex-wrap">
-              {googleApiKey ? (
+              {geminiApiKey ? (
                 <>
                   <span className="text-emerald-400">🟢</span>
                   <span className="break-words">{language === 'bn' ? 'গুগল অ্যাকাউন্ট সংযুক্ত রয়েছে (অসীম ফ্রি এআই ক্রেডিট)' : 'Connected to Google Account (Unlimited AI Credits)'}</span>
@@ -1337,7 +1353,7 @@ export const AiAcademyRoom: React.FC = () => {
               )}
             </h3>
             <p className="text-xs text-slate-300 max-w-2xl font-medium leading-relaxed">
-              {googleApiKey
+              {geminiApiKey
                 ? (language === 'bn'
                   ? 'আপনার নিজস্ব গুগল অ্যাকাউন্ট জেমিনি কুপন কোড ব্যবহার করা হচ্ছে! আপনি মূল সার্ভার ক্রেডিট ছাড়াই আনলিমিটেড স্টাডি ডেক লেসন, টিউটর চ্যাট ও মৌখিক ভাইভা প্র্যাকটিস করতে পারছেন।'
                   : 'Your personal Google Account Gemini AI Key is active! All AI Study Deck queries will use your free Google quota without deducting server credits.')
@@ -1349,7 +1365,7 @@ export const AiAcademyRoom: React.FC = () => {
           </div>
 
           <div className="shrink-0 w-full md:w-auto flex flex-col sm:flex-row items-center gap-2">
-            {googleApiKey ? (
+            {geminiApiKey ? (
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => setIsKeyModalOpen(true)}

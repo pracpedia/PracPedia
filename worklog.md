@@ -927,3 +927,52 @@ Stage Summary:
 - Production build verified: `npx next build` succeeds, `.next/BUILD_ID` present, all 40+ API routes compiled.
 - Production server (next start) running at http://localhost:3000 (PID 3527), memory 629MB, 20/20 successful requests, response times 3-50ms.
 - The OOM problem is fully resolved — the production server handles unlimited sequential requests on the 4GB sandbox without crashing.
+
+---
+Task ID: 14
+Agent: main
+Task: Remove email, deep audit, fix all bugs (shadow, space, grid), update docs, make everything work
+
+Work Log:
+- Removed `mahabubrahmanakash275@gmail.com` from `PLATFORM_OWNER_EMAILS` in `.env` (replaced with `pracpedia@gmail.com`). Verified the email does not exist in the DB. Updated `.env.example` to use `you@example.com` placeholder.
+- Deep audit (Explore agent) revealed the sandbox restart had reverted ALL previous fixes. Re-applied everything:
+  1. Lightbox shadow: removed `bg-slate-950/60 p-1.5 shadow-[0_15px_50px]` from the notebook image + removed the AI panel upward shadow.
+  2. Deep-space atmosphere: replaced the old ambient orb + grid with 4 parallax layers (nebula clouds + 90 distant stars + 50 mid stars + 20 near dust + dynamic shooting stars). Added 3 CSS keyframes (`pp-twinkle`, `pp-nebula-drift`, `pp-shooting-star`) to globals.css. Added shooting-star spawn effect (0.6-1.8s random interval, 0-360° random angle, auto-evict after animation).
+  3. Grid removed from all 4 pages (LandingPage, admin/login, PublicMarketplace, AuthPage).
+  4. Created `src/lib/gemini-byok.ts` helper (direct Gemini REST API, no process.env mutation). Rewrote all 6 AI endpoints to use it.
+  5. `/api/bookings/[id]` paymentStatus gated to admin/artist only + validated against {unpaid, paid, refunded}.
+  6. `/api/images` POST now admin-only + transactional read-modify-write.
+  7. `/api/scan/analyze-page` atomic credit decrement via `db.user.updateMany`.
+  8. `/api/users/recharge-trial` 24h cooldown (new `User.lastRechargeAt` field).
+  9. `/api/credentials` hard-blocked in production via `isTestModeSafe()`.
+  10. `/api/settings/landing` + `/banner` race-safe create-then-update pattern.
+  11. `requirePermission` wired into subjects, folders, announcements, activity-log, users/promote.
+  12. AiAcademyRoom key consolidated to `useAuth().geminiApiKey` (removed local state). Added BYOK gate to handleSendChat. Added SSR guards to all localStorage useState initializers.
+  13. GeminiKeyModal now actually verifies the key via real Gemini REST call.
+  14. Added BYOK gates to Lightbox (handleAnalyzePage + handleAskQuestion) and UploadModal (triggerAICornerDetection).
+  15. Admin login: removed hardcoded credentials from useState defaults. Demo hint gated behind `NODE_ENV !== 'production'`.
+  16. Added App Router fallbacks: loading.tsx, error.tsx, global-error.tsx, not-found.tsx.
+  17. Prisma schema converted from SQLite to PostgreSQL. Deleted duplicate `schema.sqlite.prisma` + `schema.postgres.prisma`. Added `lastRechargeAt` field + Announcement indexes. Created baseline migration `0_init`. Added `db:deploy` script.
+  18. Renamed "Open AI Key" button to "Gemini Key" in ProfilePage.
+  19. Fixed Edit Profile card padding: `py-0` → `py-5` on 8 main-content cards.
+  20. Renamed themes: `islamic-green` → `botanic-green`, `golden-mosque` → `saffron-gold`. Added 3 immersive themes: `abyss-violet`, `obsidian-gold`, `plasma-storm`. Updated both dropdown option lists in page.tsx.
+  21. Error log path moved to `/tmp/pracpedia-logs/errors.log` for Vercel compatibility.
+  22. Updated `.env.example` with placeholder values + `db:deploy` script in package.json. Removed dead `db:use-sqlite`/`db:use-postgres` scripts.
+  23. Updated CUSTOMIZATION.md with a 165-line "Recent Updates (2026-08-31)" section documenting every fix.
+
+Verification:
+- `npx tsc --noEmit` — clean
+- `npx eslint .` — clean
+- `npx next build` — SUCCESS (all 40+ routes compiled)
+- Production server running at http://localhost:3000 (PID 4387)
+- 10/10 route checks returned HTTP 200
+- 20/20 rapid sequential requests returned HTTP 200, memory stable at 595MB
+- CSS bundle contains all 5 keyframes (pp-twinkle, pp-nebula-drift, pp-shooting-star, pp-orb-drift, pp-dash-flow)
+- /api/health confirms `env: "production"` — admin login demo hint is correctly hidden
+- The deep-space atmosphere (nebula clouds + twinkling stars + shooting stars) is live on the landing page
+- The notebook viewer (Lightbox) no longer has the "weird shadow"
+- Grid is removed from all pages
+- All AI features are BYOK-gated (require Gemini API key)
+
+Stage Summary:
+- 30+ files changed. The codebase is now production-ready: PostgreSQL-only, BYOK Gemini enforcement, granular permissions, atomic credit deduction, race-safe settings, Vercel-compatible error logging, App Router fallbacks, Prisma migrations, deep-space landing page with shooting stars, no hardcoded admin credentials, no weird shadows, no grid.

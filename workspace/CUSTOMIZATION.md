@@ -6,6 +6,136 @@ A practical reference for adapting PracPedia to your needs. Covers themes, compo
 
 ---
 
+## Recent Updates (2026-08-31)
+
+This section documents the major changes in the latest production-readiness pass.
+
+### Email Removed from Platform Owners
+
+`mahabubrahmanakash275@gmail.com` has been removed from `PLATFORM_OWNER_EMAILS` in `.env` (replaced with `pracpedia@gmail.com`). The `.env.example` now uses `you@example.com` as a placeholder. No users with that email existed in the DB.
+
+### Deep-Space Atmosphere on Landing Page
+
+The landing page background was upgraded from a single ambient orb + grid overlay to a 4-layer cosmic scene:
+
+1. **Nebula clouds** — 3 drifting violet/cyan/indigo blobs with heavy blur + slow `pp-nebula-drift` animation
+2. **Distant star field** — 90 dim twinkling pinpricks using `pp-twinkle` keyframes
+3. **Mid star field** — 50 brighter cyan/violet/amber stars with glow shadows
+4. **Near dust + shooting stars** — 20 white specks + dynamic shooting stars array
+
+Three new CSS keyframes added to `globals.css`: `pp-twinkle`, `pp-nebula-drift`, `pp-shooting-star`.
+
+### Random Shooting Stars
+
+JS-driven shooting stars spawn every 0.6–1.8 seconds at a random position with a random 0–360° angle, random travel distance (320–740 px), random duration (0.7–1.5 s), random thickness (1–2.2 px), and a random color from a 4-color palette. Each star auto-evicts from state after its animation completes. Honors `prefers-reduced-motion`.
+
+### Grid Removed From All Pages
+
+The grid overlay (`bg-[linear-gradient(to_right,...)]`) has been removed from:
+- `src/components/features/pages/LandingPage.tsx`
+- `src/app/admin/login/page.tsx`
+- `src/components/features/pages/PublicMarketplace.tsx`
+- `src/components/features/pages/AuthPage.tsx`
+
+The deep-space atmosphere is now the sole background on the landing page.
+
+### Lightbox Shadow Fixed
+
+The notebook viewer (`Lightbox.tsx`) had a "weird shadow" caused by three stacked effects on the image: `bg-slate-950/60` (dark backdrop), `p-1.5` (padding showing the dark bg as a frame), and `shadow-[0_15px_50px_rgba(0,0,0,0.5)]` (50px-blur drop shadow). Removed all three — the image now has just `rounded-2xl border border-white/10`. Also removed the AI panel's upward shadow.
+
+### BYOK Gemini Enforcement (AI Features Locked Without a Key)
+
+Every AI feature now requires the user's own Google Gemini API key (BYOK). Server-side, all 6 AI endpoints reject requests without the `x-gemini-api-key` header with HTTP 403 `{ error, needsGeminiKey: true }`:
+- `/api/academy/lesson`, `/api/academy/chat`, `/api/academy/mcq`, `/api/academy/cq`
+- `/api/scan/analyze-page`, `/api/scan/detect-corners`
+
+Client-side, every AI callsite checks `geminiApiKey` from `useAuth()` BEFORE the API call. If missing, it opens the `GeminiKeyModal` and shows a localized (English/Bengali) prompt. The `GeminiKeyModal` now actually verifies the key by calling the real Gemini REST endpoint (was: called `/api/health` which never reads the header).
+
+The "Open AI Key" sidebar button in `ProfilePage` has been renamed to **"Gemini Key"**.
+
+### New `src/lib/gemini-byok.ts` Helper
+
+All AI endpoints use a dedicated helper that calls the Gemini REST API directly with the user's key — no `process.env` mutation. This fixes a critical race condition where concurrent requests from different users would have leaked each other's keys via `process.env.GEMINI_API_KEY` global state.
+
+### Theme Renames + New Immersive Themes
+
+- `islamic-green` → **`botanic-green`** ("🌿 Botanic Green")
+- `golden-mosque` → **`saffron-gold`** ("🌟 Saffron Gold")
+
+Three new immersive heavy themes added:
+- **`theme-abyss-violet`** ("🌌 Abyss Violet") — 4-layer deep violet + magenta + indigo
+- **`theme-obsidian-gold`** ("⚫ Obsidian Gold") — 4-layer near-black base with gold filaments
+- **`theme-plasma-storm`** ("⚡ Plasma Storm") — 4-layer magenta + cyan + violet plasma
+
+### Edit Profile Card Padding Fix
+
+8 main-content `<Card>` components in `ProfilePage.tsx` had `py-0` (zero vertical padding) making content stick to the card borders. Changed to `py-5` for proper breathing room. The sidebar avatar card kept `py-0` since its inner blocks provide their own `p-5` padding.
+
+### Granular Permissions Wired Into Admin API Routes
+
+All admin API routes now use `requirePermission(request, '<permission_key>')` instead of coarse role checks:
+- `manage_subjects` — `/api/subjects` POST, `/api/subjects/[id]` PUT/DELETE
+- `manage_folders` — `/api/folders` POST, `/api/folders/[id]` PUT/DELETE
+- `manage_images` — `/api/images` POST (also admin-only + transactional)
+- `manage_announcements` — `/api/announcements` POST, `/api/announcements/[id]` DELETE
+- `manage_admins` — `/api/users/promote` POST (super_admin only)
+- `view_activity_log` — `/api/activity-log` GET
+
+A regular admin with NO permissions assigned can no longer perform admin actions. Only super_admin (who implicitly has all permissions) bypasses the checks.
+
+### AI Credits: Atomic Decrement + Recharge Cooldown
+
+- `/api/scan/analyze-page` now deducts credits atomically via `db.user.updateMany({ where: { id, aiCredits: { gt: 0 } } })`. Concurrent requests can't both see the same credit balance.
+- `/api/users/recharge-trial` now has a 24-hour cooldown (new `User.lastRechargeAt` column). Platform owners bypass.
+
+### Settings Endpoints Race-Safe
+
+`/api/settings/landing` and `/api/settings/banner` now use a race-safe create-then-on-conflict-update pattern (was: two super admins hitting PUT simultaneously could both create duplicate config rows).
+
+### `/api/credentials` Production Hard-Block
+
+The credentials endpoint now uses `isTestModeSafe()` — returns 404 in production even if `PRACPEDIA_TEST_PASSWORDS_VISIBLE=true` is set. Prevents a leaked `.env` from exposing credentials.
+
+### `/api/bookings/[id]` paymentStatus Gating
+
+Clients can no longer self-mark their booking as `paid`. Only admin/artist can set `paymentStatus`, and it must be one of `unpaid`, `paid`, `refunded`. Prevents forging a paid booking with no payment gateway integration.
+
+### `/api/images` Admin-Only + Transactional
+
+`/api/images` POST now requires admin role. The read-modify-write of `imagesJson` is wrapped in `db.$transaction` so concurrent uploads don't lose one image.
+
+### Error Log Path Fixed for Vercel
+
+`src/lib/error-log.ts` now writes to `/tmp/pracpedia-logs/errors.log` (was: `/home/z/my-project/logs/errors.log` which throws EROFS on Vercel serverless).
+
+### AiAcademyRoom: Single Source of Truth for Gemini Key
+
+`AiAcademyRoom` now reads `geminiApiKey` exclusively from `useAuth()`. Removed the separate local `googleApiKey` state that could drift out of sync. Added SSR guards to all localStorage-backed `useState` initializers. Added BYOK gate to `handleSendChat`.
+
+### Admin Login: No Hardcoded Credentials
+
+`/admin/login` no longer pre-fills `pracpedia@gmail.com` / `pracpedia123456789` into the form fields. The demo credentials hint is now gated behind `process.env.NODE_ENV !== 'production'` so it only shows in dev/preview.
+
+### App Router Fallbacks
+
+Added the standard App Router convention files:
+- `src/app/loading.tsx` — uses the existing `<DataLoader />`
+- `src/app/error.tsx` — branded error fallback with "Try again" + "Back to home"
+- `src/app/global-error.tsx` — root error fallback (renders own `<html>`)
+- `src/app/not-found.tsx` — branded 404 with subtle nebula backdrop
+
+### Prisma Migrations Initialized
+
+Created `prisma/migrations/0_init/migration.sql` as the baseline snapshot. Deleted the duplicate `prisma/schema.sqlite.prisma` and `prisma/schema.postgres.prisma`. The active `prisma/schema.prisma` is PostgreSQL-only. Added `db:deploy` script (`prisma migrate deploy`) for production CI/CD.
+
+Also added `@@index([targetUserId])` and `@@index([createdById])` to the `Announcement` model.
+
+### Production Server Instead of Dev Server
+
+On memory-constrained hosts (4GB / no-swap), use `next start` (the production server) instead of `next dev`. The production server serves pre-built bundles — memory footprint is ~150MB vs 1.5GB+ for dev, response times are 3–50ms vs 5–15s, and there are no on-demand compiles to OOM the sandbox. A `start.sh` script at the project root builds (if needed) and starts the production server.
+
+---
+
 ## Table of Contents
 
 - [1. Theming & Visual Customization](#1-theming--visual-customization)

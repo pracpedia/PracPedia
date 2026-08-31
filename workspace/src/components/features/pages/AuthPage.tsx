@@ -271,9 +271,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
       <div className="absolute top-[-10%] left-[15%] w-[65vw] h-[45vh] rounded-full bg-gradient-to-br from-indigo-600/12 via-cyan-600/8 to-transparent blur-[160px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[10%] w-[55vw] h-[45vh] rounded-full bg-gradient-to-tl from-amber-500/8 via-purple-600/5 to-transparent blur-[160px] pointer-events-none" />
 
-      {/* Subtle blueprint grid overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#131826_1px,transparent_1px),linear-gradient(to_bottom,#131826_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_45%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
-
       {/* Main Container Layout */}
       <div className="w-full max-w-5xl relative z-10 space-y-4 sm:space-y-6">
 

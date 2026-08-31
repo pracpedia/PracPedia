@@ -67,7 +67,16 @@ export async function PUT(request: NextRequest) {
     if (existing) {
       await db.announcement.update({ where: { id: existing.id }, data });
     } else {
-      await db.announcement.create({ data });
+      try {
+        await db.announcement.create({ data });
+      } catch (createErr: any) {
+        const race = await db.announcement.findFirst({ where: { targetUserId: 'banner-config' } });
+        if (race) {
+          await db.announcement.update({ where: { id: race.id }, data });
+        } else {
+          throw createErr;
+        }
+      }
     }
 
     return NextResponse.json({ enabled, text, bgColor, textColor, size });

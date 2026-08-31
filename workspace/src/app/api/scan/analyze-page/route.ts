@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { isPlatformOwner } from '@/lib/platform-owner';
+import { geminiVision } from '@/lib/gemini-byok';
 
 /**
  * AI vision: analyze a notebook page image and answer follow-up questions.
@@ -14,14 +15,27 @@ import { isPlatformOwner } from '@/lib/platform-owner';
  *
  * Each call decrements the user's aiCredits by 1 (down to a floor of 0).
  * Platform owners bypass the credit deduction.
+ *
+ * BYOK: requires the user's own Gemini API key via the `x-gemini-api-key`
+ * header. Credit deduction happens AFTER the BYOK check so a missing key
+ * doesn't burn a credit. The decrement is atomic via Prisma's conditional
+ * update — concurrent requests can't both see the same credit balance.
  */
-const DEFAULT_AI_CREDITS = Number(process.env.AI_CREDITS_DEFAULT || '25');
-
 export async function POST(request: NextRequest) {
   try {
     const payload = await getUserFromRequest(request);
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // BYOK gate — Gemini API key required. Checked BEFORE credit deduction
+    // so a missing key doesn't burn a credit.
+    const userApiKey = request.headers.get('x-gemini-api-key');
+    if (!userApiKey || !userApiKey.trim()) {
+      return NextResponse.json(
+        { error: 'Gemini API key required. Open "Gemini Key" in your profile sidebar and connect your free Google Gemini API key to use AI features.', needsGeminiKey: true },
+        { status: 403 }
+      );
     }
 
     const u = await db.user.findUnique({ where: { id: payload.userId } });
@@ -36,6 +50,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Credit accounting (platform owners bypass) ─────────────────────────
+    // Atomic conditional decrement — concurrent requests can't both succeed at
+    // decrementing past zero. If the row's `aiCredits` is already 0 the update
+    // returns count=0 and we reject.
     let aiCredits = u.aiCredits;
     const bypassCredits = isPlatformOwner(u.email);
     if (!bypassCredits) {
@@ -45,8 +62,17 @@ export async function POST(request: NextRequest) {
           { status: 402 }
         );
       }
+      const updated = await db.user.updateMany({
+        where: { id: u.id, aiCredits: { gt: 0 } },
+        data: { aiCredits: { decrement: 1 } },
+      });
+      if (updated.count === 0) {
+        return NextResponse.json(
+          { error: 'Out of AI credits. Use the "Recharge trial credits" button to top up.', outOfCredits: true },
+          { status: 402 }
+        );
+      }
       aiCredits = Math.max(0, u.aiCredits - 1);
-      await db.user.update({ where: { id: u.id }, data: { aiCredits } });
     }
 
     const isBn = language === 'bn_book';
@@ -58,39 +84,21 @@ Respond in ${langName}.
 Use Markdown formatting. Keep the response under 500 words.
 If the image is unclear or not a notebook page, say so politely and suggest a clearer scan.`;
 
-    const userContent: any[] = [
-      { type: 'text', text: question || 'Analyze this notebook page and give me a structured overview.' },
-      { type: 'file_url', file_url: { url: imageUrl } },
-    ];
+    const userPrompt = question || 'Analyze this notebook page and give me a structured overview.';
 
-    let analysis: string;
     try {
-      const ZAI = await import('z-ai-web-dev-sdk');
-      const userApiKey = request.headers.get('x-gemini-api-key');
-      if (userApiKey) process.env.GEMINI_API_KEY = userApiKey;
-      const zai = await ZAI.default.create();
-      const completion = await (zai.chat.completions as any).createVision({
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: userContent },
-        ],
-        thinking: { type: 'disabled' },
+      const analysis = await geminiVision(userApiKey.trim(), sysPrompt, userPrompt, imageUrl, {
+        temperature: 0.5,
+        maxOutputTokens: 1500,
       });
-      analysis = completion.choices?.[0]?.message?.content || '';
+      return NextResponse.json({ analysis, aiCredits });
     } catch (aiErr: any) {
-      console.warn('AI vision (analyze-page) failed, returning fallback:', aiErr?.message);
-      analysis = isBn
-        ? `> ⚠️ **AI সার্ভিস সাময়িকভাবে অনুপলব্ধ।**\n\nআমি আপনার নোটবুকের পৃষ্ঠাটি গ্রহণ করেছি কিন্তু এই মুহূর্তে বিশ্লেষণ করতে পারছি না। কিছুক্ষণ পর আবার চেষ্টা করুন।`
-        : `> ⚠️ **AI service temporarily unavailable.**\n\nI received your notebook page but cannot analyze it right now. Please try again in a moment.`;
+      console.warn('AI vision (analyze-page) failed:', aiErr?.message);
+      return NextResponse.json(
+        { error: aiErr?.message || 'Gemini AI request failed. Check that your API key is valid and try again.', aiCredits: u.aiCredits },
+        { status: 502 }
+      );
     }
-
-    if (!analysis) {
-      analysis = isBn
-        ? `> ⚠️ AI থেকে খালি উত্তর এসেছে। আবার চেষ্টা করুন।`
-        : `> ⚠️ Empty AI response received. Please try again.`;
-    }
-
-    return NextResponse.json({ analysis, aiCredits });
   } catch (err: any) {
     console.error('POST /api/scan/analyze-page error:', err);
     return NextResponse.json({ error: 'Page analysis failed.' }, { status: 500 });

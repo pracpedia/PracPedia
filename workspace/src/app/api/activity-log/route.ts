@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { requirePermission } from '@/lib/permissions';
 
 /**
  * GET /api/activity-log
@@ -22,10 +23,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Role gate — only admins can view the activity log
-    if (payload.role !== 'admin' && payload.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 });
-    }
+    // Granular permission check — super_admin bypasses, regular admin needs
+    // 'view_activity_log' explicitly assigned.
+    const denied = await requirePermission(request, 'view_activity_log');
+    if (denied) return NextResponse.json({ error: 'Forbidden — requires permission: view_activity_log' }, { status: 403 });
 
     const { searchParams } = new URL(request.url);
     const limit = Math.min(200, Math.max(1, Number(searchParams.get('limit')) || 50));

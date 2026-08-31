@@ -30,7 +30,7 @@ interface LightboxProps {
 }
 
 export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClose }) => {
-  const { apiFetch, user, setUser } = useAuth();
+  const { apiFetch, user, setUser, geminiApiKey, setIsKeyModalOpen, language } = useAuth();
 
   // Carousel states
   const [index, setIndex] = useState(initialIndex);
@@ -137,6 +137,18 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
   // Call backend parser
   const handleAnalyzePage = async () => {
     if (!currentImage?.url) return;
+
+    // ── BYOK gate — block AI features until the user connects a Gemini API key ──
+    if (!geminiApiKey || !geminiApiKey.trim()) {
+      setIsKeyModalOpen(true);
+      setErrorMessage(
+        language === 'bn'
+          ? 'এই ফিচারটি ব্যবহার করতে Gemini API কী সংযুক্ত করুন। আপনার নিজস্ব API কী দিন (BYOK) অথবা https://aistudio.google.com/app/apikey থেকে বিনামূল্যে একটি তৈরি করুন।'
+          : 'Connect your Gemini API key to use this feature. Bring Your Own Key (BYOK) — get a free one at https://aistudio.google.com/app/apikey'
+      );
+      return;
+    }
+
     try {
       setIsAnalyzing(true);
       setErrorMessage(null);
@@ -148,7 +160,9 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
       });
 
       if (!res.ok) {
-        throw new Error("Unable to read image scan. Check your internet connection.");
+        let serverMsg = '';
+        try { const e = await res.json(); serverMsg = e.error || ''; } catch (_) {}
+        throw new Error(serverMsg || "Unable to read image scan. Check your internet connection.");
       }
 
       const data = await res.json();
@@ -176,6 +190,17 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
   const handleAskQuestion = async (presetText?: string) => {
     const textToSend = (presetText || customQuestion).trim();
     if (!textToSend || !currentImage?.url) return;
+
+    // ── BYOK gate ──
+    if (!geminiApiKey || !geminiApiKey.trim()) {
+      setIsKeyModalOpen(true);
+      setErrorMessage(
+        language === 'bn'
+          ? 'এই ফিচারটি ব্যবহার করতে Gemini API কী সংযুক্ত করুন। আপনার নিজস্ব API কী দিন (BYOK) অথবা https://aistudio.google.com/app/apikey থেকে বিনামূল্যে একটি তৈরি করুন।'
+          : 'Connect your Gemini API key to use this feature. Bring Your Own Key (BYOK) — get a free one at https://aistudio.google.com/app/apikey'
+      );
+      return;
+    }
 
     setChatLogs((prev) => [...prev, { sender: 'student', text: textToSend }]);
     if (!presetText) setCustomQuestion('');
@@ -386,7 +411,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
                 src={currentImage?.url}
                 alt={currentImage?.title}
                 onClick={() => setZoom(!zoom)}
-                className="max-w-[95vw] max-h-[34vh] sm:max-h-[38vh] lg:max-h-[72vh] object-contain rounded-2xl border border-white/10 bg-slate-950/60 p-1.5 shadow-[0_15px_50px_rgba(0,0,0,0.5)]"
+                className="max-w-[95vw] max-h-[34vh] sm:max-h-[38vh] lg:max-h-[72vh] object-contain rounded-2xl border border-white/10"
               />
             </div>
 
@@ -431,7 +456,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
               animate={{ opacity: 1, x: 0, y: 0 }}
               exit={{ opacity: 0, x: typeof window !== 'undefined' && window.innerWidth < 1024 ? 0 : 360, y: typeof window !== 'undefined' && window.innerWidth < 1024 ? 120 : 0 }}
               transition={{ type: "spring", damping: 28, stiffness: 200 }}
-              className="w-full lg:w-[480px] xl:w-[520px] bg-[#070b13] border-t lg:border-t-0 lg:border-l border-white/5 flex flex-col shrink-0 text-left h-[52vh] lg:h-full relative overflow-hidden z-20 shadow-[0_-15px_40px_rgba(0,0,0,0.6)] select-text min-h-0"
+              className="w-full lg:w-[480px] xl:w-[520px] bg-[#070b13] border-t lg:border-t-0 lg:border-l border-white/5 flex flex-col shrink-0 text-left h-[52vh] lg:h-full relative overflow-hidden z-20 select-text min-h-0"
               onClick={(e) => e.stopPropagation()}
             >
 

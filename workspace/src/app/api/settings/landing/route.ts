@@ -72,7 +72,18 @@ export async function PUT(request: NextRequest) {
     if (existing) {
       await db.announcement.update({ where: { id: existing.id }, data });
     } else {
-      await db.announcement.create({ data });
+      // Race-safe insert — if two requests both reach here, one succeeds
+      // and the other falls back to update.
+      try {
+        await db.announcement.create({ data });
+      } catch (createErr: any) {
+        const race = await db.announcement.findFirst({ where: { targetUserId: 'landing-config' } });
+        if (race) {
+          await db.announcement.update({ where: { id: race.id }, data });
+        } else {
+          throw createErr;
+        }
+      }
     }
 
     return NextResponse.json({ trustBadge: { enabled, useCustomCount, customCount } });

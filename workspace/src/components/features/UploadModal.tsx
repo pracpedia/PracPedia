@@ -39,7 +39,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   folderTitle,
   onUploadSuccess,
 }) => {
-  const { apiFetch } = useAuth();
+  const { apiFetch, geminiApiKey, setIsKeyModalOpen, language } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('upload');
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +156,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   // Gemini AI auto corner detection tool request call
   const triggerAICornerDetection = async () => {
     if (!rawImageBase64) return;
+
+    // ── BYOK gate ──
+    if (!geminiApiKey || !geminiApiKey.trim()) {
+      setIsKeyModalOpen(true);
+      setError(
+        language === 'bn'
+          ? 'এই ফিচারটি ব্যবহার করতে Gemini API কী সংযুক্ত করুন। আপনার নিজস্ব API কী দিন (BYOK) অথবা https://aistudio.google.com/app/apikey থেকে বিনামূল্যে একটি তৈরি করুন।'
+          : 'Connect your Gemini API key to use this feature. Bring Your Own Key (BYOK) — get a free one at https://aistudio.google.com/app/apikey'
+      );
+      return;
+    }
+
     setIsProcessing(true);
     setError(null);
     try {

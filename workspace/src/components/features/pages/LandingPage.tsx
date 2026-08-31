@@ -341,8 +341,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const { scrollY } = useScroll();
   const heroTextY = useTransform(scrollY, [0, 700], isDesktop ? [0, -210] : [0, 0]);
   const heroVizY = useTransform(scrollY, [0, 700], isDesktop ? [0, -350] : [0, 0]);
-  const bgGridY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 600] : [0, 0]);
   const parallaxWillChange = isDesktop ? 'transform' as const : undefined;
+
+  /* Deep-space parallax layers — each moves at a different speed to create
+     depth (nebula clouds slowest, near dust + shooting stars fastest). */
+  const bgAuroraY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 200] : [0, 0]);
+  const bgFarMountainY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 350] : [0, 0]);
+  const bgMidMountainY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 500] : [0, 0]);
+  const bgNearHillY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 700] : [0, 0]);
 
   /* Close mobile drawer on Escape */
   useEffect(() => {
@@ -661,6 +667,71 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => tweens.forEach((t) => t.kill());
   }, []);
 
+  /* ── RANDOM SHOOTING STARS ──
+     Spawns a meteor every 0.6-1.8 s at a random position + angle, animates it
+     across the sky with a fading tail, then removes it. Driven by JS timers
+     (not CSS) so the angles + timings stay genuinely unpredictable. */
+  const [shootingStars, setShootingStars] = useState<
+    Array<{
+      id: number;
+      top: number;
+      left: number;
+      angle: number;
+      distance: number;
+      duration: number;
+      delay: number;
+      thickness: number;
+      color: string;
+    }>
+  >([]);
+  const shootingStarIdRef = useRef(0);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) return;
+
+    let timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+
+    const spawnStar = () => {
+      if (cancelled) return;
+      // Star enters at a random position anywhere on screen and flies in a
+      // truly random direction (0..360 deg).
+      const top = Math.random() * 90 + 2;             // 2..92 % from top
+      const left = Math.random() * 92 + 2;            // 2..94 % from left
+      const angle = Math.random() * 360;              // any direction 0..360 deg
+      const distance = 320 + Math.random() * 420;    // 320..740 px travel
+      const duration = 700 + Math.random() * 800;    // 0.7..1.5 s
+      const delay = 0;
+      const thickness = 1 + Math.random() * 1.2;     // 1..2.2 px
+      const palette = ['#e0f2fe', '#a5f3fc', '#c4b5fd', '#fde68a'];
+      const color = palette[Math.floor(Math.random() * palette.length)];
+
+      const id = shootingStarIdRef.current++;
+      setShootingStars((prev) => [
+        ...prev,
+        { id, top, left, angle, distance, duration, delay, thickness, color },
+      ]);
+      // Auto-evict after the animation completes (so the array doesn't grow).
+      setTimeout(() => {
+        setShootingStars((prev) => prev.filter((s) => s.id !== id));
+      }, duration + 200);
+
+      // Schedule the NEXT spawn — random 0.6..1.8 s gap for a high meteor
+      // shower feel (multiple stars often in flight simultaneously).
+      const nextGap = 600 + Math.random() * 1200;
+      timer = setTimeout(spawnStar, nextGap);
+    };
+
+    // First spawn after a short initial delay.
+    timer = setTimeout(spawnStar, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
+
   /* Compute dynamic contextual statistics (preserves existing logic) */
   const physicsCount =
     folders.filter(
@@ -698,19 +769,163 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       id="landing_page_container"
       className="w-full min-h-screen text-slate-200 bg-[#060814] relative font-sans flex flex-col overflow-x-hidden selection:bg-cyan-500/20 selection:text-cyan-300"
     >
-      {/* Ambient gradient orb — the only page-wide infinite CSS animation */}
-      <div
-        aria-hidden
-        className="absolute top-[-15%] left-[-10%] w-[85%] h-[80%] rounded-full bg-gradient-to-br from-cyan-950/25 via-indigo-950/15 to-purple-950/10 blur-[180px] pointer-events-none select-none"
-        style={{ animation: 'pp-orb-drift 20s ease-in-out infinite' }}
-      />
+      {/* ── DEEP SPACE PARALLAX LAYERS ──
+         Layered cosmic atmosphere that moves at different speeds on scroll,
+         creating a 3D "looking out into space" depth effect:
+         1. Nebula clouds (slowest, deepest) — violet / indigo / cyan blobs
+         2. Distant star field (slow)        — small twinkling pinpricks
+         3. Mid star field (medium)          — brighter closer stars
+         4. Near dust + shooting stars      — fastest, foreground
 
-      {/* Grid overlay with radial mask — parallax (bgGridY) */}
+         All parallax layers are wrapped in a single `overflow-hidden` clip
+         box so transformed layers can't extend below the footer. */}
+
+      {/* Layer 1: Nebula clouds — deepest, slowest parallax */}
       <motion.div
         aria-hidden
-        style={{ y: bgGridY, willChange: parallaxWillChange }}
-        className="absolute inset-0 bg-[linear-gradient(to_right,#111827_1px,transparent_1px),linear-gradient(to_bottom,#111827_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_52%_at_50%_50%,#000_70%,transparent_100%)] opacity-25 pointer-events-none"
-      />
+        style={{ y: bgAuroraY, willChange: parallaxWillChange }}
+        className="absolute inset-0 pointer-events-none"
+      >
+        <div
+          className="absolute top-[5%] left-[5%] w-[60%] h-[55%] opacity-30"
+          style={{
+            background: 'radial-gradient(ellipse at center, rgba(168,85,247,0.30) 0%, rgba(124,58,237,0.12) 35%, transparent 70%)',
+            filter: 'blur(70px)',
+            animation: 'pp-nebula-drift 22s ease-in-out infinite',
+          }}
+        />
+        <div
+          className="absolute top-[20%] right-[5%] w-[55%] h-[60%] opacity-25"
+          style={{
+            background: 'radial-gradient(ellipse at center, rgba(34,211,238,0.22) 0%, rgba(14,165,233,0.10) 40%, transparent 70%)',
+            filter: 'blur(90px)',
+            animation: 'pp-nebula-drift 28s ease-in-out infinite reverse',
+          }}
+        />
+        <div
+          className="absolute bottom-[10%] left-[20%] w-[55%] h-[50%] opacity-20"
+          style={{
+            background: 'radial-gradient(ellipse at center, rgba(99,102,241,0.22) 0%, rgba(168,85,247,0.08) 45%, transparent 70%)',
+            filter: 'blur(110px)',
+            animation: 'pp-nebula-drift 34s ease-in-out infinite',
+            animationDelay: '-8s',
+          }}
+        />
+      </motion.div>
+
+      {/* Layer 2: Distant star field — slow parallax, dim small stars */}
+      <motion.div
+        aria-hidden
+        style={{ y: bgFarMountainY, willChange: parallaxWillChange }}
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+      >
+        {Array.from({ length: 90 }).map((_, i) => {
+          const seed = (i * 137) % 100;
+          const top = ((i * 53) % 100);
+          const left = ((i * 91) % 100);
+          const size = 0.6 + (seed / 100) * 1.2;
+          const dur = 3 + (seed % 5);
+          return (
+            <span
+              key={`far-${i}`}
+              className="absolute rounded-full bg-white"
+              style={{
+                top: `${top}%`,
+                left: `${left}%`,
+                width: `${size}px`,
+                height: `${size}px`,
+                opacity: 0.35,
+                animation: `pp-twinkle ${dur}s ease-in-out infinite`,
+                animationDelay: `-${(seed / 10).toFixed(1)}s`,
+                boxShadow: '0 0 2px rgba(255,255,255,0.5)',
+              }}
+            />
+          );
+        })}
+      </motion.div>
+
+      {/* Layer 3: Mid star field — medium parallax, brighter closer stars */}
+      <motion.div
+        aria-hidden
+        style={{ y: bgMidMountainY, willChange: parallaxWillChange }}
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+      >
+        {Array.from({ length: 50 }).map((_, i) => {
+          const top = ((i * 71) % 100);
+          const left = ((i * 47) % 100);
+          const size = 1 + (i % 3) * 0.5;
+          const dur = 2.5 + (i % 4);
+          const tint = i % 4 === 0 ? '#a5f3fc' : i % 4 === 1 ? '#c4b5fd' : i % 4 === 2 ? '#fde68a' : '#ffffff';
+          return (
+            <span
+              key={`mid-${i}`}
+              className="absolute rounded-full"
+              style={{
+                top: `${top}%`,
+                left: `${left}%`,
+                width: `${size}px`,
+                height: `${size}px`,
+                background: tint,
+                opacity: 0.5,
+                animation: `pp-twinkle ${dur}s ease-in-out infinite`,
+                animationDelay: `-${(i % 7 * 0.4).toFixed(1)}s`,
+                boxShadow: `0 0 ${2 + (i % 3)}px ${tint}`,
+              }}
+            />
+          );
+        })}
+      </motion.div>
+
+      {/* Layer 4: Near dust + shooting stars — fast parallax, foreground */}
+      <motion.div
+        aria-hidden
+        style={{ y: bgNearHillY, willChange: parallaxWillChange }}
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+      >
+        {Array.from({ length: 20 }).map((_, i) => {
+          const top = ((i * 31) % 100);
+          const left = ((i * 67) % 100);
+          return (
+            <span
+              key={`near-${i}`}
+              className="absolute rounded-full bg-white"
+              style={{
+                top: `${top}%`,
+                left: `${left}%`,
+                width: '1.4px',
+                height: '1.4px',
+                opacity: 0.7,
+                animation: `pp-twinkle ${1.8 + (i % 4)}s ease-in-out infinite`,
+                animationDelay: `-${(i % 5 * 0.3).toFixed(1)}s`,
+                boxShadow: '0 0 3px rgba(255,255,255,0.7)',
+              }}
+            />
+          );
+        })}
+
+        {/* Shooting stars — random angle/position/duration from the spawn effect */}
+        {shootingStars.map((s) => (
+          <span
+            key={s.id}
+            className="absolute pointer-events-none"
+            style={
+              {
+                top: `${s.top}%`,
+                left: `${s.left}%`,
+                height: `${s.thickness}px`,
+                width: '120px',
+                background: `linear-gradient(to right, transparent 0%, ${s.color} 80%, ${s.color} 100%)`,
+                borderRadius: '9999px',
+                transform: `rotate(${s.angle}deg)`,
+                transformOrigin: '0% 50%',
+                '--ss-distance': `${s.distance}px`,
+                boxShadow: `0 0 6px ${s.color}, 0 0 12px ${s.color}`,
+                animation: `pp-shooting-star ${s.duration}ms cubic-bezier(0.4, 0.0, 0.2, 1) ${s.delay}ms forwards`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </motion.div>
 
       {/* Top banner — customizable by super admin */}
       {bannerConfig?.enabled !== false && (

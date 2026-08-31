@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
+import { geminiGenerate } from '@/lib/gemini-byok';
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,6 +8,15 @@ export async function POST(request: NextRequest) {
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const userApiKey = request.headers.get('x-gemini-api-key');
+    if (!userApiKey || !userApiKey.trim()) {
+      return NextResponse.json(
+        { error: 'Gemini API key required. Open "Gemini Key" in your profile sidebar and connect your free Google Gemini API key to use AI features.', needsGeminiKey: true },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { prompt, subject, language = 'en' } = body;
     if (!prompt) {
@@ -21,36 +31,19 @@ Provide clear, concise, helpful answers. Use Markdown formatting when appropriat
 Include code blocks for formulas, examples, or step-by-step solutions.
 Keep responses under 600 words.`;
 
-    let aiResponse: string;
     try {
-      const ZAI = await import('z-ai-web-dev-sdk');
-      // The z-AI SDK reads the API key from process.env.GEMINI_API_KEY automatically.
-      // BYOK: if the user sends their own key via x-gemini-api-key header, we set
-      // it as the env var before calling create() (workaround for SDK not accepting args).
-      const userApiKey = request.headers.get('x-gemini-api-key');
-      if (userApiKey) {
-        process.env.GEMINI_API_KEY = userApiKey;
-      }
-      const zai = await ZAI.default.create();
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: String(prompt) },
-        ],
+      const aiResponse = await geminiGenerate(userApiKey.trim(), sysPrompt, String(prompt), {
         temperature: 0.7,
-        max_tokens: 1500,
+        maxOutputTokens: 1500,
       });
-      aiResponse = completion.choices?.[0]?.message?.content || '';
+      return NextResponse.json({ content: aiResponse });
     } catch (aiErr: any) {
-      console.error('AI SDK error:', aiErr);
-      aiResponse = `> ⚠️ **Note:** The AI service is currently unavailable.\n\nI received your question about **${prompt}** but cannot generate a live response right now. Please try again in a moment, or review your textbook materials on this topic.`;
+      console.error('Gemini chat error:', aiErr?.message);
+      return NextResponse.json(
+        { error: aiErr?.message || 'Gemini AI request failed. Check that your API key is valid and try again.' },
+        { status: 502 }
+      );
     }
-
-    if (!aiResponse) {
-      aiResponse = `> ⚠️ Empty AI response received. Please try again.`;
-    }
-
-    return NextResponse.json({ content: aiResponse });
   } catch (err: any) {
     console.error('POST /api/academy/chat error:', err);
     return NextResponse.json({ error: 'Could not process chat.' }, { status: 500 });

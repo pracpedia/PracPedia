@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
+import { geminiGenerate } from '@/lib/gemini-byok';
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,6 +8,15 @@ export async function POST(request: NextRequest) {
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const userApiKey = request.headers.get('x-gemini-api-key');
+    if (!userApiKey || !userApiKey.trim()) {
+      return NextResponse.json(
+        { error: 'Gemini API key required. Open "Gemini Key" in your profile sidebar and connect your free Google Gemini API key to use AI features.', needsGeminiKey: true },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { subject, topic, question, language = 'en' } = body;
 
@@ -28,32 +38,19 @@ Provide a detailed step-by-step solution to the creative question. Use Markdown 
 6. **Alternative Approach** — another way to solve it
 Keep the response under 800 words.`;
 
-    let aiResponse: string;
     try {
-      const ZAI = await import('z-ai-web-dev-sdk');
-      // BYOK: set user's API key as env var if provided via header
-      const userApiKey = request.headers.get('x-gemini-api-key');
-      if (userApiKey) process.env.GEMINI_API_KEY = userApiKey;
-      const zai = await ZAI.default.create();
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: String(question) },
-        ],
+      const aiResponse = await geminiGenerate(userApiKey.trim(), sysPrompt, String(question), {
         temperature: 0.6,
-        max_tokens: 1800,
+        maxOutputTokens: 1800,
       });
-      aiResponse = completion.choices?.[0]?.message?.content || '';
+      return NextResponse.json({ content: aiResponse });
     } catch (aiErr: any) {
-      console.error('AI SDK error in CQ:', aiErr);
-      aiResponse = `> ⚠️ **AI service unavailable.**\n\nCould not generate a creative question solution right now. Please try again later.\n\n**Your question:** ${question}`;
+      console.error('Gemini CQ error:', aiErr?.message);
+      return NextResponse.json(
+        { error: aiErr?.message || 'Gemini AI request failed. Check that your API key is valid and try again.' },
+        { status: 502 }
+      );
     }
-
-    if (!aiResponse) {
-      aiResponse = `> ⚠️ Empty AI response received.`;
-    }
-
-    return NextResponse.json({ content: aiResponse });
   } catch (err: any) {
     console.error('POST /api/academy/cq error:', err);
     return NextResponse.json({ error: 'Could not generate CQ solution.' }, { status: 500 });

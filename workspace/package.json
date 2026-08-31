@@ -12,10 +12,9 @@
     "db:push": "prisma db push --accept-data-loss",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",
     "db:seed": "bunx tsx prisma/seed.ts",
-    "db:use-sqlite": "cp prisma/schema.sqlite.prisma prisma/schema.prisma && bunx prisma generate",
-    "db:use-postgres": "cp prisma/schema.postgres.prisma prisma/schema.prisma && bunx prisma generate",
     "postinstall": "prisma generate"
   },
   "prisma": {

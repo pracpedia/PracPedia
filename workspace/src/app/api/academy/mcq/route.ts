@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
+import { geminiGenerate } from '@/lib/gemini-byok';
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,6 +8,15 @@ export async function POST(request: NextRequest) {
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const userApiKey = request.headers.get('x-gemini-api-key');
+    if (!userApiKey || !userApiKey.trim()) {
+      return NextResponse.json(
+        { error: 'Gemini API key required. Open "Gemini Key" in your profile sidebar and connect your free Google Gemini API key to use AI features.', needsGeminiKey: true },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { subject, topic, count = 5, language = 'en' } = body;
 
@@ -24,35 +34,32 @@ Return a JSON array of ${count} multiple choice questions. Each question must ha
 
 Return ONLY the JSON array, no markdown fences or surrounding text.`;
 
-    let parsed: any[] = [];
+    const userPrompt = `Generate ${count} MCQs on: ${topic} (${subject})`;
+
+    let parsed: any[];
     try {
-      const ZAI = await import('z-ai-web-dev-sdk');
-      // BYOK: set user's API key as env var if provided via header
-      const userApiKey = request.headers.get('x-gemini-api-key');
-      if (userApiKey) process.env.GEMINI_API_KEY = userApiKey;
-      const zai = await ZAI.default.create();
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: `Generate ${count} MCQs on: ${topic} (${subject})` },
-        ],
+      const raw = await geminiGenerate(userApiKey.trim(), sysPrompt, userPrompt, {
         temperature: 0.7,
-        max_tokens: 2500,
+        maxOutputTokens: 2500,
       });
-      const raw = completion.choices?.[0]?.message?.content || '[]';
-      // Extract JSON from possible markdown fences
       let cleaned = raw.trim();
       if (cleaned.startsWith('```')) {
         cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
       }
       parsed = JSON.parse(cleaned);
     } catch (aiErr: any) {
-      console.error('AI SDK error in MCQ:', aiErr);
-      parsed = generateFallbackMCQs(subject, topic, count);
+      console.error('Gemini MCQ error:', aiErr?.message);
+      return NextResponse.json(
+        { error: aiErr?.message || 'Gemini AI request failed. Check that your API key is valid and try again.' },
+        { status: 502 }
+      );
     }
 
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      parsed = generateFallbackMCQs(subject, topic, count);
+      return NextResponse.json(
+        { error: 'Gemini returned no valid MCQs. Please try again.' },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json({ questions: parsed });
@@ -60,24 +67,4 @@ Return ONLY the JSON array, no markdown fences or surrounding text.`;
     console.error('POST /api/academy/mcq error:', err);
     return NextResponse.json({ error: 'Could not generate MCQs.' }, { status: 500 });
   }
-}
-
-function generateFallbackMCQs(subject: string | undefined, topic: string | undefined, count: number): any[] {
-  const subj = subject || 'General Science';
-  const top = topic || 'this topic';
-  const qs: any[] = [];
-  for (let i = 0; i < Math.max(1, Math.min(count, 10)); i++) {
-    qs.push({
-      question: `Sample MCQ #${i + 1} on ${top} (${subj}). Which statement is correct?`,
-      options: [
-        'Option A — the primary definition or concept',
-        'Option B — a common misconception',
-        'Option C — an unrelated distractor',
-        'Option D — a partially correct statement',
-      ],
-      answer: 0,
-      explanation: 'Option A is correct because it directly aligns with the textbook definition.',
-    });
-  }
-  return qs;
 }

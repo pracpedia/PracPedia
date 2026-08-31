@@ -131,12 +131,6 @@ export const PublicMarketplace: React.FC<PublicMarketplaceProps> = ({ onRegister
         style={{ animation: 'pp-orb-drift 20s ease-in-out infinite' }}
       />
 
-      {/* Grid overlay with radial mask */}
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-[linear-gradient(to_right,#111827_1px,transparent_1px),linear-gradient(to_bottom,#111827_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_52%_at_50%_50%,#000_70%,transparent_100%)] opacity-25 pointer-events-none"
-      />
-
       {/* Header */}
       <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#060814]/70 border-b border-white/[0.06]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 md:h-16 flex items-center justify-between gap-3">

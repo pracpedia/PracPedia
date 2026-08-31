@@ -17,8 +17,8 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading, user } = useAuth();
 
-  const [email, setEmail] = useState('pracpedia@gmail.com');
-  const [password, setPassword] = useState('pracpedia123456789');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -72,7 +72,6 @@ export default function AdminLoginPage() {
       {/* Ambient glows */}
       <div className="absolute top-[-15%] left-[10%] w-[60vw] h-[45vh] rounded-full bg-gradient-to-br from-amber-600/15 via-amber-500/8 to-transparent blur-[160px] pointer-events-none" />
       <div className="absolute bottom-[-15%] right-[10%] w-[55vw] h-[45vh] rounded-full bg-gradient-to-tl from-fuchsia-600/8 via-amber-600/5 to-transparent blur-[160px] pointer-events-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1a1208_1px,transparent_1px),linear-gradient(to_bottom,#1a1208_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_45%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -164,12 +163,15 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          {/* Demo credentials hint */}
-          <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-200/80 text-[11px] leading-relaxed">
-            <p className="font-bold text-amber-300 mb-1">Demo Admin Credentials:</p>
-            <p>Super Admin: <code className="font-mono">pracpedia@gmail.com / pracpedia123456789</code></p>
-            <p>Admin: <code className="font-mono">admin2@gallery.com</code> / <code className="font-mono">admin123</code></p>
-          </div>
+          {/* Demo credentials hint — only shown in development */}
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-200/80 text-[11px] leading-relaxed">
+              <p className="font-bold text-amber-300 mb-1">Dev Mode — Demo Admin Credentials:</p>
+              <p>Super Admin: <code className="font-mono">pracpedia@gmail.com / pracpedia123456789</code></p>
+              <p>Admin: <code className="font-mono">admin2@gallery.com</code> / <code className="font-mono">admin123</code></p>
+              <p className="text-amber-200/50 mt-1 text-[10px]">These credentials are for local development only. In production, this hint is hidden.</p>
+            </div>
+          )}
         </div>
 
         {/* Back to main site */}

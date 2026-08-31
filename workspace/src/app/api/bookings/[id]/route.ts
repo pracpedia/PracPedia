@@ -86,7 +86,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const updateData: any = {};
     if (newStatus) updateData.status = newStatus;
-    if (paymentStatus !== undefined) updateData.paymentStatus = String(paymentStatus);
+    // paymentStatus can ONLY be set by an admin/artist (after a payment
+    // webhook confirms the payment). Clients cannot self-mark their own
+    // booking as paid — there's no payment gateway integration, so the
+    // previous version allowed anyone to forge a paid booking.
+    if (paymentStatus !== undefined && (isArtist || isSuperAdmin || isAdmin)) {
+      const validPaymentStatuses = ['unpaid', 'paid', 'refunded'];
+      const ps = String(paymentStatus);
+      if (validPaymentStatuses.includes(ps)) {
+        updateData.paymentStatus = ps;
+      }
+    }
     if (artistNotes !== undefined && isArtist) updateData.artistNotes = String(artistNotes);
     if (clientNotes !== undefined && isClient) updateData.clientNotes = String(clientNotes);
 

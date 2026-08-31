@@ -2,18 +2,20 @@
  * File-based error log writer/reader.
  *
  * Errors reported by the client are persisted as JSON-lines
- * (one JSON object per line) at /home/z/my-project/logs/errors.log.
+ * (one JSON object per line) at `/tmp/pracpedia-logs/errors.log`.
  *
- * This avoids a Prisma migration (just for dev logging) while still giving
- * admins a queryable on-disk record. For production you'd swap this for
- * Sentry / Datadog / a Postgres `ErrorLog` table — the API surface here is
- * small enough that the swap is a one-file change.
+ * Why /tmp?
+ *   Vercel serverless functions have a read-only filesystem except `/tmp`.
+ *   Writing to a hardcoded project-relative path throws EROFS on every
+ *   error report. `/tmp` is per-instance ephemeral — for a persistent log,
+ *   swap this for a Postgres `ErrorLog` table or Sentry.
  */
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import os from 'os';
 
-const LOG_DIR = '/home/z/my-project/logs';
+const LOG_DIR = path.join(os.tmpdir(), 'pracpedia-logs');
 const LOG_FILE = path.join(LOG_DIR, 'errors.log');
 
 export interface ErrorLogEntry {

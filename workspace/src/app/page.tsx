@@ -1344,14 +1344,17 @@ function PortalConsole() {
       activeTheme === 'cosmic-black' ? 'theme-cosmic-black' :
       activeTheme === 'mesh-aurora' ? 'theme-mesh-aurora' :
       activeTheme === 'emerald-green' ? 'theme-emerald-green' :
-      activeTheme === 'islamic-green' ? 'theme-islamic-green' :
-      activeTheme === 'golden-mosque' ? 'theme-golden-mosque' :
+      activeTheme === 'botanic-green' ? 'theme-botanic-green' :
+      activeTheme === 'saffron-gold' ? 'theme-saffron-gold' :
       activeTheme === 'royal-purple' ? 'theme-royal-purple' :
       activeTheme === 'crimson-red' ? 'theme-crimson-red' :
       activeTheme === 'ocean-teal' ? 'theme-ocean-teal' :
       activeTheme === 'sunset-orange' ? 'theme-sunset-orange' :
       activeTheme === 'midnight-blue' ? 'theme-midnight-blue' :
       activeTheme === 'rose-pink' ? 'theme-rose-pink' :
+      activeTheme === 'abyss-violet' ? 'theme-abyss-violet' :
+      activeTheme === 'obsidian-gold' ? 'theme-obsidian-gold' :
+      activeTheme === 'plasma-storm' ? 'theme-plasma-storm' :
       'glass-main-bg'
     }`}>
 
@@ -1726,14 +1729,17 @@ function PortalConsole() {
               <option value="cosmic-black">🖤 Black</option>
               <option value="mesh-aurora">✨ Aurora</option>
               <option value="emerald-green">🌲 Emerald</option>
-              <option value="islamic-green">🕌 Islamic Green</option>
-              <option value="golden-mosque">🕌 Golden Mosque</option>
+              <option value="botanic-green">🌿 Botanic Green</option>
+              <option value="saffron-gold">🌟 Saffron Gold</option>
               <option value="royal-purple">👑 Royal Purple</option>
               <option value="crimson-red">🔴 Crimson Red</option>
               <option value="ocean-teal">🌊 Ocean Teal</option>
               <option value="sunset-orange">🌅 Sunset Orange</option>
               <option value="midnight-blue">🌙 Midnight Blue</option>
               <option value="rose-pink">🌸 Rose Pink</option>
+              <option value="abyss-violet">🌌 Abyss Violet</option>
+              <option value="obsidian-gold">⚫ Obsidian Gold</option>
+              <option value="plasma-storm">⚡ Plasma Storm</option>
             </select>
           </div>
         </div>
@@ -1834,14 +1840,17 @@ function PortalConsole() {
                 <option value="cosmic-black">🖤 Black</option>
                 <option value="mesh-aurora">🌈 Aurora</option>
                 <option value="emerald-green">🌲 Emerald</option>
-                <option value="islamic-green">🕌 Islamic Green</option>
-                <option value="golden-mosque">🕌 Golden Mosque</option>
+                <option value="botanic-green">🌿 Botanic Green</option>
+                <option value="saffron-gold">🌟 Saffron Gold</option>
                 <option value="royal-purple">👑 Royal Purple</option>
                 <option value="crimson-red">🔴 Crimson Red</option>
                 <option value="ocean-teal">🌊 Ocean Teal</option>
                 <option value="sunset-orange">🌅 Sunset Orange</option>
                 <option value="midnight-blue">🌙 Midnight Blue</option>
                 <option value="rose-pink">🌸 Rose Pink</option>
+                <option value="abyss-violet">🌌 Abyss Violet</option>
+                <option value="obsidian-gold">⚫ Obsidian Gold</option>
+                <option value="plasma-storm">⚡ Plasma Storm</option>
               </select>
             </div>
 

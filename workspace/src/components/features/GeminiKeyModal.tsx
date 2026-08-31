@@ -50,10 +50,20 @@ export const GeminiKeyModal: React.FC = () => {
     setMsg(language === 'bn' ? 'যাচাই করা হচ্ছে...' : 'Verifying Gemini API key...');
 
     try {
-      // Test Gemini API key against health check endpoint
-      const res = await fetch('/api/health', {
-        headers: { 'x-gemini-api-key': cleanKey }
-      });
+      // Actually call Gemini with a trivial prompt to verify the key.
+      // The previous version called /api/health which never reads the
+      // header — so the test always succeeded even for garbage keys.
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(cleanKey)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: 5 },
+          }),
+        }
+      );
 
       if (res.ok) {
         setGeminiApiKey(cleanKey);
@@ -64,22 +74,18 @@ export const GeminiKeyModal: React.FC = () => {
           setStatus('idle');
         }, 1200);
       } else {
-        setGeminiApiKey(cleanKey); // save anyway
-        setStatus('success');
-        setMsg(language === 'bn' ? 'এপিআই কি সংরক্ষিত হয়েছে!' : 'Gemini API key saved!');
-        setTimeout(() => {
-          setIsKeyModalOpen(false);
-          setStatus('idle');
-        }, 1200);
+        let detail = '';
+        try { const e2 = await res.json(); detail = e2?.error?.message || ''; } catch (_) {}
+        setStatus('error');
+        setMsg(
+          language === 'bn'
+            ? `কি যাচাই ব্যর্থ (${res.status}): ${detail || res.statusText}`
+            : `Key verification failed (${res.status}): ${detail || res.statusText}`
+        );
       }
-    } catch (err) {
-      setGeminiApiKey(cleanKey);
-      setStatus('success');
-      setMsg(language === 'bn' ? 'এপিআই কি সংরক্ষিত হয়েছে!' : 'Gemini API key saved!');
-      setTimeout(() => {
-        setIsKeyModalOpen(false);
-        setStatus('idle');
-      }, 1200);
+    } catch (err: any) {
+      setStatus('error');
+      setMsg(language === 'bn' ? 'নেটওয়ার্ক ত্রুটি: কি যাচাই করা যায়নি' : 'Network error: could not verify key');
     }
   };
 

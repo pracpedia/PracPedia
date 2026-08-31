@@ -1,12 +1,16 @@
 // Prisma schema for PracPedia (Practical Notebook Gallery)
+//
+// PostgreSQL-only. The project no longer supports SQLite — Neon serverless
+// Postgres is the recommended production provider. Set DATABASE_URL in .env
+// (see .env.example for the format — do NOT include channel_binding=require).
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:/home/z/my-project/db/custom.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -28,23 +32,24 @@ model User {
   // Granular permissions for admins — JSON array of permission keys.
   // Super admins have all permissions implicitly. Regular admins only have
   // the permissions assigned to them by a super admin.
-  // Examples: "manage_users", "manage_subjects", "manage_folders",
-  //           "manage_announcements", "manage_hire_requests",
-  //           "manage_commissions", "view_credentials", "manage_artists"
   permissionsJson String   @default("[]")
 
   // Artist marketplace fields
-  rateDrawingOnly  Int      @default(150)   // BDT price for "Drawing Only" service
-  rateDrawingWriting Int    @default(300)   // BDT price for "Drawing + Writing" service
-  notebookCost     Int      @default(100)   // BDT extra if artist provides the notebook
-  specialtiesJson String   @default("[]")   // JSON array of strings
-  isAvailable     Boolean  @default(true)   // accepting new commissions?
-  rating          Float    @default(5.0)    // average rating (0-5)
-  completedOrders Int      @default(0)      // total completed commissions
+  rateDrawingOnly  Int      @default(150)
+  rateDrawingWriting Int    @default(300)
+  notebookCost     Int      @default(100)
+  specialtiesJson String   @default("[]")
+  isAvailable     Boolean  @default(true)
+  rating          Float    @default(5.0)
+  completedOrders Int      @default(0)
 
-  // IP address tracking — records the user's last known IP for security
-  // auditing and abuse prevention. Updated on login, register, and google auth.
+  // IP address tracking
   lastIpAddress String?
+
+  // Trial-credit recharge cooldown — set to the current time when the user
+  // self-recharges via /api/users/recharge-trial. Regular users are limited
+  // to one recharge per 24h. Platform owners bypass.
+  lastRechargeAt DateTime?
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -53,9 +58,7 @@ model User {
   bookingsAsArtist  Booking[]    @relation("BookingArtist")
   portfolio         PortfolioItem[]
 
-  // Index the role column — every admin dashboard query filters by role
   @@index([role])
-  // Compound index for marketplace listing: availability + rating for sorting
   @@index([isAvailable, rating])
   @@map("users")
 }
@@ -78,13 +81,12 @@ model Folder {
   subjectId   String
   title       String
   description String
-  imagesJson  String   @default("[]") // JSON array of {url, title}
+  imagesJson  String   @default("[]")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  // Folder listing is always filtered by subjectId
   @@index([subjectId])
   @@map("folders")
 }
@@ -94,15 +96,17 @@ model Announcement {
   title        String
   content      String
   deadline     String?
-  fileUrl      String?  // downloadable file (URL or base64 data URL)
-  fileName     String?  // original filename for download
-  fileSize     Int      @default(0) // bytes (0 if URL)
-  targetUserId String?  // null = broadcast to all; specific user ID = targeted share
+  fileUrl      String?
+  fileName     String?
+  fileSize     Int      @default(0)
+  targetUserId String?  // null = broadcast; user ID = targeted; also used as KV key for landing/banner-config
   createdById  String
   createdByName String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@index([targetUserId])
+  @@index([createdById])
   @@map("announcements")
 }
 
@@ -114,14 +118,12 @@ model ChatMessage {
   userRole   String   @default("user")
   userAvatar String?
   text       String
-  imageUrl   String?  // base64 data URL or blob URL for image messages
+  imageUrl   String?
   createdAt  DateTime @default(now())
 
   subject    Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  // Chat messages are always fetched by subjectId, newest first
   @@index([subjectId, createdAt])
-  // Also index userId for "messages by this user" queries
   @@index([userId])
   @@map("chat_messages")
 }
@@ -133,11 +135,10 @@ model HireRequest {
   phone      String
   subject    String
   message    String
-  status     String   @default("pending") // pending | approved | rejected
+  status     String   @default("pending")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  // Admin inbox is filtered by status
   @@index([status])
   @@map("hire_requests")
 }
@@ -146,17 +147,17 @@ model Booking {
   id            String   @id @default(cuid())
   clientId      String
   artistId      String
-  serviceType   String   @default("drawing_only") // "drawing_only" | "drawing_writing"
-  notebookProvider String @default("client") // "client" (I will provide) | "artist" (artist provides)
+  serviceType   String   @default("drawing_only")
+  notebookProvider String @default("client")
   subject       String
   description   String
-  referenceImagesJson String @default("[]") // JSON array of {url, title}
-  price             Int      @default(0)        // BDT — total price student pays
-  commissionPercent Int      @default(0)        // % commission admin takes (0-100)
-  commissionAmount  Int      @default(0)        // BDT — calculated commission amount (price * percent / 100)
-  artistEarnings    Int      @default(0)        // BDT — what artist keeps (price - commissionAmount)
-  status        String   @default("pending") // pending | in_progress | completed | cancelled
-  paymentStatus String   @default("unpaid")  // unpaid | paid | refunded
+  referenceImagesJson String @default("[]")
+  price             Int      @default(0)
+  commissionPercent Int      @default(0)
+  commissionAmount  Int      @default(0)
+  artistEarnings    Int      @default(0)
+  status        String   @default("pending")
+  paymentStatus String   @default("unpaid")
   clientNotes   String?
   artistNotes   String?
   createdAt     DateTime @default(now())
@@ -165,7 +166,6 @@ model Booking {
   client        User     @relation("BookingClient", fields: [clientId], references: [id], onDelete: Cascade)
   artist        User     @relation("BookingArtist", fields: [artistId], references: [id], onDelete: Cascade)
 
-  // Bookings are always queried by client OR artist, filtered by status
   @@index([clientId, status])
   @@index([artistId, status])
   @@index([status])
@@ -178,34 +178,31 @@ model PortfolioItem {
   imageUrl    String
   title       String
   description String   @default("")
-  tagsJson    String   @default("[]") // JSON array of subject tags
+  tagsJson    String   @default("[]")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   artist      User     @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
-  // Portfolio is always fetched by artistId
   @@index([artistId])
   @@map("portfolio_items")
 }
 
-/// Activity log entry — tracks user actions for the admin real-time feed.
-/// Each row is one event: login, register, booking created, message posted, etc.
 model ActivityLog {
   id        String   @id @default(cuid())
-  userId    String?  // null for anonymous/public events
+  userId    String?
   userName  String   @default("Anonymous")
   userRole  String   @default("user")
-  action    String   // e.g. "login", "register", "booking_created", "message_sent"
-  category  String   @default("user") // "auth" | "user" | "content" | "marketplace" | "chat" | "system"
-  detail    String   @default("")    // human-readable description
-  metadataJson String @default("{}") // JSON object with extra context (e.g. bookingId, subjectId)
+  action    String
+  category  String   @default("user")
+  detail    String   @default("")
+  metadataJson String @default("{}")
   ipAddress String?
   createdAt DateTime @default(now())
 
-  @@index([createdAt])     // newest first — main query pattern
-  @@index([userId])         // filter by user
-  @@index([category])       // filter by category
-  @@index([action])         // filter by action type
+  @@index([createdAt])
+  @@index([userId])
+  @@index([category])
+  @@index([action])
   @@map("activity_logs")
 }

@@ -3,12 +3,25 @@ import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { uploadDataUrl } from '@/lib/blob-storage';
 
+/**
+ * POST /api/images
+ *
+ * Attach an image to a folder. Admin / super_admin only — regular users
+ * (students, artists) cannot mutate admin-managed folders.
+ *
+ * The read-modify-write of `imagesJson` is wrapped in a transaction so
+ * two concurrent uploads don't both read the same array and lose one image.
+ */
 export async function POST(request: NextRequest) {
   try {
     const payload = await getUserFromRequest(request);
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Admin only.' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { folderId, imageUrl, title } = body;
     if (!folderId || !imageUrl) {
@@ -19,18 +32,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
     }
 
-    // If the image is a base64 data URL, upload it to blob storage (Vercel Blob
-    // in production, stays as data URL in dev). This keeps the DB small.
     const finalUrl = imageUrl.startsWith('data:')
       ? await uploadDataUrl(String(imageUrl), 'folders')
       : String(imageUrl);
 
-    const images = JSON.parse(folder.imagesJson || '[]');
-    images.push({ url: finalUrl, title: String(title || '') });
-    const updated = await db.folder.update({
-      where: { id: folder.id },
-      data: { imagesJson: JSON.stringify(images) },
+    // Transaction + read-from-row to avoid the lost-update race where two
+    // concurrent uploads both parse the same imagesJson, both push, and one
+    // image is silently dropped.
+    const updated = await db.$transaction(async (tx) => {
+      const fresh = await tx.folder.findUniqueOrThrow({ where: { id: folder.id } });
+      const images = JSON.parse(fresh.imagesJson || '[]');
+      images.push({ url: finalUrl, title: String(title || '') });
+      return tx.folder.update({
+        where: { id: fresh.id },
+        data: { imagesJson: JSON.stringify(images) },
+      });
     });
+
+    const images = JSON.parse(updated.imagesJson || '[]');
     return NextResponse.json({
       id: updated.id,
       subjectId: updated.subjectId,

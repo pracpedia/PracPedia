@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { requirePermission } from '@/lib/permissions';
 
 /**
  * GET /api/announcements
@@ -53,9 +54,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const payload = await getUserFromRequest(request);
-    if (!payload || (payload.role !== 'admin' && payload.role !== 'super_admin')) {
-      return NextResponse.json({ error: 'Admin only.' }, { status: 403 });
+    if (!payload) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const denied = await requirePermission(request, 'manage_announcements');
+    if (denied) return NextResponse.json({ error: 'Forbidden — requires permission: manage_announcements' }, { status: 403 });
     const u = await db.user.findUnique({ where: { id: payload.userId } });
     if (!u) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

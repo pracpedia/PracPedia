@@ -1,32 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { isTestModeSafe } from '@/lib/test-mode';
 
 /**
  * Super-admin-only endpoint returning ALL users' plaintext credentials.
  *
  * ⚠️  TEST MODE ONLY — DO NOT DEPLOY TO PRODUCTION.
  *
- * Returns:
- *   - System metadata (framework, Node version, uptime)
- *   - Per-table row counts
- *   - Admin / super_admin user list
- *   - Endpoint catalog
- *   - **ALL users** with: name, email, plaintext password, phone number, role
- *
- * The `allUsers` array is what the credentials viewer UI renders in the red
- * "TEST MODE" section with search functionality.
+ * Hard-gated by `isTestModeSafe()` — returns 404 in production even if the
+ * `PRACPEDIA_TEST_PASSWORDS_VISIBLE` env flag is accidentally set. This
+ * prevents a leaked .env from exposing the entire user table.
  *
  * Auth:
- *   1. `PRACPEDIA_TEST_PASSWORDS_VISIBLE=true` in env (hard gate)
+ *   1. `isTestModeSafe()` (env flag AND not production — hard gate)
  *   2. Caller must be authenticated
  *   3. Caller must have role === 'super_admin'
- *
- * If the env flag is off, returns 404 (endpoint effectively doesn't exist).
  */
 export async function GET(request: NextRequest) {
-  // Hard gate — even super admins cannot bypass this without the env flag.
-  if (process.env.PRACPEDIA_TEST_PASSWORDS_VISIBLE !== 'true') {
+  if (!isTestModeSafe()) {
     return NextResponse.json({ error: 'Not found.' }, { status: 404 });
   }
 

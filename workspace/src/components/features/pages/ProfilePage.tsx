@@ -637,7 +637,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({
     !phoneNumber || /^[0-9+\-\s()]{6,20}$/.test(phoneNumber.trim());
 
   return (
-    <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-0 shadow-none">
+    <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
       <CardHeader className="pb-4 border-b border-white/[0.04]">
         <SectionTitle
           icon={UserIcon}
@@ -816,7 +816,7 @@ const ArtistSettingsTab: React.FC<ArtistSettingsTabProps> = ({
     <div className="grid lg:grid-cols-[1fr_320px] gap-6">
       {/* Left: forms */}
       <div className="space-y-5">
-        <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-0 shadow-none">
+        <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
           <CardHeader className="pb-4 border-b border-white/[0.04]">
             <SectionTitle
               icon={Coins}
@@ -897,7 +897,7 @@ const ArtistSettingsTab: React.FC<ArtistSettingsTabProps> = ({
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-0 shadow-none">
+        <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
           <CardHeader className="pb-4 border-b border-white/[0.04]">
             <SectionTitle
               icon={Sparkles}
@@ -954,7 +954,7 @@ const ArtistSettingsTab: React.FC<ArtistSettingsTabProps> = ({
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-0 shadow-none">
+        <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
           <CardHeader className="pb-4 border-b border-white/[0.04]">
             <SectionTitle
               icon={isAvailable ? CheckCircle2 : Clock}
@@ -1523,7 +1523,7 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
   return (
     <div className="space-y-5">
       {/* Account type */}
-      <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-0 shadow-none">
+      <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
         <CardHeader className="pb-4 border-b border-white/[0.04]">
           <SectionTitle
             icon={Crown}
@@ -1558,7 +1558,7 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
       </Card>
 
       {/* Change password (placeholder) */}
-      <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-0 shadow-none">
+      <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
         <CardHeader className="pb-4 border-b border-white/[0.04]">
           <SectionTitle
             icon={Lock}
@@ -1635,7 +1635,7 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
       </Card>
 
       {/* Email display */}
-      <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-0 shadow-none">
+      <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
         <CardHeader className="pb-4 border-b border-white/[0.04]">
           <SectionTitle
             icon={Mail}
@@ -1656,7 +1656,7 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
       </Card>
 
       {/* Danger zone */}
-      <Card className="bg-rose-500/[0.03] border-rose-500/15 gap-0 py-0 shadow-none">
+      <Card className="bg-rose-500/[0.03] border-rose-500/15 gap-0 py-5 shadow-none">
         <CardHeader className="pb-4 border-b border-rose-500/[0.08]">
           <SectionTitle
             icon={AlertTriangle}
@@ -2103,7 +2103,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
                 className="bg-white/[0.02] border-white/10 text-slate-200 hover:bg-white/5 hover:text-white h-11 min-h-[44px]"
               >
                 <Key className="w-4 h-4" />
-                Open AI Key
+                Gemini Key
               </Button>
               <Button
                 type="button"
