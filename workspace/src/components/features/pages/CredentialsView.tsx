@@ -121,7 +121,7 @@ interface CredentialsPayload {
 
 interface EndpointCategory {
   name: string;
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
   bg: string;
   border: string;
@@ -472,7 +472,7 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
   void _demoAccounts; void _allUsers; void _testMode; void _warning;
   const categories = categorizeEndpoints(endpoints);
 
-  const statsTiles: { label: string; value: number | undefined; icon: React.ElementType; color: string; bg: string; border: string }[] = [
+  const statsTiles: { label: string; value: number | undefined; icon: React.ComponentType<{ className?: string }>; color: string; bg: string; border: string }[] = [
     { label: 'Users', value: stats.users, icon: Users, color: 'text-sky-400', bg: 'bg-sky-500/10', border: 'border-sky-500/20' },
     { label: 'Subjects', value: stats.subjects, icon: BookOpen, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' },
     { label: 'Folders', value: stats.folders, icon: Folder, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
@@ -483,7 +483,7 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
     { label: 'Hire Requests', value: stats.hireRequests, icon: Briefcase, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
   ];
 
-  const systemRows: { label: string; value: React.ReactNode; icon: React.ElementType }[] = [
+  const systemRows: { label: string; value: React.ReactNode; icon: React.ComponentType<{ className?: string }> }[] = [
     { label: 'App Name', value: system.appName || '—', icon: Activity },
     { label: 'Framework', value: system.framework || '—', icon: Layers },
     { label: 'Language', value: system.language || '—', icon: FileText },
@@ -1199,7 +1199,7 @@ const CredentialsHeader: React.FC<CredentialsHeaderProps> = ({
 interface RoleRosterCardProps {
   title: string;
   subtitle: string;
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   accent: 'fuchsia' | 'amber';
   users: RoleUser[];
   badgeLabel: string;

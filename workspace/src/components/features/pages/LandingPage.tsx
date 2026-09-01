@@ -26,6 +26,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { Logo } from '@/components/features/Logo';
+import { Cosmic3DScene } from '@/components/features/landing/Cosmic3DScene';
 
 interface BannerConfig {
   enabled: boolean;
@@ -813,13 +814,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         />
       </motion.div>
 
+      {/* 3D Cosmic Scene — Three.js + React Three Fiber.
+          A rotating star globe (2000 points) + inner star cloud (800 points)
+          with scroll-driven tilt. Sits behind the 2D star fields for depth.
+          Pointer-events disabled so it never blocks UI clicks. */}
+      <Cosmic3DScene />
+
       {/* Layer 2: Distant star field — slow parallax, dim small stars */}
       <motion.div
         aria-hidden
         style={{ y: bgFarMountainY, willChange: parallaxWillChange }}
         className="absolute inset-0 pointer-events-none overflow-hidden"
       >
-        {Array.from({ length: 90 }).map((_, i) => {
+        {Array.from({ length: 220 }).map((_, i) => {
           const seed = (i * 137) % 100;
           const top = ((i * 53) % 100);
           const left = ((i * 91) % 100);
@@ -850,7 +857,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         style={{ y: bgMidMountainY, willChange: parallaxWillChange }}
         className="absolute inset-0 pointer-events-none overflow-hidden"
       >
-        {Array.from({ length: 50 }).map((_, i) => {
+        {Array.from({ length: 130 }).map((_, i) => {
           const top = ((i * 71) % 100);
           const left = ((i * 47) % 100);
           const size = 1 + (i % 3) * 0.5;
@@ -882,7 +889,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         style={{ y: bgNearHillY, willChange: parallaxWillChange }}
         className="absolute inset-0 pointer-events-none overflow-hidden"
       >
-        {Array.from({ length: 20 }).map((_, i) => {
+        {Array.from({ length: 60 }).map((_, i) => {
           const top = ((i * 31) % 100);
           const left = ((i * 67) % 100);
           return (

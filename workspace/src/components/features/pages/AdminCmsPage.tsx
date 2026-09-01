@@ -152,7 +152,7 @@ const CATEGORY_META: Record<string, { label: string; color: string; bg: string; 
   system:      { label: 'System',      color: 'text-fuchsia-300', bg: 'bg-fuchsia-500/10',  border: 'border-fuchsia-500/25',  icon: Activity },
 };
 
-const ACTION_ICONS: Record<string, React.ElementType> = {
+const ACTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   login: LogIn,
   logout: LogOut,
   register: UserPlus,
