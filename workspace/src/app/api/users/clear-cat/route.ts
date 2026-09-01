@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
       data: { catTriggered: false },
     });
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err: any) {
+    console.error("POST /api/users/clear-cat error:", err);
     return NextResponse.json({ error: 'Could not clear cat.' }, { status: 500 });
   }
 }

@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
       data: { scareTriggered: false },
     });
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err: any) {
+    console.error("POST /api/users/clear-scare error:", err);
     return NextResponse.json({ error: 'Could not clear scare.' }, { status: 500 });
   }
 }

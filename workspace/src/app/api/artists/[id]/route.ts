@@ -22,7 +22,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         tags: JSON.parse(p.tagsJson || '[]'),
       })),
     });
-  } catch {
+  } catch (err: any) {
+    console.error('GET /api/artists/[id] error:', err);
     return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
   }
 }

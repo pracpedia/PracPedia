@@ -933,7 +933,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Sticky header */}
       <header
         id="landing_header"
-        className="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#060814]/70 border-b border-white/[0.06]"
+        className="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#05070e]/70 border-b border-white/[0.06]"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 md:h-16 flex items-center justify-between gap-3">
           <a
@@ -1090,7 +1090,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 {AVATAR_INITIALS.map((i) => (
                   <span
                     key={i}
-                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-600 text-white text-[8px] sm:text-[9px] font-bold flex items-center justify-center border-2 border-[#060814]"
+                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-600 text-white text-[8px] sm:text-[9px] font-bold flex items-center justify-center border-2 border-[#05070e]"
                   >
                     {i}
                   </span>

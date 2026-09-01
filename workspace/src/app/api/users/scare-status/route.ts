@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
       scareTriggered: u.scareTriggered,
       catTriggered: u.catTriggered,
     });
-  } catch {
+  } catch (err: any) {
+    console.error('GET /api/users/scare-status error:', err);
     return NextResponse.json({ error: 'Could not check status.' }, { status: 500 });
   }
 }
