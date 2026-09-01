@@ -781,10 +781,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           const seed = (i * 137) % 100;
           const top = ((i * 53) % 100);
           const left = ((i * 91) % 100);
-          const size = 1 + (seed / 100) * 2; // 1-3px — bigger for real star visibility
+          const size = 0.5 + (seed / 100) * 0.8; // 0.5-1.3px — tiny but glowy
           const dur = 3 + (seed % 5);
-          // Multi-layer glow: tight core + medium halo + wide diffuse glow
-          const glow = `0 0 ${size * 2}px rgba(255,255,255,0.8), 0 0 ${size * 4}px rgba(255,255,255,0.4), 0 0 ${size * 8}px rgba(99,179,237,0.2)`;
+          // Strong multi-layer glow: tight bright core + wide diffuse halo
+          const glow = `0 0 ${size * 3}px rgba(255,255,255,0.95), 0 0 ${size * 6}px rgba(255,255,255,0.5), 0 0 ${size * 12}px rgba(99,179,237,0.25)`;
           return (
             <span
               key={`far-${i}`}
@@ -794,7 +794,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 left: `${left}%`,
                 width: `${size}px`,
                 height: `${size}px`,
-                opacity: 0.6,
+                opacity: 0.5,
                 animation: `pp-twinkle ${dur}s ease-in-out infinite`,
                 animationDelay: `-${(seed / 10).toFixed(1)}s`,
                 boxShadow: glow,
@@ -813,12 +813,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {Array.from({ length: 130 }).map((_, i) => {
           const top = ((i * 71) % 100);
           const left = ((i * 47) % 100);
-          const size = 1.5 + (i % 3) * 0.8; // 1.5-3.9px — bigger + brighter
+          const size = 0.8 + (i % 3) * 0.4; // 0.8-1.6px — tiny but glowy
           const dur = 2.5 + (i % 4);
           const tint = i % 4 === 0 ? '#a5f3fc' : i % 4 === 1 ? '#c4b5fd' : i % 4 === 2 ? '#fde68a' : '#ffffff';
-          // Color-matched multi-layer glow for each star tint
+          // Color-matched strong multi-layer glow
           const glowColor = i % 4 === 0 ? 'rgba(165,243,252' : i % 4 === 1 ? 'rgba(196,181,253' : i % 4 === 2 ? 'rgba(253,230,138' : 'rgba(255,255,255';
-          const glow = `0 0 ${size * 2}px ${glowColor},0.9), 0 0 ${size * 5}px ${glowColor},0.4), 0 0 ${size * 10}px ${glowColor},0.15)`;
+          const glow = `0 0 ${size * 3}px ${glowColor},1), 0 0 ${size * 6}px ${glowColor},0.5), 0 0 ${size * 14}px ${glowColor},0.2)`;
           return (
             <span
               key={`mid-${i}`}
@@ -829,7 +829,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 width: `${size}px`,
                 height: `${size}px`,
                 background: tint,
-                opacity: 0.7,
+                opacity: 0.6,
                 animation: `pp-twinkle ${dur}s ease-in-out infinite`,
                 animationDelay: `-${(i % 7 * 0.4).toFixed(1)}s`,
                 boxShadow: glow,
@@ -848,8 +848,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {Array.from({ length: 60 }).map((_, i) => {
           const top = ((i * 31) % 100);
           const left = ((i * 67) % 100);
-          const size = 2 + (i % 3) * 0.5; // 2-3.5px — largest, closest stars
-          const glow = `0 0 ${size * 3}px rgba(255,255,255,0.9), 0 0 ${size * 6}px rgba(255,255,255,0.5), 0 0 ${size * 12}px rgba(99,179,237,0.25)`;
+          const size = 1 + (i % 3) * 0.3; // 1-1.6px — tiny but bright
+          const glow = `0 0 ${size * 4}px rgba(255,255,255,1), 0 0 ${size * 8}px rgba(255,255,255,0.6), 0 0 ${size * 16}px rgba(99,179,237,0.3)`;
           return (
             <span
               key={`near-${i}`}
@@ -859,7 +859,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 left: `${left}%`,
                 width: `${size}px`,
                 height: `${size}px`,
-                opacity: 0.85,
+                opacity: 0.75,
                 animation: `pp-twinkle ${1.8 + (i % 4)}s ease-in-out infinite`,
                 animationDelay: `-${(i % 5 * 0.3).toFixed(1)}s`,
                 boxShadow: glow,
