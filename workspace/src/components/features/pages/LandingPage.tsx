@@ -26,8 +26,6 @@ import {
   Clock,
 } from 'lucide-react';
 import { Logo } from '@/components/features/Logo';
-import { Cosmic3DScene } from '@/components/features/landing/Cosmic3DScene';
-import { ConstellationHero } from '@/components/features/landing/ConstellationHero';
 
 interface BannerConfig {
   enabled: boolean;
@@ -131,6 +129,38 @@ const NAV_LINKS = [
   { href: '#features', label: 'Features' },
   { href: '#marketplace', label: 'Marketplace' },
   { href: '#faq', label: 'FAQ' },
+];
+
+/* ---------------- Fourier series constants ---------------- */
+
+// Square wave Fourier series:  f(t) = (4/π) · Σ_{k=1..7} sin((2k-1)·ω·t) / (2k−1)
+// 7 harmonics — odd multiples of the base frequency (1, 3, 5, 7, 9, 11, 13).
+const HARMONIC_KS = [1, 3, 5, 7, 9, 11, 13];
+const HARMONIC_AMPS = HARMONIC_KS.map((k) => (4 / Math.PI) / k);
+
+const SUBSCRIPTS: Record<string, string> = {
+  '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+  '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+};
+
+const toSubscript = (n: number): string =>
+  String(n).split('').map((c) => SUBSCRIPTS[c] ?? c).join('');
+
+const HARMONIC_ROWS: Array<[string, string, string]> = HARMONIC_KS.map((k, i) => [
+  String(k),
+  `A${toSubscript(k)} sin(${k}ωt)`,
+  HARMONIC_AMPS[i].toFixed(3),
+]);
+
+// 7 epicycle stroke colors — smooth cyan → teal → indigo gradient.
+const CIRCLE_COLORS = [
+  '#22d3ee', // cyan-400
+  '#14b8a6', // teal-500
+  '#2dd4bf', // teal-400
+  '#5eead4', // teal-300
+  '#818cf8', // indigo-400
+  '#6366f1', // indigo-500
+  '#a78bfa', // violet-400
 ];
 
 /* ---------------- AnimatedStat (kept — one-shot rAF count-up) ---------------- */
@@ -272,6 +302,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
+  /* GSAP refs for the Fourier series epicycle animation */
+  const sceneRef = useRef<HTMLDivElement>(null);
+  const circleRefs = useRef<Array<SVGCircleElement | null>>(Array(7).fill(null));
+  const lineRefs = useRef<Array<SVGLineElement | null>>(Array(7).fill(null));
+  const tipRef = useRef<SVGCircleElement>(null);
+  const trailLineRef = useRef<SVGLineElement>(null);
+  const waveformRef = useRef<SVGPolylineElement>(null);
+  const tLabelRef = useRef<HTMLSpanElement>(null);
+  const sumLabelRef = useRef<HTMLSpanElement>(null);
+  const stepRowsRef = useRef<HTMLDivElement>(null);
+  const chipRef = useRef<HTMLDivElement>(null);
+
   /* CTA dots + glow animation refs */
   const ctaDotsRef = useRef<HTMLDivElement>(null);
   const ctaGlow1Ref = useRef<HTMLDivElement>(null);
@@ -289,6 +331,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   }, []);
   const { scrollY } = useScroll();
   const heroTextY = useTransform(scrollY, [0, 700], isDesktop ? [0, -210] : [0, 0]);
+  const heroVizY = useTransform(scrollY, [0, 700], isDesktop ? [0, -350] : [0, 0]);
   const parallaxWillChange = isDesktop ? 'transform' as const : undefined;
 
   /* Deep-space parallax layers — each moves at a different speed to create
@@ -341,6 +384,158 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [mobileNavOpen]);
+
+  /* GSAP-animated Fourier series epicycles — infinite rotation.
+     NOTE: the floating math glyphs (∑ π ω ƒ) were removed per user request
+     (they looked like "floating balls"). Only the epicycles + waveform remain. */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const tweens: gsap.core.Tween[] = [];
+    const timelines: gsap.core.Timeline[] = [];
+
+    const FOURIER_SCALE = 36;
+    const FOURIER_OMEGA_BASE = 1.4;
+    const WAVE_SAMPLES = 120;
+    const WAVE_WINDOW = 6;
+    const WAVE_X_START = 120;
+    const WAVE_X_END = 240;
+    const WAVE_X_RANGE = WAVE_X_END - WAVE_X_START;
+    const EPICYCLE_CENTER_X = 60;
+    const EPICYCLE_CENTER_Y = 80;
+
+    const omegas = HARMONIC_KS.map((k) => k * FOURIER_OMEGA_BASE);
+
+    function fourierSum(s: number): number {
+      let sum = 0;
+      for (let i = 0; i < HARMONIC_KS.length; i++) {
+        sum += HARMONIC_AMPS[i] * Math.sin(omegas[i] * s);
+      }
+      return sum;
+    }
+
+    let t = 0;
+    let lastFrameTime = performance.now();
+
+    function renderFrame(currentTime: number) {
+      const dt = Math.min((currentTime - lastFrameTime) / 1000, 0.05);
+      lastFrameTime = currentTime;
+      t += dt;
+
+      let prevX = EPICYCLE_CENTER_X;
+      let prevY = EPICYCLE_CENTER_Y;
+      let sumValue = 0;
+
+      for (let i = 0; i < HARMONIC_KS.length; i++) {
+        const angle = omegas[i] * t;
+        const dx = HARMONIC_AMPS[i] * FOURIER_SCALE * Math.cos(angle);
+        const dy = -HARMONIC_AMPS[i] * FOURIER_SCALE * Math.sin(angle);
+        const tipX = prevX + dx;
+        const tipY = prevY + dy;
+
+        const circleEl = circleRefs.current[i];
+        if (circleEl) {
+          circleEl.setAttribute('cx', prevX.toFixed(2));
+          circleEl.setAttribute('cy', prevY.toFixed(2));
+        }
+        const lineEl = lineRefs.current[i];
+        if (lineEl) {
+          lineEl.setAttribute('x1', prevX.toFixed(2));
+          lineEl.setAttribute('y1', prevY.toFixed(2));
+          lineEl.setAttribute('x2', tipX.toFixed(2));
+          lineEl.setAttribute('y2', tipY.toFixed(2));
+        }
+
+        prevX = tipX;
+        prevY = tipY;
+        sumValue += HARMONIC_AMPS[i] * Math.sin(omegas[i] * t);
+      }
+
+      if (tipRef.current) {
+        tipRef.current.setAttribute('cx', prevX.toFixed(2));
+        tipRef.current.setAttribute('cy', prevY.toFixed(2));
+      }
+
+      if (waveformRef.current) {
+        let points = '';
+        for (let i = 0; i < WAVE_SAMPLES; i++) {
+          const x = WAVE_X_START + (i / (WAVE_SAMPLES - 1)) * WAVE_X_RANGE;
+          const timeAtX = t - (1 - i / (WAVE_SAMPLES - 1)) * WAVE_WINDOW;
+          const y = EPICYCLE_CENTER_Y - fourierSum(timeAtX) * FOURIER_SCALE;
+          points += `${x.toFixed(1)},${y.toFixed(1)} `;
+        }
+        waveformRef.current.setAttribute('points', points.trim());
+      }
+
+      if (trailLineRef.current) {
+        trailLineRef.current.setAttribute('x1', prevX.toFixed(2));
+        trailLineRef.current.setAttribute('y1', prevY.toFixed(2));
+        trailLineRef.current.setAttribute('x2', String(WAVE_X_END));
+        trailLineRef.current.setAttribute('y2', prevY.toFixed(2));
+      }
+
+      if (tLabelRef.current) tLabelRef.current.textContent = (t % 10).toFixed(2);
+      if (sumLabelRef.current) sumLabelRef.current.textContent = sumValue.toFixed(3);
+    }
+
+    renderFrame(performance.now());
+
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    timelines.push(tl);
+    if (sceneRef.current) {
+      tl.fromTo(sceneRef.current, { scale: 0.92, opacity: 0, y: 24 }, { scale: 1, opacity: 1, y: 0, duration: 0.7 });
+    }
+    const allCircleEls = circleRefs.current.filter(Boolean) as SVGCircleElement[];
+    const allLineEls = lineRefs.current.filter(Boolean) as SVGLineElement[];
+    if (allCircleEls.length) {
+      tl.fromTo(allCircleEls, { opacity: 0 }, { opacity: 1, duration: 0.5, stagger: 0.05, ease: 'power2.out' }, 0.2);
+    }
+    if (allLineEls.length) {
+      tl.fromTo(allLineEls, { opacity: 0 }, { opacity: 1, duration: 0.5, stagger: 0.05, ease: 'power2.out' }, 0.2);
+    }
+    if (chipRef.current) {
+      tl.fromTo(chipRef.current, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: 'back.out(1.7)' }, '-=0.1');
+    }
+    if (stepRowsRef.current) {
+      const rows = gsap.utils.toArray<HTMLElement>(stepRowsRef.current.children);
+      tl.fromTo(rows, { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.3, stagger: 0.05, ease: 'power2.out' }, '-=0.3');
+    }
+
+    if (!prefersReduced) {
+      let fourierVisible = true;
+      const fourierObserver = new IntersectionObserver(
+        (entries) => {
+          fourierVisible = entries[0]?.isIntersecting ?? false;
+        },
+        { threshold: 0.01 },
+      );
+      if (sceneRef.current) fourierObserver.observe(sceneRef.current);
+
+      const tickerFn = () => {
+        if (fourierVisible) renderFrame(performance.now());
+      };
+      gsap.ticker.add(tickerFn);
+      tweens.push({
+        kill: () => {
+          gsap.ticker.remove(tickerFn);
+          fourierObserver.disconnect();
+        },
+      } as unknown as gsap.core.Tween);
+    }
+
+    if (prefersReduced) {
+      tl.progress(1);
+      renderFrame(performance.now());
+    }
+
+    return () => {
+      tweens.forEach((t) => t.kill());
+      timelines.forEach((t) => t.kill());
+    };
+  }, []);
 
   /* GSAP batch reveal — a single IntersectionObserver drives ALL .gsap-reveal cards
      at once (replaces 7 framer-motion whileInView triggers + their observers).
@@ -559,18 +754,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       className="w-full min-h-screen text-slate-200 bg-[#060814] relative font-sans flex flex-col overflow-x-hidden selection:bg-cyan-500/20 selection:text-cyan-300"
     >
       {/* ── REAL SPACE BACKGROUND ──
-         A pure starfield — no nebula clouds, no visible "ball" shapes.
+         A pure starfield — no nebula clouds, no 3D canvas (removed for performance).
          Layered parallax creates depth:
-         1. 3D starfield (Three.js) — points scattered through 3D space, no sphere
-         2. Distant star field (slow parallax) — small twinkling pinpricks
-         3. Mid star field (medium parallax) — brighter closer stars
-         4. Near dust + shooting stars — fastest, foreground */}
-
-      {/* 3D Cosmic Scene — Three.js + React Three Fiber.
-          A flat 3D starfield (points scattered through 3D space, NOT a sphere)
-          with a very slow drift. Sits behind the 2D star fields for depth.
-          Pointer-events disabled so it never blocks UI clicks. */}
-      <Cosmic3DScene />
+         1. Distant star field (slow parallax) — small twinkling pinpricks
+         2. Mid star field (medium parallax) — brighter closer stars
+         3. Near dust + shooting stars — fastest, foreground */}
 
       {/* Layer 2: Distant star field — slow parallax (scroll-Y + mouse-X/Y) */}
       <motion.div
@@ -956,9 +1144,128 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </motion.div>
 
-          {/* Constellation hero — parallax (scroll + mouse), real space, no balls.
-              Replaces the old Fourier epicycles which looked like moving balls. */}
-          <ConstellationHero />
+          {/* Fourier series animation — parallax (heroVizY), BELOW text on mobile, RIGHT on desktop.
+              Floating math glyphs (∑ π ω ƒ) were removed per user request ("floating balls"). */}
+          <motion.div
+            style={{ y: heroVizY, willChange: parallaxWillChange }}
+            className="relative mx-auto w-full max-w-[260px] sm:max-w-[320px] md:max-w-[360px] lg:max-w-[440px] order-2 md:order-2"
+          >
+            {/* Soft static glow under the scene */}
+            <div
+              aria-hidden
+              className="absolute -inset-6 bg-gradient-to-br from-cyan-500/20 via-indigo-500/10 to-transparent blur-2xl pointer-events-none"
+            />
+
+            {/* The scene card itself — GSAP entrance */}
+            <div
+              ref={sceneRef}
+              className="relative aspect-[4/5] rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 shadow-2xl shadow-cyan-950/40 overflow-hidden"
+            >
+              <div className="absolute inset-0 p-3 sm:p-4 flex flex-col gap-2 sm:gap-3">
+                <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-slate-500">
+                  <span>FOURIER · EPICYCLES</span>
+                  <span className="text-cyan-400">7 harmonics · square wave</span>
+                </div>
+                <div className="text-[11px] sm:text-xs font-bold text-white truncate">
+                  f(t) = (4/π) · Σ sin((2k−1)ωt)/(2k−1)
+                </div>
+
+                {/* SVG — epicycles on left (0-120), waveform on right (120-240) */}
+                <div className="relative rounded-lg bg-slate-950/60 border border-white/5 p-1.5 sm:p-2 flex items-center justify-center overflow-hidden">
+                  <svg viewBox="0 0 240 160" className="w-full h-auto" aria-hidden>
+                    <line
+                      x1="120"
+                      y1="8"
+                      x2="120"
+                      y2="152"
+                      stroke="#1e293b"
+                      strokeDasharray="2 2"
+                      strokeWidth="0.8"
+                    />
+                    <circle cx="60" cy="80" r="0.8" fill="#475569" />
+                    <polyline
+                      ref={waveformRef}
+                      fill="none"
+                      stroke="#e0f2fe"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      opacity="0.95"
+                    />
+                    {HARMONIC_KS.map((k, i) => (
+                      <g key={`h${k}`}>
+                        <circle
+                          ref={(el) => { circleRefs.current[i] = el; }}
+                          r={HARMONIC_AMPS[i] * 36}
+                          fill={CIRCLE_COLORS[i]}
+                          fillOpacity="0.05"
+                          stroke={CIRCLE_COLORS[i]}
+                          strokeWidth="1.5"
+                          strokeOpacity="0.8"
+                        />
+                        <line
+                          ref={(el) => { lineRefs.current[i] = el; }}
+                          stroke={CIRCLE_COLORS[i]}
+                          strokeWidth="1.2"
+                          strokeOpacity="0.95"
+                        />
+                      </g>
+                    ))}
+                    <line
+                      ref={trailLineRef}
+                      stroke="#fbbf24"
+                      strokeWidth="1.0"
+                      strokeDasharray="1.5 1.5"
+                      strokeOpacity="0.85"
+                    />
+                    <circle ref={tipRef} r="3" fill="#fde68a" stroke="#fbbf24" strokeWidth="1" />
+                  </svg>
+
+                  <div className="absolute top-2 right-2 sm:top-3 sm:right-3 px-2 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/30 font-mono text-[7px] sm:text-[8px] text-cyan-300 leading-tight">
+                    <div className="flex items-center gap-1">
+                      <span className="inline-block w-1 h-1 bg-cyan-300 rounded-full" />
+                      <span>t = <span ref={tLabelRef}>0.00</span>s</span>
+                    </div>
+                    <div>Σ = <span ref={sumLabelRef}>0.000</span></div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-white/5 overflow-hidden text-[6px] sm:text-[7px] font-mono">
+                  <div className="grid grid-cols-3 bg-slate-950/60 text-slate-400">
+                    <div className="px-1.5 py-1 border-r border-white/5">k</div>
+                    <div className="px-1.5 py-1 border-r border-white/5">Term</div>
+                    <div className="px-1.5 py-1">A_k</div>
+                  </div>
+                  <div ref={stepRowsRef}>
+                    {HARMONIC_ROWS.map((row, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-3 text-slate-300 border-t border-white/5"
+                      >
+                        <div className="px-1.5 py-0.5 border-r border-white/5 truncate">
+                          {row[0]}
+                        </div>
+                        <div className="px-1.5 py-0.5 border-r border-white/5 truncate">
+                          {row[1]}
+                        </div>
+                        <div className="px-1.5 py-0.5 text-emerald-400 truncate">
+                          {row[2]}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div
+                  ref={chipRef}
+                  className="mt-auto flex items-center gap-1.5 sm:gap-2 text-[8px] sm:text-[9px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-md px-2 sm:px-2.5 py-1.5"
+                >
+                  <CheckCircle2 className="w-3 h-3 shrink-0" />
+                  <span className="font-mono">Fourier series · square wave approximation with 7 harmonics</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </section>
 
         {/* Stats bar — one-shot count-up only, no infinite animations */}
