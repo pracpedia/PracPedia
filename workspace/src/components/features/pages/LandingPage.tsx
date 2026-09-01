@@ -252,18 +252,28 @@ const GsapHeading: React.FC<{
     const el = ref.current;
     if (!el) return;
     gsap.registerPlugin(SplitText);
+
+    // Ensure the heading is visible immediately (in case the IntersectionObserver
+    // doesn't fire on mount — e.g. element is already in viewport on load).
+    gsap.set(el, { opacity: 1 });
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const split = new SplitText(el, { type: 'chars,words' });
             splitRef.current = split;
+            // Character-by-character reveal: each char flies in from below
+            // with a slight rotation + scale for a premium staggered effect.
             gsap.from(split.chars, {
               opacity: 0,
-              y: 8,
-              duration: 0.3,
-              stagger: 0.015,
-              ease: 'power2.out',
+              y: 20,
+              rotationX: -90,
+              scale: 0.5,
+              duration: 0.6,
+              stagger: 0.025,
+              ease: 'back.out(1.7)',
+              transformOrigin: '50% 100%',
             });
             observer.unobserve(el);
           }
@@ -279,7 +289,7 @@ const GsapHeading: React.FC<{
   }, []);
   const Tag = as;
   return (
-    <Tag ref={ref} className={className}>
+    <Tag ref={ref} className={className} style={{ opacity: 1 }}>
       {children}
     </Tag>
   );
@@ -332,7 +342,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const { scrollY } = useScroll();
   const heroTextY = useTransform(scrollY, [0, 700], isDesktop ? [0, -210] : [0, 0]);
   const heroVizY = useTransform(scrollY, [0, 700], isDesktop ? [0, -350] : [0, 0]);
-  const parallaxWillChange = isDesktop ? 'transform' as const : undefined;
 
   /* Deep-space parallax layers — each moves at a different speed to create
      depth (distant stars slowest, near dust + shooting stars fastest). */
@@ -344,35 +353,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({
      The cursor position drives a spring-smoothed motion value that's mapped
      to horizontal + vertical offsets for each star layer at different rates
      (distant slow, near fast). Combined with the scroll-Y parallax above,
-     this creates a buttery 3D depth effect as the user moves their mouse. */
+     this creates a buttery 3D depth effect as the user moves their mouse.
+     Uses requestAnimationFrame throttling to avoid scroll jank. */
   const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
   const springMouseX = useSpring(mouseX, { stiffness: 60, damping: 20, mass: 0.6 });
-  const springMouseY = useSpring(mouseY, { stiffness: 60, damping: 20, mass: 0.6 });
   // Distant layer — moves slowest (0.3x of mouse delta)
   const farMouseX = useTransform(springMouseX, [-0.5, 0.5], [-10, 10]);
-  const farMouseY = useTransform(springMouseY, [-0.5, 0.5], [-8, 8]);
   // Mid layer — medium (0.7x)
   const midMouseX = useTransform(springMouseX, [-0.5, 0.5], [-25, 25]);
-  const midMouseY = useTransform(springMouseY, [-0.5, 0.5], [-18, 18]);
   // Near layer — fastest (1.2x)
   const nearMouseX = useTransform(springMouseX, [-0.5, 0.5], [-40, 40]);
-  const nearMouseY = useTransform(springMouseY, [-0.5, 0.5], [-30, 30]);
 
-  // Combine scroll-Y + mouse-Y into a single transform for each layer.
-  // We use useTransform on the springMouseY + scrollY combined — but since
-  // framer-motion can't combine two motion values into one style directly,
-  // we apply them as separate x/y style props (x = mouse only, y = scroll).
-  // The mouse adds x drift; scroll adds y drift. Together they feel 3D.
+  // Throttled mouse handler — uses rAF to avoid flooding the main thread.
+  const rafRef = useRef<number | null>(null);
   const handleMouseParallax = (e: React.MouseEvent) => {
-    const x = e.clientX / window.innerWidth - 0.5;
-    const y = e.clientY / window.innerHeight - 0.5;
-    mouseX.set(x);
-    mouseY.set(y);
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const x = e.clientX / window.innerWidth - 0.5;
+      mouseX.set(x);
+    });
   };
   const resetMouseParallax = () => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     mouseX.set(0);
-    mouseY.set(0);
   };
 
   /* Close mobile drawer on Escape */
@@ -760,18 +767,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
          2. Mid star field (medium parallax) — brighter closer stars
          3. Near dust + shooting stars — fastest, foreground */}
 
-      {/* Layer 2: Distant star field — slow parallax (scroll-Y + mouse-X/Y) */}
+      {/* Layer 2: Distant star field — slow parallax (scroll-Y + mouse-X) */}
       <motion.div
         aria-hidden
-        style={{ y: bgFarMountainY, x: farMouseX, willChange: parallaxWillChange }}
-        className="absolute inset-0 pointer-events-none overflow-hidden"
+        style={{ y: bgFarMountainY, x: farMouseX }}
+        className="absolute inset-0 pointer-events-none"
       >
         {Array.from({ length: 220 }).map((_, i) => {
           const seed = (i * 137) % 100;
           const top = ((i * 53) % 100);
           const left = ((i * 91) % 100);
-          const size = 0.6 + (seed / 100) * 1.2;
+          const size = 1 + (seed / 100) * 2; // 1-3px — bigger for real star visibility
           const dur = 3 + (seed % 5);
+          // Multi-layer glow: tight core + medium halo + wide diffuse glow
+          const glow = `0 0 ${size * 2}px rgba(255,255,255,0.8), 0 0 ${size * 4}px rgba(255,255,255,0.4), 0 0 ${size * 8}px rgba(99,179,237,0.2)`;
           return (
             <span
               key={`far-${i}`}
@@ -781,28 +790,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 left: `${left}%`,
                 width: `${size}px`,
                 height: `${size}px`,
-                opacity: 0.35,
+                opacity: 0.6,
                 animation: `pp-twinkle ${dur}s ease-in-out infinite`,
                 animationDelay: `-${(seed / 10).toFixed(1)}s`,
-                boxShadow: '0 0 2px rgba(255,255,255,0.5)',
+                boxShadow: glow,
               }}
             />
           );
         })}
       </motion.div>
 
-      {/* Layer 3: Mid star field — medium parallax (scroll-Y + mouse-X/Y) */}
+      {/* Layer 3: Mid star field — medium parallax (scroll-Y + mouse-X) */}
       <motion.div
         aria-hidden
-        style={{ y: bgMidMountainY, x: midMouseX, willChange: parallaxWillChange }}
-        className="absolute inset-0 pointer-events-none overflow-hidden"
+        style={{ y: bgMidMountainY, x: midMouseX }}
+        className="absolute inset-0 pointer-events-none"
       >
         {Array.from({ length: 130 }).map((_, i) => {
           const top = ((i * 71) % 100);
           const left = ((i * 47) % 100);
-          const size = 1 + (i % 3) * 0.5;
+          const size = 1.5 + (i % 3) * 0.8; // 1.5-3.9px — bigger + brighter
           const dur = 2.5 + (i % 4);
           const tint = i % 4 === 0 ? '#a5f3fc' : i % 4 === 1 ? '#c4b5fd' : i % 4 === 2 ? '#fde68a' : '#ffffff';
+          // Color-matched multi-layer glow for each star tint
+          const glowColor = i % 4 === 0 ? 'rgba(165,243,252' : i % 4 === 1 ? 'rgba(196,181,253' : i % 4 === 2 ? 'rgba(253,230,138' : 'rgba(255,255,255';
+          const glow = `0 0 ${size * 2}px ${glowColor},0.9), 0 0 ${size * 5}px ${glowColor},0.4), 0 0 ${size * 10}px ${glowColor},0.15)`;
           return (
             <span
               key={`mid-${i}`}
@@ -813,25 +825,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 width: `${size}px`,
                 height: `${size}px`,
                 background: tint,
-                opacity: 0.5,
+                opacity: 0.7,
                 animation: `pp-twinkle ${dur}s ease-in-out infinite`,
                 animationDelay: `-${(i % 7 * 0.4).toFixed(1)}s`,
-                boxShadow: `0 0 ${2 + (i % 3)}px ${tint}`,
+                boxShadow: glow,
               }}
             />
           );
         })}
       </motion.div>
 
-      {/* Layer 4: Near dust + shooting stars — fast parallax (scroll-Y + mouse-X/Y) */}
+      {/* Layer 4: Near dust + shooting stars — fast parallax (scroll-Y + mouse-X) */}
       <motion.div
         aria-hidden
-        style={{ y: bgNearHillY, x: nearMouseX, willChange: parallaxWillChange }}
-        className="absolute inset-0 pointer-events-none overflow-hidden"
+        style={{ y: bgNearHillY, x: nearMouseX }}
+        className="absolute inset-0 pointer-events-none"
       >
         {Array.from({ length: 60 }).map((_, i) => {
           const top = ((i * 31) % 100);
           const left = ((i * 67) % 100);
+          const size = 2 + (i % 3) * 0.5; // 2-3.5px — largest, closest stars
+          const glow = `0 0 ${size * 3}px rgba(255,255,255,0.9), 0 0 ${size * 6}px rgba(255,255,255,0.5), 0 0 ${size * 12}px rgba(99,179,237,0.25)`;
           return (
             <span
               key={`near-${i}`}
@@ -839,12 +853,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               style={{
                 top: `${top}%`,
                 left: `${left}%`,
-                width: '1.4px',
-                height: '1.4px',
-                opacity: 0.7,
+                width: `${size}px`,
+                height: `${size}px`,
+                opacity: 0.85,
                 animation: `pp-twinkle ${1.8 + (i % 4)}s ease-in-out infinite`,
                 animationDelay: `-${(i % 5 * 0.3).toFixed(1)}s`,
-                boxShadow: '0 0 3px rgba(255,255,255,0.7)',
+                boxShadow: glow,
               }}
             />
           );
@@ -1051,7 +1065,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         >
           {/* Text column — parallax (heroTextY), first on mobile AND first on desktop */}
           <motion.div
-            style={{ y: heroTextY, willChange: parallaxWillChange }}
+            style={{ y: heroTextY }}
             className="text-center md:text-left space-y-6 order-1 md:order-1"
           >
             {/* Trust badge with avatar stack — smaller on mobile */}
@@ -1082,12 +1096,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Master your{' '}
               <span
                 aria-hidden
+                className="text-cyan-300"
                 style={{
-                  background: 'linear-gradient(90deg, #22d3ee 0%, #34d399 50%, #818cf8 100%)',
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  filter: 'drop-shadow(0 0 20px rgba(6,182,212,0.25))',
+                  filter: 'drop-shadow(0 0 20px rgba(6,182,212,0.4))',
                   display: 'inline-block',
                 }}
               >
@@ -1147,7 +1158,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           {/* Fourier series animation — parallax (heroVizY), BELOW text on mobile, RIGHT on desktop.
               Floating math glyphs (∑ π ω ƒ) were removed per user request ("floating balls"). */}
           <motion.div
-            style={{ y: heroVizY, willChange: parallaxWillChange }}
+            style={{ y: heroVizY }}
             className="relative mx-auto w-full max-w-[260px] sm:max-w-[320px] md:max-w-[360px] lg:max-w-[440px] order-2 md:order-2"
           >
             {/* Soft static glow under the scene */}
