@@ -1093,7 +1093,7 @@ function PortalConsole() {
       setEditFolderData(null);
       await refreshWorkspaceData();
     } catch (err: any) {
-      alert(err.message || "Operation failed.");
+      addLiveNotification(err.message || "Operation failed.", "warning");
       throw err;
     }
   };
@@ -1112,7 +1112,7 @@ function PortalConsole() {
       setView('dashboard');
       await refreshWorkspaceData();
     } catch (err: any) {
-      alert(err.message || "Delete operations could not be parsed.");
+      addLiveNotification(err.message || "Delete failed.", "warning");
       throw err;
     }
   };
@@ -1242,7 +1242,7 @@ function PortalConsole() {
       if (!res.ok) throw new Error("Uploading script page rejected.");
       await refreshWorkspaceData();
     } catch (err: any) {
-      alert(err.message || "Failed to finalize image injection.");
+      addLiveNotification(err.message || "Failed to add image.", "warning");
     }
   };
 
@@ -1262,7 +1262,7 @@ function PortalConsole() {
       }
       await refreshWorkspaceData();
     } catch (err: any) {
-      alert(err.message || "Could not prune requested image.");
+      addLiveNotification(err.message || "Failed to delete image.", "warning");
     }
   };
 
@@ -2051,10 +2051,10 @@ function PortalConsole() {
                                                 await refreshWorkspaceData();
                                               } else {
                                                 const err = await res.json();
-                                                alert(err.error || "Failed to delete subject.");
+                                                addLiveNotification(err.error || "Failed to delete subject.", "warning");
                                               }
                                             } catch (err) {
-                                              alert("Network error deleting subject.");
+                                              addLiveNotification("Network error deleting subject.", "warning");
                                             }
                                           }
                                         }}

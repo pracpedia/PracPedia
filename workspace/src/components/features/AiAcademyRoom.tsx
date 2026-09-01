@@ -1154,7 +1154,7 @@ export const AiAcademyRoom: React.FC = () => {
   const copyLessonsToClipboard = () => {
     const compiledText = responseHtml || "No lesson active. Generate concepts above!";
     navigator.clipboard.writeText(compiledText);
-    alert("🎉 Study guide content successfully copied to your system clipboard!");
+    setErrorMessage("🎉 Study guide content copied to clipboard!"); setTimeout(() => setErrorMessage(null), 3000);
   };
 
   const colors = getSubjectColors(selectedSubject);

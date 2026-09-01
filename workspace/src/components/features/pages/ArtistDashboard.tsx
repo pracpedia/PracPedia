@@ -883,11 +883,11 @@ const UploadModal: React.FC<UploadModalProps> = ({
     if (portfolioFileRef.current) portfolioFileRef.current.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert('Please choose an image file.');
+      console.warn('Please choose an image file.');
       return;
     }
     if (file.size > 4 * 1024 * 1024) {
-      alert('Max 4 MB for portfolio images.');
+      console.warn('Max 4 MB for portfolio images.');
       return;
     }
     const reader = new FileReader();
@@ -900,7 +900,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
         setTitle(name.slice(0, 60));
       }
     };
-    reader.onerror = () => alert('Could not read image file.');
+    reader.onerror = () => console.warn('Could not read image file.');
     reader.readAsDataURL(file);
   };
 

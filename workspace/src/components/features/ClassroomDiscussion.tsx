@@ -256,10 +256,10 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
         setMessages((prev) => prev.filter(m => (m.id || m._id) !== msgId));
       } else {
         const errData = await res.json();
-        alert(errData.error || "De-registration of message parameters refused.");
+        setErrorMessage(errData.error || "Could not delete message."); setTimeout(() => setErrorMessage(null), 4000);
       }
     } catch (err) {
-      alert("Error deleting message. Check student permission rules.");
+      setErrorMessage("Network error deleting message."); setTimeout(() => setErrorMessage(null), 4000);
     }
   };
 
