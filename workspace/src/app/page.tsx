@@ -2047,8 +2047,8 @@ function PortalConsole() {
                                       <button
                                         onClick={async (e) => {
                                           e.stopPropagation();
-                                          if (confirm(`Are you sure you want to delete subject discipline "${sub.title}"?`)) {
-                                            try {
+                                          addLiveNotification(`Deleting subject "${sub.title}"...`, "warning");
+                                          try {
                                               const res = await apiFetch(`/api/subjects/${sub.id}`, { method: 'DELETE' });
                                               if (res.ok) {
                                                 await refreshWorkspaceData();
@@ -2059,7 +2059,6 @@ function PortalConsole() {
                                             } catch (err) {
                                               addLiveNotification("Network error deleting subject.", "warning");
                                             }
-                                          }
                                         }}
                                         className="p-1 sm:p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
                                         title="Delete Subject"
@@ -2331,9 +2330,8 @@ function PortalConsole() {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        if (confirm(`Are you sure you want to delete practical folder "${fold.title}"?`)) {
-                                          handleDeleteFolder(fold.id);
-                                        }
+                                        addLiveNotification(`Deleting folder "${fold.title}"...`, "warning");
+                                        handleDeleteFolder(fold.id);
                                       }}
                                       className="p-0.5 sm:p-1 px-1.5 sm:px-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg font-bold font-sans text-[9px] sm:text-[10px] flex items-center gap-1 cursor-pointer transition-colors min-h-[32px]"
                                       title="Delete practical folder"
@@ -2410,9 +2408,8 @@ function PortalConsole() {
 
                             <button
                               onClick={() => {
-                                if (confirm(`Are you sure you want to delete practical folder "${activeFolder.title}"?`)) {
-                                  handleDeleteFolder(activeFolder.id);
-                                }
+                                addLiveNotification(`Deleting folder "${activeFolder.title}"...`, "warning");
+                                handleDeleteFolder(activeFolder.id);
                               }}
                               className="px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 min-h-[44px]"
                               title="Delete practical folder"

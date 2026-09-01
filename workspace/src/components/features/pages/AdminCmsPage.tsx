@@ -1059,7 +1059,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   };
 
   const handleDeleteSubject = async (subject: Subject) => {
-    if (!confirm(`Are you sure you want to delete subject "${subject.title}"?`)) return;
+    showSuccess(`Deleting subject "${subject.title}"...`);
     setIsActionLoading(true);
     try {
       const res = await apiFetch(`/api/subjects/${subject.id}`, { method: 'DELETE' });
@@ -1145,7 +1145,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   };
 
   const handleDeleteFolder = async (folder: PracticalFolder) => {
-    if (!confirm(`Are you sure you want to delete practical notebook folder "${folder.title}"?`)) return;
+    showSuccess(`Deleting folder "${folder.title}"...`);
     setIsActionLoading(true);
     try {
       const res = await apiFetch(`/api/folders/${folder.id}`, { method: 'DELETE' });
@@ -1234,7 +1234,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   };
 
   const handleDeleteScan = async (folderId: string, imageIndex: number, scanTitle: string) => {
-    if (!confirm(`Delete scan page "${scanTitle}"?`)) return;
+    showSuccess(`Deleting scan page "${scanTitle}"...`);
     setIsActionLoading(true);
     try {
       const res = await apiFetch(`/api/images/${folderId}/${imageIndex}`, { method: 'DELETE' });
@@ -1312,7 +1312,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   };
 
   const handlePromoteAdminToSuper = async (adminEmail: string, adminName: string) => {
-    if (!confirm(`Elevate ${adminName} (${adminEmail}) to Super Admin?\n\nThis grants FULL SYSTEM ACCESS including the /creds view and the ability to demote other admins. Proceed only if you fully trust this user.`)) return;
+    showSuccess(`Elevating ${adminName} to Super Admin...`);
     setIsActionLoading(true);
     try {
       const res = await apiFetch('/api/users/promote-super', {
@@ -1427,7 +1427,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   };
 
   const handleDeleteAnnouncement = async (id: string, title: string) => {
-    if (!confirm(`Delete announcement "${title}"?`)) return;
+    showSuccess(`Deleting announcement "${title}"...`);
     setIsActionLoading(true);
     try {
       const res = await apiFetch(`/api/announcements/${id}`, { method: 'DELETE' });

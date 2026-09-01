@@ -467,12 +467,12 @@ const AvatarField: React.FC<AvatarFieldProps> = ({ url, onApply, saving }) => {
     const file = e.target.files?.[0];
     if (fileRef.current) fileRef.current.value = '';
     if (!file) return;
-    if (!file.type.startsWith('image/')) { console.warn('Please choose an image file.'); return; }
-    if (file.size > 2 * 1024 * 1024) { console.warn('Max 2 MB for avatars.'); return; }
+    if (!file.type.startsWith('image/')) { console.warn('Invalid file type'); return; }
+    if (file.size > 2 * 1024 * 1024) { console.warn('File too large'); return; }
     setIsUploading(true);
     const reader = new FileReader();
     reader.onload = () => { setDraft(String(reader.result || '')); setIsUploading(false); };
-    reader.onerror = () => { console.warn('Read failed.'); setIsUploading(false); };
+    reader.onerror = () => { console.warn('Read failed'); setIsUploading(false); };
     reader.readAsDataURL(file);
   };
 
