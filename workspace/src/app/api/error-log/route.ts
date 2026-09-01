@@ -9,7 +9,7 @@ import { getUserFromRequest } from '@/lib/auth';
  *
  * Receives unhandled errors, promise rejections, and React render errors from
  * the browser. Writes them to:
- *   1. /home/z/my-project/logs/errors.log  (JSON-lines file, persisted on disk)
+ *   1. /tmp/pracpedia-logs/errors.log  (JSON-lines file, persisted on disk)
  *   2. The ActivityLog table (visible in the admin dashboard feed)
  *
  * Public endpoint (no auth required) so we can capture errors that happen
@@ -139,5 +139,26 @@ export async function GET(request: NextRequest) {
   } catch (err: any) {
     console.error('GET /api/error-log error:', err);
     return NextResponse.json({ error: 'Could not read error log.' }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE — admin-only. Clears the error log file.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const payload = await getUserFromRequest(request);
+    if (!payload) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Admin only.' }, { status: 403 });
+    }
+    const { clearErrorLog } = await import('@/lib/error-log');
+    await clearErrorLog();
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error('DELETE /api/error-log error:', err);
+    return NextResponse.json({ error: 'Could not clear error log.' }, { status: 500 });
   }
 }

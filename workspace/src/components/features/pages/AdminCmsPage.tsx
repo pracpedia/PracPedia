@@ -202,7 +202,7 @@ const ActivityLogTab: React.FC<ActivityLogTabProps> = ({ apiFetch }) => {
     }
   };
 
-  // Initial fetch + poll loop (5s interval)
+  // Initial fetch + poll loop (30s interval — was 5s, too aggressive)
   useEffect(() => {
     let cancelled = false;
 
@@ -228,7 +228,7 @@ const ActivityLogTab: React.FC<ActivityLogTabProps> = ({ apiFetch }) => {
 
     const pollLoop = async () => {
       while (!cancelled && autoRefresh) {
-        await new Promise((r) => setTimeout(r, 5000));
+        await new Promise((r) => setTimeout(r, 30000));
         if (cancelled || !autoRefresh) break;
         await doFetch(true);
       }
@@ -436,7 +436,7 @@ const BugMonitorTab: React.FC<{ apiFetch: (url: string, opts?: RequestInit) => P
     doFetch();
     const poll = async () => {
       while (!cancelled && autoRefresh) {
-        await new Promise((r) => setTimeout(r, 10000));
+        await new Promise((r) => setTimeout(r, 30000));
         if (cancelled || !autoRefresh) break;
         await doFetch(true);
       }
@@ -512,6 +512,22 @@ const BugMonitorTab: React.FC<{ apiFetch: (url: string, opts?: RequestInit) => P
           >
             <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
             Refresh
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const res = await apiFetch('/api/error-log', { method: 'DELETE' });
+                if (res.ok) {
+                  setEntries([]);
+                }
+              } catch (e) {
+                // silent
+              }
+            }}
+            className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer min-h-[32px] flex items-center gap-1.5"
+          >
+            <Trash2 className="w-3 h-3" />
+            Clear
           </button>
         </div>
       </div>
