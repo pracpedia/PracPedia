@@ -1908,6 +1908,50 @@ function PortalConsole() {
                               </p>
                             </div>
 
+                            {/* Downloadable attachment — visible to all users */}
+                            {ann.fileUrl && (
+                              <button
+                                onClick={() => {
+                                  const url = ann.fileUrl!;
+                                  const name = ann.fileName || 'download';
+                                  if (url.startsWith('data:')) {
+                                    try {
+                                      const [meta, base64] = url.split(',');
+                                      const mime = meta.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
+                                      const binary = atob(base64);
+                                      const bytes = new Uint8Array(binary.length);
+                                      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                                      const blob = new Blob([bytes], { type: mime });
+                                      const blobUrl = URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.href = blobUrl;
+                                      a.download = name;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      document.body.removeChild(a);
+                                      URL.revokeObjectURL(blobUrl);
+                                    } catch (err) {
+                                      console.error('Download failed:', err);
+                                      window.open(url, '_blank');
+                                    }
+                                  } else {
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = name;
+                                    a.target = '_blank';
+                                    a.rel = 'noopener noreferrer';
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-bold transition-all cursor-pointer"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                Download {ann.fileName || 'file'}
+                              </button>
+                            )}
+
                             <div className="flex items-center justify-between pt-4 mt-3 border-t border-white/[0.03] text-[10.5px] font-mono gap-2 flex-wrap">
                               <span className="text-slate-400 font-sans truncate min-w-0">Posted by: {ann.createdByName}</span>
                               {ann.deadline && (

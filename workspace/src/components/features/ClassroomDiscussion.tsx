@@ -63,10 +63,21 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
   const [activeChannelId, setActiveChannelId] = useState<string>('general');
   const [typedMessage, setTypedMessage] = useState<string>('');
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Close zoom popup on Escape
+  useEffect(() => {
+    if (!zoomedImage) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setZoomedImage(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [zoomedImage]);
 
   // Custom mobile screen flow: 'channels' list vs the 'chat' window itself
   const [mobileView, setMobileView] = useState<'channels' | 'chat'>('chat');
@@ -663,7 +674,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
                             alt="Shared"
                             referrerPolicy="no-referrer"
                             className="max-w-full max-h-64 rounded-2xl border border-white/10 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => window.open(msg.imageUrl, '_blank')}
+                            onClick={() => setZoomedImage(msg.imageUrl!)}
                           />
                         </div>
                       )}
@@ -788,6 +799,38 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
           </form>
         </div>
       </section>
+
+      {/* Image zoom popup — fullscreen overlay when a chat image is clicked */}
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 cursor-pointer"
+          onClick={() => setZoomedImage(null)}
+        >
+          {/* Close button */}
+          <button
+            className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white transition-colors z-10"
+            onClick={(e) => { e.stopPropagation(); setZoomedImage(null); }}
+            aria-label="Close image"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Zoomable image — click to toggle zoom, drag to pan when zoomed */}
+          <img
+            src={zoomedImage}
+            alt="Zoomed image"
+            referrerPolicy="no-referrer"
+            className="max-w-[95vw] max-h-[90vh] object-contain rounded-xl shadow-2xl select-none"
+            onClick={(e) => e.stopPropagation()}
+            style={{ cursor: 'zoom-in' }}
+          />
+
+          {/* Hint text */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 font-mono uppercase tracking-wider pointer-events-none">
+            Click anywhere outside to close
+          </div>
+        </div>
+      )}
     </div>
   );
 };

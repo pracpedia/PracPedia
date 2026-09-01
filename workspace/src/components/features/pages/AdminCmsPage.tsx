@@ -1390,7 +1390,12 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
   };
 
   // Handle file upload for announcement attachment
-  const handleAnnounceFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file upload for announcement attachment.
+  // Uses the dedicated multipart endpoint /api/announcements/upload-file
+  // (Vercel Blob in production, base64 in dev) instead of inline base64 in
+  // the JSON body — which timed out for large files.
+  const [announceFileUploading, setAnnounceFileUploading] = useState(false);
+  const handleAnnounceFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (announceFileRef.current) announceFileRef.current.value = '';
     if (!file) return;
@@ -1398,16 +1403,30 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
       showError('Max 50 MB for file attachments.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAnnounceFile({
-        url: String(reader.result || ''),
-        name: file.name,
-        size: file.size,
+    setAnnounceFileUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await apiFetch('/api/announcements/upload-file', {
+        method: 'POST',
+        body: fd,
       });
-    };
-    reader.onerror = () => showError('Could not read file.');
-    reader.readAsDataURL(file);
+      const data = await res.json();
+      if (!res.ok) {
+        showError(data.error || 'File upload failed.');
+        return;
+      }
+      setAnnounceFile({
+        url: String(data.url || ''),
+        name: data.name || file.name,
+        size: Number(data.size) || file.size,
+      });
+    } catch (err) {
+      console.error('Announcement file upload error:', err);
+      showError('Network error uploading file.');
+    } finally {
+      setAnnounceFileUploading(false);
+    }
   };
 
   const handleDeleteAnnouncement = async (id: string, title: string) => {
@@ -2979,6 +2998,11 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
+                  </div>
+                ) : announceFileUploading ? (
+                  <div className="w-full px-3.5 py-2.5 bg-slate-900 border border-cyan-500/30 text-xs text-cyan-300 rounded-xl flex items-center justify-center gap-2 min-h-[44px]">
+                    <span className="inline-block w-3 h-3 border-2 border-cyan-300/40 border-t-cyan-300 rounded-full animate-spin" />
+                    Uploading file…
                   </div>
                 ) : (
                   <button
