@@ -2889,6 +2889,26 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [isLoading]);
 
+  // SSR-level safety net — ONLY fires if the loading screen is still
+  // visible after 60s (genuine ChunkLoadError / server crash). Uses
+  // useEffect (NOT a <script> tag) because React doesn't execute
+  // <script> tags during client-side rendering.
+  useEffect(() => {
+    if (!isLoading || forceLoaded) return;
+    const t = setTimeout(() => {
+      if ((window as any).__pracpedia_chunk_retry__) return;
+      (window as any).__pracpedia_chunk_retry__ = true;
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.set('__chunk_retry', String(Date.now()));
+        window.location.replace(u.toString());
+      } catch {
+        window.location.reload();
+      }
+    }, 60000);
+    return () => clearTimeout(t);
+  }, [isLoading, forceLoaded]);
+
   // Suppress unused-warning for `user` — referenced to keep the hook contract explicit.
   void user;
 
@@ -2900,31 +2920,6 @@ export default function Home() {
       >
         <div className="w-10 h-10 rounded-full border-t-2 border-b-2 border-cyan-400 animate-spin" />
         <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500 text-center">Loading PracPedia…</p>
-        {/* SSR-level safety net — ONLY fires if React completely fails to
-            hydrate after 60 seconds (genuine ChunkLoadError / server crash).
-            Was 6s → 20s → now 60s to eliminate all false-positive reloads. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                if (typeof window === 'undefined') return;
-                setTimeout(function() {
-                  var loaderStillVisible = !!document.getElementById('pracpedia-initial-loader');
-                  if (!loaderStillVisible) return;
-                  if (window.__pracpedia_chunk_retry__) return;
-                  window.__pracpedia_chunk_retry__ = true;
-                  try {
-                    var u = new URL(window.location.href);
-                    u.searchParams.set('__chunk_retry', String(Date.now()));
-                    window.location.replace(u.toString());
-                  } catch (e) {
-                    window.location.reload();
-                  }
-                }, 60000);
-              })();
-            `,
-          }}
-        />
       </div>
     );
   }
