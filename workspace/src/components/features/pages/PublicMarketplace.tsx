@@ -371,8 +371,8 @@ export const PublicMarketplace: React.FC<PublicMarketplaceProps> = ({ onRegister
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-white/[0.06] bg-[#060814]/80 backdrop-blur-md">
+      {/* Footer — mt-auto pins to bottom */}
+      <footer className="relative z-10 mt-auto border-t border-white/[0.06] bg-[#05070e]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-500 font-mono uppercase tracking-wider text-center">
           <span>© 2026 PracPedia Marketplace · Public Preview</span>
           <button
