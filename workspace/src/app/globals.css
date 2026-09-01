@@ -454,32 +454,36 @@ html, body {
   font-family: "Space Grotesk", "Geist", ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
   width: 100%;
-  /* Extend content into curved-edge safe areas */
-  -webkit-fill-available: both;
+  min-width: 100%;
+  /* Prevent rubber-band scrolling that reveals white edges on curved displays */
+  overscroll-behavior: none;
 }
 
-/* Fixed full-screen dark background — covers the entire viewport including
-   curved-edge safe areas. Uses -100px inset to guarantee coverage past the
-   physical screen edge on curved-display phones. */
+/* Fixed full-screen dark background — covers the ENTIRE viewport including
+   curved-edge safe areas. position:fixed is NOT clipped by overflow-x:hidden
+   on ancestors, so this guarantees the dark bg reaches the physical screen
+   edge on curved-display phones like the Tecno Camon 40 Pro. */
 body::before {
   content: '';
   position: fixed;
-  top: -200px;
-  left: -200px;
-  right: -200px;
-  bottom: -200px;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
   background: #05070e;
   z-index: -1;
   pointer-events: none;
 }
 
 /* Ensure ALL root-level app containers use the same dark background
-   so there's never a color mismatch on curved edges */
+   so there's never a color mismatch on curved edges — use #05070e to
+   match the body background exactly (was #060814 in Tailwind class). */
 #landing_page_container,
 #auth_page_container,
 .glass-main-bg,
 [id*="classroom"] {
   background-color: #05070e !important;
+  width: 100%;
+  min-width: 100%;
 }
 
 /* Math blocks custom safety wrapping */
