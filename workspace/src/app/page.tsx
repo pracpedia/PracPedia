@@ -2881,11 +2881,12 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // Safety timeout — force-load after 4s no matter what (covers the case
+  // Safety timeout — force-load after 10s no matter what (covers the case
   // where the JS bundle DID load but AuthContext's fetch is hanging).
+  // Was 4s — too aggressive for cold Neon DB starts which can take 3-5s.
   useEffect(() => {
     if (!isLoading) return;
-    const t = setTimeout(() => setForceLoaded(true), 4000);
+    const t = setTimeout(() => setForceLoaded(true), 10000);
     return () => clearTimeout(t);
   }, [isLoading]);
 
@@ -2903,17 +2904,16 @@ export default function Home() {
         {/* SSR-level safety net — runs even if React fails to hydrate
             (e.g., after a dev server restart when the old JS chunks are
             no longer on disk → ChunkLoadError prevents hydration).
-            After 6 seconds of no hydration, force a cache-busted reload
-            so the browser fetches fresh HTML with current chunk URLs. */}
+            After 20 seconds of no hydration, force a cache-busted reload
+            so the browser fetches fresh HTML with current chunk URLs.
+            Was 6s — too aggressive, caused unnecessary reloads on slow
+            DB connections. */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 if (typeof window === 'undefined') return;
                 setTimeout(function() {
-                  // If React hydrated, the #pracpedia-initial-loader div would
-                  // be gone. If it's still in the DOM after 6s, the JS bundle
-                  // failed to load — force a cache-busted reload.
                   var loaderStillVisible = !!document.getElementById('pracpedia-initial-loader');
                   if (!loaderStillVisible) return;
                   if (window.__pracpedia_chunk_retry__) return;
@@ -2925,7 +2925,7 @@ export default function Home() {
                   } catch (e) {
                     window.location.reload();
                   }
-                }, 6000);
+                }, 20000);
               })();
             `,
           }}

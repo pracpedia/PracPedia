@@ -765,7 +765,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
          Layered parallax creates depth:
          1. Distant star field (slow parallax) — small twinkling pinpricks
          2. Mid star field (medium parallax) — brighter closer stars
-         3. Near dust + shooting stars — fastest, foreground */}
+         3. Near dust + shooting stars — fastest, foreground
+
+         All parallax layers are wrapped in a single overflow:clip container so
+         transformed layers can't extend below the footer (fixes blank space). */}
+      <div aria-hidden className="absolute inset-0 overflow-clip pointer-events-none" style={{ zIndex: 0 }}>
 
       {/* Layer 2: Distant star field — slow parallax (scroll-Y + mouse-X) */}
       <motion.div
@@ -887,6 +891,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           />
         ))}
       </motion.div>
+      </div>{/* end of overflow-clip parallax wrapper */}
 
       {/* Top banner — customizable by super admin */}
       {bannerConfig?.enabled !== false && (
