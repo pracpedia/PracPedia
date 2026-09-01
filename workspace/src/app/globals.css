@@ -130,7 +130,9 @@
   body {
     @apply bg-background text-foreground;
     width: 100%;
-    overflow-x: hidden;
+    /* Use clip instead of hidden to prevent horizontal scroll
+       WITHOUT creating a scroll container that traps vertical touch scroll. */
+    overflow-x: clip;
   }
 }
 
@@ -470,10 +472,12 @@ html, body {
   background-color: #05070e !important;
   color: #f8fafc !important;
   font-family: "Space Grotesk", "Geist", ui-sans-serif, system-ui, sans-serif;
-  overflow-x: hidden;
   width: 100%;
-  min-width: 100%;
-  overscroll-behavior: none;
+  /* CRITICAL: touch-action: pan-y tells mobile browsers to ALWAYS allow
+     vertical scrolling, even when compositor layers (from framer-motion
+     transforms) cover the viewport. Without this, the parallax motion.div
+     layers can intercept touch events and trap the scroll. */
+  touch-action: pan-y;
 }
 
 /* Fixed full-screen dark background — position:fixed with inset:0 covers
@@ -490,14 +494,18 @@ body::before {
   pointer-events: none;
 }
 
-/* ALL root-level app containers — same dark bg, full width */
+/* ALL root-level app containers — same dark bg, full width.
+   Uses overflow-x: clip (NOT hidden) to prevent horizontal scroll
+   WITHOUT creating a scroll container that traps vertical touch scroll.
+   touch-action: pan-y ensures mobile browsers always allow vertical scrolling. */
 #landing_page_container,
 #auth_page_container,
 .glass-main-bg,
 [id*="classroom"] {
   background-color: #05070e !important;
   width: 100%;
-  min-width: 100%;
+  overflow-x: clip;
+  touch-action: pan-y;
 }
 
 /* Math blocks custom safety wrapping */
