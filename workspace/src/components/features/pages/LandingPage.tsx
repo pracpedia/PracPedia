@@ -345,8 +345,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const parallaxWillChange = isDesktop ? 'transform' as const : undefined;
 
   /* Deep-space parallax layers — each moves at a different speed to create
-     depth (nebula clouds slowest, near dust + shooting stars fastest). */
-  const bgAuroraY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 200] : [0, 0]);
+     depth (distant stars slowest, near dust + shooting stars fastest). */
   const bgFarMountainY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 350] : [0, 0]);
   const bgMidMountainY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 500] : [0, 0]);
   const bgNearHillY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 700] : [0, 0]);
@@ -770,53 +769,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       id="landing_page_container"
       className="w-full min-h-screen text-slate-200 bg-[#060814] relative font-sans flex flex-col overflow-x-hidden selection:bg-cyan-500/20 selection:text-cyan-300"
     >
-      {/* ── DEEP SPACE PARALLAX LAYERS ──
-         Layered cosmic atmosphere that moves at different speeds on scroll,
-         creating a 3D "looking out into space" depth effect:
-         1. Nebula clouds (slowest, deepest) — violet / indigo / cyan blobs
-         2. Distant star field (slow)        — small twinkling pinpricks
-         3. Mid star field (medium)          — brighter closer stars
-         4. Near dust + shooting stars      — fastest, foreground
-
-         All parallax layers are wrapped in a single `overflow-hidden` clip
-         box so transformed layers can't extend below the footer. */}
-
-      {/* Layer 1: Nebula clouds — deepest, slowest parallax */}
-      <motion.div
-        aria-hidden
-        style={{ y: bgAuroraY, willChange: parallaxWillChange }}
-        className="absolute inset-0 pointer-events-none"
-      >
-        <div
-          className="absolute top-[5%] left-[5%] w-[60%] h-[55%] opacity-30"
-          style={{
-            background: 'radial-gradient(ellipse at center, rgba(168,85,247,0.30) 0%, rgba(124,58,237,0.12) 35%, transparent 70%)',
-            filter: 'blur(70px)',
-            animation: 'pp-nebula-drift 22s ease-in-out infinite',
-          }}
-        />
-        <div
-          className="absolute top-[20%] right-[5%] w-[55%] h-[60%] opacity-25"
-          style={{
-            background: 'radial-gradient(ellipse at center, rgba(34,211,238,0.22) 0%, rgba(14,165,233,0.10) 40%, transparent 70%)',
-            filter: 'blur(90px)',
-            animation: 'pp-nebula-drift 28s ease-in-out infinite reverse',
-          }}
-        />
-        <div
-          className="absolute bottom-[10%] left-[20%] w-[55%] h-[50%] opacity-20"
-          style={{
-            background: 'radial-gradient(ellipse at center, rgba(99,102,241,0.22) 0%, rgba(168,85,247,0.08) 45%, transparent 70%)',
-            filter: 'blur(110px)',
-            animation: 'pp-nebula-drift 34s ease-in-out infinite',
-            animationDelay: '-8s',
-          }}
-        />
-      </motion.div>
+      {/* ── REAL SPACE BACKGROUND ──
+         A pure starfield — no nebula clouds, no visible "ball" shapes.
+         Layered parallax creates depth:
+         1. 3D starfield (Three.js) — points scattered through 3D space, no sphere
+         2. Distant star field (slow parallax) — small twinkling pinpricks
+         3. Mid star field (medium parallax) — brighter closer stars
+         4. Near dust + shooting stars — fastest, foreground */}
 
       {/* 3D Cosmic Scene — Three.js + React Three Fiber.
-          A rotating star globe (2000 points) + inner star cloud (800 points)
-          with scroll-driven tilt. Sits behind the 2D star fields for depth.
+          A flat 3D starfield (points scattered through 3D space, NOT a sphere)
+          with a very slow drift. Sits behind the 2D star fields for depth.
           Pointer-events disabled so it never blocks UI clicks. */}
       <Cosmic3DScene />
 
