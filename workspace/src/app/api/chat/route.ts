@@ -3,6 +3,17 @@ import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { logActivity } from '@/lib/activity-log';
 
+/**
+ * GET /api/chat
+ * Returns global chat messages (subjectId = null).
+ *
+ * Query params:
+ *   ?since=ISO  — only messages newer than this timestamp (for client-side polling)
+ *   ?limit=200  — max messages to return (default 200)
+ *
+ * Returns IMMEDIATELY — no long-polling. The client polls every 3 seconds.
+ * This is Vercel serverless-safe (no held function invocations).
+ */
 export async function GET(request: NextRequest) {
   try {
     const payload = await getUserFromRequest(request);
@@ -12,36 +23,20 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const since = searchParams.get('since');
+    const limit = Math.min(Number(searchParams.get('limit') || '200'), 500);
 
-    // Long-polling mode (kept for backward compat — prefer /api/chat/general)
+    const where: any = { subjectId: null };
     if (since) {
       const sinceDate = new Date(since);
-      if (isNaN(sinceDate.getTime())) {
-        return NextResponse.json({ error: 'Invalid since timestamp' }, { status: 400 });
+      if (!isNaN(sinceDate.getTime())) {
+        where.createdAt = { gt: sinceDate };
       }
-      const maxWaitMs = 20_000;
-      const startedAt = Date.now();
-      while (Date.now() - startedAt < maxWaitMs) {
-        const newMessages = await db.chatMessage.findMany({
-          where: { subjectId: null, createdAt: { gt: sinceDate } },
-          orderBy: { createdAt: 'asc' },
-          take: 100,
-        });
-        if (newMessages.length > 0) {
-          return NextResponse.json({
-            messages: newMessages.map((m) => ({ ...m, id: m.id })),
-            polledAt: new Date().toISOString(),
-          });
-        }
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      return NextResponse.json({ messages: [], polledAt: new Date().toISOString() });
     }
 
     const messages = await db.chatMessage.findMany({
-      where: { subjectId: null },
+      where,
       orderBy: { createdAt: 'asc' },
-      take: 200,
+      take: limit,
     });
     return NextResponse.json({
       messages: messages.map((m) => ({ ...m, id: m.id })),
@@ -75,11 +70,10 @@ export async function POST(request: NextRequest) {
         userRole: u.role,
         userAvatar: u.profilePic || null,
         text: String(text || '').slice(0, 4000),
-        imageUrl: imageUrl ? String(imageUrl).slice(0, 500000) : null,  // base64 can be large
+        imageUrl: imageUrl ? String(imageUrl).slice(0, 500000) : null,
         subjectId: subjectId || null,
       },
     });
-    // Log to activity feed
     await logActivity({
       userId: u.id,
       userName: u.name,

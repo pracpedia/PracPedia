@@ -7,15 +7,13 @@ import { getUserFromRequest } from '@/lib/auth';
  *
  * Fetches chat messages for a subject (or global if subjectId === 'general').
  *
- * Long-polling support:
- *   ?since=ISO_TIMESTAMP  — if provided, the server holds the request open for
- *   up to 20 seconds waiting for a message newer than `since`. Returns
- *   immediately when a new message arrives, or an empty array on timeout.
+ * Query params:
+ *   ?since=ISO  — only messages newer than this timestamp (for client-side polling)
+ *   ?limit=200  — max messages to return (default 200)
  *
- * Without `since`, returns the latest 200 messages immediately.
- *
- * This approach works on Vercel serverless (25s timeout) and provides
- * near-real-time chat without WebSocket infrastructure.
+ * Returns IMMEDIATELY — no long-polling busy-wait loop. The client polls
+ * every 3 seconds. This is Vercel serverless-safe (no held invocations,
+ * no quota burning, no timeout risk on Hobby plan).
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ subjectId: string }> }) {
   try {
@@ -26,55 +24,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { subjectId: sid } = await params;
     const subjectId = sid === 'general' ? null : sid;
-    const where = subjectId ? { subjectId } : { subjectId: null };
+    const where: any = subjectId ? { subjectId } : { subjectId: null };
 
-    // ── Long-polling mode ───────────────────────────────────────────────────
     const { searchParams } = new URL(request.url);
     const since = searchParams.get('since');
+    const limit = Math.min(Number(searchParams.get('limit') || '200'), 500);
 
     if (since) {
       const sinceDate = new Date(since);
-      if (isNaN(sinceDate.getTime())) {
-        return NextResponse.json({ error: 'Invalid since timestamp' }, { status: 400 });
+      if (!isNaN(sinceDate.getTime())) {
+        where.createdAt = { gt: sinceDate };
       }
-
-      // Poll for up to 20 seconds (Vercel safe — under 25s serverless timeout)
-      const maxWaitMs = 20_000;
-      const pollIntervalMs = 1_000;
-      const startedAt = Date.now();
-
-      while (Date.now() - startedAt < maxWaitMs) {
-        const newMessages = await db.chatMessage.findMany({
-          where: { ...where, createdAt: { gt: sinceDate } },
-          orderBy: { createdAt: 'asc' },
-          take: 100,
-        });
-
-        if (newMessages.length > 0) {
-          return NextResponse.json({
-            messages: newMessages.map((m) => ({ ...m, id: m.id })),
-            polledAt: new Date().toISOString(),
-            longPoll: true,
-          });
-        }
-
-        // Wait 1 second before checking again
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-      }
-
-      // Timeout — no new messages
-      return NextResponse.json({
-        messages: [],
-        polledAt: new Date().toISOString(),
-        longPoll: true,
-      });
     }
 
-    // ── Initial fetch mode ──────────────────────────────────────────────────
     const messages = await db.chatMessage.findMany({
       where,
       orderBy: { createdAt: 'asc' },
-      take: 200,
+      take: limit,
     });
     return NextResponse.json({
       messages: messages.map((m) => ({ ...m, id: m.id })),

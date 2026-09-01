@@ -263,41 +263,35 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
     }
   };
 
-  // Initial fetch + long-polling loop for near-real-time chat.
-  //
-  // How it works:
-  //   1. On mount/channel change, fetch the latest 200 messages (initial load)
-  //   2. Then start a long-poll loop: send a request with ?since=<last message time>
-  //   3. Server holds the request open up to 20s, returns when new messages arrive
-  //   4. Client merges new messages, then immediately sends the next long-poll
-  //
-  // This gives ~1s latency (same as the old 1s polling) but with 20× fewer
-  // requests — dramatically lower server load and battery usage.
+  // ── Client-side polling (Vercel serverless-safe) ──────────────────────
+  // Instead of long-polling (server holds request open 20s — burns Vercel
+  // quota + times out on Hobby plan), the client polls every 3 seconds.
+  // The server returns immediately with any new messages since the last
+  // poll. This is cheaper, simpler, and works on all serverless platforms.
   useEffect(() => {
     let cancelled = false;
 
-    const startLongPollLoop = async (subjId: string) => {
-      // Initial fetch (no `since` param)
+    const startPollLoop = async (subjId: string) => {
+      // Initial fetch (no `since` param — get latest 200 messages)
       await fetchChannelMessages(subjId, false);
 
       if (cancelled) return;
 
-      // Long-poll loop
+      // Poll loop — fetch new messages every 3 seconds
       while (!cancelled) {
+        await new Promise((r) => setTimeout(r, 3000));
+        if (cancelled) break;
+
         // Get the latest message timestamp to use as the `since` cursor
         const latestMsg = messagesRef.current[messagesRef.current.length - 1];
         const since = latestMsg?.createdAt || new Date(0).toISOString();
 
-        // Wait for new messages (server holds up to 20s)
+        // Fetch only new messages since the last poll
         await fetchChannelMessages(subjId, true, since);
-
-        // Small delay between long-poll cycles to prevent tight loops on errors
-        if (cancelled) break;
-        await new Promise((r) => setTimeout(r, 500));
       }
     };
 
-    startLongPollLoop(activeChannelId);
+    startPollLoop(activeChannelId);
 
     return () => {
       cancelled = true;
