@@ -21,7 +21,6 @@
     "seed": "bunx tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.1.1",
     "@prisma/client": "^6.11.1",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.14",
@@ -35,7 +34,6 @@
     "@vercel/blob": "^2.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
     "framer-motion": "^12.23.2",
     "gsap": "^3.15.0",
     "katex": "^0.18.4",
@@ -43,16 +41,11 @@
     "next": "^16.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-hook-form": "^7.60.0",
     "react-markdown": "^10.1.0",
-    "recharts": "^2.15.4",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
     "tailwind-merge": "^3.3.1",
-    "tailwindcss-animate": "^1.0.7",
-    "uuid": "^11.1.0",
-    "z-ai-web-dev-sdk": "^0.0.18",
-    "zod": "^4.0.2"
+    "z-ai-web-dev-sdk": "^0.0.18"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

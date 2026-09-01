@@ -1024,7 +1024,7 @@ export const AiAcademyRoom: React.FC = () => {
         // (If a future agent wants to wire dynamic MCQs, swap `presets` in the JSX for data.questions.)
         setResponseHtml('');
         if (data && Array.isArray(data.questions) && data.questions.length > 0) {
-          console.info('Academy MCQ endpoint returned', data.questions.length, 'dynamic questions (UI uses predefined presets per original behavior).');
+          // MCQ response received — UI uses predefined presets
         }
       } else {
         // lesson + cq endpoints return { content: string }
