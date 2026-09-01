@@ -9,6 +9,10 @@ import { uploadImage } from '@/lib/blob-storage';
  * Accepts multipart/form-data with a single `file` field, returns a public
  * URL (Vercel Blob in production, base64 data URL in dev) so the client can
  * then pass that URL to POST /api/announcements as `fileUrl`.
+ *
+ * No file size limit — admins can upload files of any size. In production
+ * Vercel Blob handles large files; in dev the base64 fallback works for
+ * any size that fits in memory.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -23,14 +27,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File is required.' }, { status: 400 });
     }
 
-    const MAX_BYTES = 50 * 1024 * 1024;
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json(
-        { error: 'File exceeds the 50 MB upload limit.' },
-        { status: 413 },
-      );
-    }
-
+    // No size limit — admins can upload any file size.
     const url = await uploadImage(file, 'announcements');
     return NextResponse.json({
       url,

@@ -123,7 +123,7 @@ export const PublicMarketplace: React.FC<PublicMarketplaceProps> = ({ onRegister
   };
 
   return (
-    <div className="w-full min-h-screen text-slate-200 bg-[#05070e] relative font-sans flex flex-col overflow-y-auto overflow-x-hidden selection:bg-cyan-500/20 selection:text-cyan-300">
+    <div className="w-full min-h-screen text-slate-200 bg-[#05070e] relative font-sans flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
       {/* Ambient gradient orb (matches LandingPage) */}
       <div
         aria-hidden

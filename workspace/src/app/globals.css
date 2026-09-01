@@ -446,6 +446,24 @@ body {
   }
 }
 
+/* ── CURVED DISPLAY FIX ──
+   On phones with curved edges (Tecno Camon 40 Pro, Samsung Edge, etc.),
+   the browser leaves white gaps on left/right sides. This is because:
+   1. The <html> element has a default white background from the browser
+   2. 100vw includes scrollbar width on desktop, and on mobile can miss
+      the safe-area insets
+   3. overflow-x: hidden on body can clip background extensions
+
+   Fix: set the dark background on EVERY ancestor element (html, body,
+   body::before) and use position:fixed with inset:0 (not 100vw) so the
+   background covers the full physical screen including curved edges. */
+
+html {
+  background-color: #05070e !important;
+  /* viewport-fit=cover is set in layout.tsx — this lets content extend
+     into the curved-edge safe areas */
+}
+
 html, body {
   margin: 0 !important;
   padding: 0 !important;
@@ -455,28 +473,24 @@ html, body {
   overflow-x: hidden;
   width: 100%;
   min-width: 100%;
-  /* Prevent rubber-band scrolling that reveals white edges on curved displays */
   overscroll-behavior: none;
 }
 
-/* Fixed full-screen dark background — covers the ENTIRE viewport including
-   curved-edge safe areas. position:fixed is NOT clipped by overflow-x:hidden
-   on ancestors, so this guarantees the dark bg reaches the physical screen
-   edge on curved-display phones like the Tecno Camon 40 Pro. */
+/* Fixed full-screen dark background — position:fixed with inset:0 covers
+   the ENTIRE physical viewport on curved displays. Not clipped by overflow. */
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: #05070e;
   z-index: -1;
   pointer-events: none;
 }
 
-/* Ensure ALL root-level app containers use the same dark background
-   so there's never a color mismatch on curved edges — use #05070e to
-   match the body background exactly (was #060814 in Tailwind class). */
+/* ALL root-level app containers — same dark bg, full width */
 #landing_page_container,
 #auth_page_container,
 .glass-main-bg,

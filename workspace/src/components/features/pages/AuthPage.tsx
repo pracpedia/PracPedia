@@ -265,7 +265,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
   };
 
   return (
-    <div id="auth_page_container" className="min-h-screen text-slate-100 flex flex-col justify-center items-center relative overflow-x-hidden bg-[#05070e] px-3 sm:px-6 py-6 md:py-12 select-none">
+    <div id="auth_page_container" className="min-h-screen text-slate-100 flex flex-col justify-center items-center relative bg-[#05070e] px-3 sm:px-6 py-6 md:py-12 select-none">
 
       {/* Background Lighting & Grid */}
       <div className="absolute top-[-10%] left-[15%] w-[65vw] h-[45vh] rounded-full bg-gradient-to-br from-indigo-600/12 via-cyan-600/8 to-transparent blur-[160px] pointer-events-none" />

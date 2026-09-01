@@ -1399,10 +1399,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
     const file = e.target.files?.[0];
     if (announceFileRef.current) announceFileRef.current.value = '';
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) {
-      showError('Max 50 MB for file attachments.');
-      return;
-    }
+    // No file size limit — admins can upload any file.
     setAnnounceFileUploading(true);
     try {
       const fd = new FormData();
@@ -3011,7 +3008,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-dashed border-white/15 text-xs text-slate-400 hover:text-cyan-300 hover:border-cyan-500/30 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[44px]"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    Upload file (max 50 MB)
+                    Upload file (no size limit)
                   </button>
                 )}
               </div>

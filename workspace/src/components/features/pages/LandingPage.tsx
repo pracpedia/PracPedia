@@ -758,7 +758,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       id="landing_page_container"
       onMouseMove={isDesktop ? handleMouseParallax : undefined}
       onMouseLeave={isDesktop ? resetMouseParallax : undefined}
-      className="w-full min-h-screen text-slate-200 bg-[#05070e] relative font-sans flex flex-col overflow-x-hidden selection:bg-cyan-500/20 selection:text-cyan-300"
+      className="w-full min-h-screen text-slate-200 bg-[#05070e] relative font-sans flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300"
     >
       {/* ── REAL SPACE BACKGROUND ──
          A pure starfield — no nebula clouds, no 3D canvas (removed for performance).
