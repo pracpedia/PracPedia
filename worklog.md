@@ -1010,3 +1010,50 @@ Stage Summary:
   - package.json (added three + @react-three/fiber + @react-three/drei)
 - Total stars on the landing page: ~410 2D twinkling stars + ~2800 3D stars in a rotating globe = ~3200 stars visible.
 - The 3D scene uses Three.js (rendered via React Three Fiber) + GSAP-compatible framer-motion scroll. Both libraries are now installed and active on the landing page.
+
+---
+Task ID: 16
+Agent: main
+Task: Remove the balls (Fourier epicycles), make real space with stars, add state-of-the-art parallax
+
+Work Log:
+- Identified the "balls" — the Fourier series epicycles in the hero. 7 visible SVG `<circle>` elements that rotated and chained together to draw a square wave, literally looking like glowing balls. Plus the floating math glyphs (∑ π ω ƒ) that drifted around.
+- Created `src/components/features/landing/ConstellationHero.tsx` — a real-space constellation visualization that replaces the Fourier card:
+  - 14 constellation stars arranged in an Orion-like pattern (shoulders, belt, feet, sword) connected by faint dashed lines
+  - 40 ambient background stars (independent twinkles via CSS `pp-twinkle`)
+  - A center pulsar (cross-shaped sparkle, NOT a ball)
+  - Each star has its own twinkle duration + delay for organic variation
+  - Bright stars (Betelgeuse, Bellatrix, belt middle, Saiph, Rigel) have a soft glow halo
+- Removed the Fourier viz column (lines 1170-1318 of LandingPage.tsx) and replaced with `<ConstellationHero />`.
+- Removed all dead Fourier code from LandingPage.tsx:
+  - The GSAP Fourier effect (200+ lines of `useEffect` with `renderFrame`, `fourierSum`, epicycle chain, waveform polyline, trail line, live readout)
+  - All Fourier refs (`sceneRef`, `circleRefs`, `lineRefs`, `tipRef`, `trailLineRef`, `waveformRef`, `tLabelRef`, `sumLabelRef`, `stepRowsRef`, `chipRef`, `glyphRefs`)
+  - All Fourier constants (`HARMONIC_KS`, `HARMONIC_AMPS`, `HARMONIC_ROWS`, `CIRCLE_COLORS`, `GLYPHS`, `SUBSCRIPTS`, `toSubscript`)
+  - The unused `heroVizY` parallax transform
+- Added state-of-the-art mouse parallax to the 2D star field layers:
+  - `useMotionValue` + `useSpring` for spring-smoothed cursor tracking (stiffness 60, damping 20, mass 0.6 — buttery, no jitter)
+  - 3 layers move at different rates: distant (±10px), mid (±25px), near (±40px) — creating real 3D depth as the mouse moves
+  - `onMouseMove` + `onMouseLeave` handlers on the landing container (desktop-only to avoid mobile touch conflicts)
+  - Each star field layer now has both scroll-Y parallax (existing) + mouse-X parallax (new) for a combined depth effect
+- The ConstellationHero itself also has its own internal mouse parallax (3 layers: background stars, constellation, foreground glow) with spring smoothing, PLUS scroll parallax.
+- Three.js starfield (`Cosmic3DScene.tsx`) was already updated in the previous turn to scatter points through a cube of 3D space (no sphere/ball shape).
+
+Verification:
+- `npx tsc --noEmit` — clean
+- `npx eslint .` — clean
+- `npx next build` — SUCCESS (all 40+ routes compiled)
+- Production server running at http://localhost:3000 (PID 2805), memory 624MB
+- 4/4 routes return HTTP 200
+- 10/10 rapid requests succeeded
+- Three.js starfield loaded in JS bundle
+- Constellation hero loaded in JS bundle
+- Fourier epicycles completely removed (no `circleRefs`/`HARMONIC_KS` found in any chunk)
+- CSS keyframes `pp-twinkle` + `pp-shooting-star` present
+
+Stage Summary:
+- Files changed:
+  - src/components/features/landing/ConstellationHero.tsx (NEW — constellation with mouse + scroll parallax)
+  - src/components/features/pages/LandingPage.tsx (removed Fourier viz + all dead Fourier code/constants; added ConstellationHero import + render; added state-of-the-art mouse parallax to 2D star layers)
+- The landing page hero now shows a real-space constellation (Orion pattern) instead of moving balls.
+- The background is real space: ~3,000 3D stars (Three.js, scattered through a cube, no sphere) + 410 2D twinkling stars (3 parallax layers with mouse + scroll parallax) + random shooting stars + the constellation in the hero.
+- State-of-the-art parallax: spring-smoothed mouse parallax (3 rates) + scroll parallax (3 rates) + the constellation's own internal mouse parallax (3 layers). Move your mouse to see the stars shift in 3D depth.
