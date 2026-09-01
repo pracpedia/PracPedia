@@ -433,9 +433,12 @@ function PortalConsole() {
   }, [user?.id]);
 
   // Fetch full system context
+  // NOTE: Does NOT set isLoading=true on refresh — only the initial load
+  // sets isLoading. Setting it on every refresh causes the loading screen
+  // to flash + triggers the forceLoaded/SSR auto-reload timeouts, which
+  // reload the page and wipe all user state (AI answers, chat, etc.).
   const refreshWorkspaceData = async () => {
     try {
-      setIsLoading(true);
       // Fetch subjects
       const subRes = await apiFetch('/api/subjects');
       const subData = await subRes.json();
@@ -2682,21 +2685,19 @@ function PortalConsole() {
 
               {/* ==============================================
                   💬 VIEW: STUDENT CLASSROOM HUB CHAT MESSAGES
+                  — kept mounted (display:none when inactive) for state persistency
                   ============================================== */}
-              {currentView === 'chat' && (
-                <div className="space-y-6 animate-in fade-in duration-300">
-                  <ClassroomDiscussion subjects={subjects} />
-                </div>
-              )}
+              <div className={currentView === 'chat' ? "space-y-6" : "hidden"}>
+                <ClassroomDiscussion subjects={subjects} />
+              </div>
 
               {/* ==============================================
                   🧬 VIEW: AI ACADEMY STUDY CHAMBER
+                  — kept mounted (display:none when inactive) for state persistency
                   ============================================== */}
-              {currentView === 'academy' && (
-                <div className="space-y-6 animate-in fade-in duration-300">
-                  <AiAcademyRoom />
-                </div>
-              )}
+              <div className={currentView === 'academy' ? "space-y-6" : "hidden"}>
+                <AiAcademyRoom />
+              </div>
 
               {/* ==============================================
                   👤 VIEW: PROFILE SETTINGS CONTROLS
