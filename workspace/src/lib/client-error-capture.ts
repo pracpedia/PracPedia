@@ -117,9 +117,17 @@ export function installErrorCapture(): void {
   // Fix: detect ChunkLoadError on the page and AUTO-RELOAD ONCE with cache
   // busting. The reload fetches fresh HTML which references the NEW chunk
   // hashes — they exist on disk, so React hydrates normally.
+  //
+  // IMPORTANT: Only active in development (NODE_ENV !== 'production').
+  // In production with `next start`, chunks are served from .next/static/
+  // and never go missing — so the auto-reload should NEVER fire. Keeping
+  // it active in production caused false-positive reloads on slow network
+  // responses that matched the regex patterns.
   let chunkReloaded = false;
   const handleChunkError = (msg: string): boolean => {
     if (chunkReloaded) return false;
+    // Only fire in development — production chunks don't go missing.
+    if (process.env.NODE_ENV === 'production') return false;
     // Match both "ChunkLoadError" (the actual class name) and the common
     // substrings it appears with in different bundlers/versions.
     const isChunkError =

@@ -2882,12 +2882,13 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // Safety timeout — force-load after 10s no matter what (covers the case
+  // Safety timeout — force-load after 30s no matter what (covers the case
   // where the JS bundle DID load but AuthContext's fetch is hanging).
-  // Was 4s — too aggressive for cold Neon DB starts which can take 3-5s.
+  // This should ONLY fire in genuine crash scenarios, never during normal
+  // operation. Was 4s → 10s → now 30s to eliminate false positives.
   useEffect(() => {
     if (!isLoading) return;
-    const t = setTimeout(() => setForceLoaded(true), 10000);
+    const t = setTimeout(() => setForceLoaded(true), 30000);
     return () => clearTimeout(t);
   }, [isLoading]);
 
@@ -2902,13 +2903,9 @@ export default function Home() {
       >
         <div className="w-10 h-10 rounded-full border-t-2 border-b-2 border-cyan-400 animate-spin" />
         <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500 text-center">Loading PracPedia…</p>
-        {/* SSR-level safety net — runs even if React fails to hydrate
-            (e.g., after a dev server restart when the old JS chunks are
-            no longer on disk → ChunkLoadError prevents hydration).
-            After 20 seconds of no hydration, force a cache-busted reload
-            so the browser fetches fresh HTML with current chunk URLs.
-            Was 6s — too aggressive, caused unnecessary reloads on slow
-            DB connections. */}
+        {/* SSR-level safety net — ONLY fires if React completely fails to
+            hydrate after 60 seconds (genuine ChunkLoadError / server crash).
+            Was 6s → 20s → now 60s to eliminate all false-positive reloads. */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -2926,7 +2923,7 @@ export default function Home() {
                   } catch (e) {
                     window.location.reload();
                   }
-                }, 20000);
+                }, 60000);
               })();
             `,
           }}
