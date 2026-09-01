@@ -61,7 +61,6 @@ export async function POST(request: NextRequest) {
         bio: bio ? String(bio) : null,
         phoneNumber: phoneNumber ? String(phoneNumber) : null,
         profilePic: profilePic || null,
-        aiCredits: Number(process.env.AI_CREDITS_DEFAULT || '25'),
         rateDrawingOnly: Number(rateDrawingOnly) || 150,
         rateDrawingWriting: Number(rateDrawingWriting) || 300,
         notebookCost: Number(notebookCost) || 100,

@@ -596,31 +596,7 @@ export const AiAcademyRoom: React.FC = () => {
   const { apiFetch, user, setUser, geminiApiKey, setGeminiApiKey, isKeyModalOpen, setIsKeyModalOpen } = useAuth();
   const { t, language } = useLanguage();
 
-  const [rechargingCredits, setRechargingCredits] = useState(false);
 
-  const handleRechargeTrial = async () => {
-    setRechargingCredits(true);
-    try {
-      const res = await apiFetch('/api/users/recharge-trial', {
-        method: 'POST',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (user && setUser) {
-          setUser({ ...user, aiCredits: data.aiCredits });
-        }
-        setErrorMessage(null);
-      } else {
-        const errData = await res.json();
-        alert(errData.error || "Failed to recharge trial credits.");
-      }
-    } catch (e) {
-      console.warn('Recharge trial credits failed:', e);
-      alert("Error contacting the credit recharge service.");
-    } finally {
-      setRechargingCredits(false);
-    }
-  };
 
   const [subjectsList, setSubjectsList] = useState<string[]>(['Physics', 'Chemistry', 'Biology', 'Higher Math', 'ICT']);
 
@@ -1055,10 +1031,6 @@ export const AiAcademyRoom: React.FC = () => {
         setResponseHtml(data.content || data.response || '');
       }
 
-      if (typeof data.aiCredits === 'number' && user) {
-        setUser({ ...user, aiCredits: data.aiCredits });
-      }
-
       // Successfully processed visual lessons matches gamification milestones
       const addition = chosenMode === 'concept' ? 15 : 25;
       const updatedKp = databaseFallbackMilestone(addition);
@@ -1136,9 +1108,6 @@ export const AiAcademyRoom: React.FC = () => {
       }
 
       const data = await res.json();
-      if (typeof data.aiCredits === 'number' && user) {
-        setUser({ ...user, aiCredits: data.aiCredits });
-      }
       setChatLogs((prev) => [...prev, {
         id: Math.random().toString(),
         sender: 'tutor',
@@ -1816,16 +1785,6 @@ export const AiAcademyRoom: React.FC = () => {
                 >
                   Reload Course
                 </button>
-
-                {errorMessage.toLowerCase().includes('credit') && (!user?.role || user?.role !== 'admin') && (
-                  <button
-                    onClick={handleRechargeTrial}
-                    disabled={rechargingCredits}
-                    className="px-3.5 py-1.5 min-h-[36px] bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-[10px] font-black uppercase transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
-                  >
-                    {rechargingCredits ? "Recharging..." : "Claim 150 Trial Credits"}
-                  </button>
-                )}
 
                 <button
                   onClick={() => {

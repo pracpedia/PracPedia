@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
-import { isPlatformOwner } from '@/lib/platform-owner';
 import { geminiVision } from '@/lib/gemini-byok';
 
 /**
@@ -11,15 +9,10 @@ import { geminiVision } from '@/lib/gemini-byok';
  * - Without `question`: returns an initial overview of the page.
  * - With `question`: returns a contextual answer.
  *
- * Response: { analysis: string, aiCredits: number }
+ * Response: { analysis: string }
  *
- * Each call decrements the user's aiCredits by 1 (down to a floor of 0).
- * Platform owners bypass the credit deduction.
- *
- * BYOK: requires the user's own Gemini API key via the `x-gemini-api-key`
- * header. Credit deduction happens AFTER the BYOK check so a missing key
- * doesn't burn a credit. The decrement is atomic via Prisma's conditional
- * update — concurrent requests can't both see the same credit balance.
+ * No AI credits needed — the user brings their own Gemini API key (BYOK),
+ * so the call goes directly to Google's API with the user's own quota.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -28,8 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // BYOK gate — Gemini API key required. Checked BEFORE credit deduction
-    // so a missing key doesn't burn a credit.
+    // BYOK gate — Gemini API key required.
     const userApiKey = request.headers.get('x-gemini-api-key');
     if (!userApiKey || !userApiKey.trim()) {
       return NextResponse.json(
@@ -38,41 +30,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const u = await db.user.findUnique({ where: { id: payload.userId } });
-    if (!u) {
-      return NextResponse.json({ error: 'User not found.' }, { status: 404 });
-    }
-
     const body = await request.json();
     const { imageUrl, question, language } = body;
     if (!imageUrl || typeof imageUrl !== 'string') {
       return NextResponse.json({ error: 'imageUrl is required.' }, { status: 400 });
-    }
-
-    // ── Credit accounting (platform owners bypass) ─────────────────────────
-    // Atomic conditional decrement — concurrent requests can't both succeed at
-    // decrementing past zero. If the row's `aiCredits` is already 0 the update
-    // returns count=0 and we reject.
-    let aiCredits = u.aiCredits;
-    const bypassCredits = isPlatformOwner(u.email);
-    if (!bypassCredits) {
-      if (u.aiCredits <= 0) {
-        return NextResponse.json(
-          { error: 'Out of AI credits. Use the "Recharge trial credits" button to top up.', outOfCredits: true },
-          { status: 402 }
-        );
-      }
-      const updated = await db.user.updateMany({
-        where: { id: u.id, aiCredits: { gt: 0 } },
-        data: { aiCredits: { decrement: 1 } },
-      });
-      if (updated.count === 0) {
-        return NextResponse.json(
-          { error: 'Out of AI credits. Use the "Recharge trial credits" button to top up.', outOfCredits: true },
-          { status: 402 }
-        );
-      }
-      aiCredits = Math.max(0, u.aiCredits - 1);
     }
 
     const isBn = language === 'bn_book';
@@ -91,11 +52,11 @@ If the image is unclear or not a notebook page, say so politely and suggest a cl
         temperature: 0.5,
         maxOutputTokens: 1500,
       });
-      return NextResponse.json({ analysis, aiCredits });
+      return NextResponse.json({ analysis });
     } catch (aiErr: any) {
       console.warn('AI vision (analyze-page) failed:', aiErr?.message);
       return NextResponse.json(
-        { error: aiErr?.message || 'Gemini AI request failed. Check that your API key is valid and try again.', aiCredits: u.aiCredits },
+        { error: aiErr?.message || 'Gemini AI request failed. Check that your API key is valid and try again.' },
         { status: 502 }
       );
     }

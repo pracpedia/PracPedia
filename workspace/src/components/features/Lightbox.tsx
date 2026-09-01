@@ -57,30 +57,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
     safeLocalStorage.setItem('ai_language', lang);
   };
 
-  const [rechargingCredits, setRechargingCredits] = useState(false);
 
-  const handleRechargeTrial = async () => {
-    setRechargingCredits(true);
-    try {
-      const res = await apiFetch('/api/users/recharge-trial', {
-        method: 'POST',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (user && setUser) {
-          setUser({ ...user, aiCredits: data.aiCredits });
-        }
-        setErrorMessage(null);
-      } else {
-        const errData = await res.json();
-        alert(errData.error || "Failed to recharge trial credits.");
-      }
-    } catch (e) {
-      alert("Error contacting the credit recharge service.");
-    } finally {
-      setRechargingCredits(false);
-    }
-  };
 
   // Automatic scroll container reference
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -166,9 +143,6 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
       }
 
       const data = await res.json();
-      if (typeof data.aiCredits === 'number' && user) {
-        setUser({ ...user, aiCredits: data.aiCredits });
-      }
       setAnalysisResult(data.analysis);
 
       setChatLogs([
@@ -224,9 +198,6 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
       }
 
       const data = await res.json();
-      if (typeof data.aiCredits === 'number' && user) {
-        setUser({ ...user, aiCredits: data.aiCredits });
-      }
       setChatLogs((prev) => [...prev, { sender: 'ai', text: data.analysis }]);
     } catch (err: any) {
       setChatLogs((prev) => [...prev, { sender: 'ai', text: `⚠️ System Error: ${err.message || "Could not retrieve prompt reply."}` }]);
@@ -306,9 +277,6 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
     );
   };
 
-  // Reference recharge function so it remains part of the component surface (used by parent later)
-  void rechargingCredits;
-  void handleRechargeTrial;
 
   return (
     <AnimatePresence>
