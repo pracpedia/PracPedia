@@ -625,43 +625,43 @@ export const AiAcademyRoom: React.FC = () => {
 
   // Selected parameters (Initializers with localStorage fallbacks)
   const [selectedSubject, setSelectedSubject] = useState<string>(() => {
-    return localStorage.getItem('academy_selected_subject') || 'Physics';
+    return safeLocalStorage.getItem('academy_selected_subject') || 'Physics';
   });
   const [selectedPaper, setSelectedPaper] = useState<'1st Paper' | '2nd Paper'>(() => {
-    return (localStorage.getItem('academy_selected_paper') as '1st Paper' | '2nd Paper') || '1st Paper';
+    return (safeLocalStorage.getItem('academy_selected_paper') as '1st Paper' | '2nd Paper') || '1st Paper';
   });
   const [curriculum, setCurriculum] = useState<'NCTB' | 'International'>(() => {
-    return (localStorage.getItem('academy_curriculum') as 'NCTB' | 'International') || 'NCTB';
+    return (safeLocalStorage.getItem('academy_curriculum') as 'NCTB' | 'International') || 'NCTB';
   });
   const [difficulty, setDifficulty] = useState<'Basic' | 'Intermediate' | 'Advanced'>(() => {
-    return (localStorage.getItem('academy_difficulty') as 'Basic' | 'Intermediate' | 'Advanced') || 'Basic';
+    return (safeLocalStorage.getItem('academy_difficulty') as 'Basic' | 'Intermediate' | 'Advanced') || 'Basic';
   });
   const [selectedTopic, setSelectedTopic] = useState<string>(() => {
-    return localStorage.getItem('academy_selected_topic') || '';
+    return safeLocalStorage.getItem('academy_selected_topic') || '';
   });
   const [customTopic, setCustomTopic] = useState<string>(() => {
-    return localStorage.getItem('academy_custom_topic') || '';
+    return safeLocalStorage.getItem('academy_custom_topic') || '';
   });
 
   // Custom expandable accordions for chapters
   const [activeChapterIndex, setActiveChapterIndex] = useState<number | null>(() => {
-    const saved = localStorage.getItem('academy_active_chapter_index');
+    const saved = safeLocalStorage.getItem('academy_active_chapter_index');
     return saved !== null ? Number(saved) : 0;
   });
 
   // Mode and loading states
   const [mode, setMode] = useState<'concept' | 'mcq' | 'creative_question' | 'ask_ai'>(() => {
-    return (localStorage.getItem('academy_mode') as 'concept' | 'mcq' | 'creative_question' | 'ask_ai') || 'concept';
+    return (safeLocalStorage.getItem('academy_mode') as 'concept' | 'mcq' | 'creative_question' | 'ask_ai') || 'concept';
   });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [responseHtml, setResponseHtml] = useState<string>(() => {
-    return localStorage.getItem('academy_response_html') || '';
+    return safeLocalStorage.getItem('academy_response_html') || '';
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Chat-specific state
   const [chatLogs, setChatLogs] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem('academy_chat_logs');
+    const saved = safeLocalStorage.getItem('academy_chat_logs');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -674,16 +674,16 @@ export const AiAcademyRoom: React.FC = () => {
   const [chatInput, setChatInput] = useState<string>('');
   const [isAnswering, setIsAnswering] = useState<boolean>(false);
   const [aiLanguage, setAiLanguage] = useState<'en' | 'bn_book'>(() => {
-    return (localStorage.getItem('ai_language') as 'en' | 'bn_book') || 'en';
+    return (safeLocalStorage.getItem('ai_language') as 'en' | 'bn_book') || 'en';
   });
 
   // Gamification & bookmarks
   const [knowledgePoints, setKnowledgePoints] = useState<number>(() => {
-    return Number(localStorage.getItem('academy_kp')) || 120;
+    return Number(safeLocalStorage.getItem('academy_kp')) || 120;
   });
   const [studyStreak, setStudyStreak] = useState<number>(8);
   const [completedLessons, setCompletedLessons] = useState<number>(() => {
-    return Number(localStorage.getItem('academy_lessons')) || 4;
+    return Number(safeLocalStorage.getItem('academy_lessons')) || 4;
   });
   const [savedLessons, setSavedLessons] = useState<string[]>([]);
   const [isBookmarkedActive, setIsBookmarkedActive] = useState<boolean>(false);
@@ -724,13 +724,13 @@ export const AiAcademyRoom: React.FC = () => {
     setGoogleApiKeyInput('');
   };
   const [diagramStyle, setDiagramStyle] = useState<string>(() => {
-    return localStorage.getItem('academy_diagram_style') || 'scientific';
+    return safeLocalStorage.getItem('academy_diagram_style') || 'scientific';
   });
   const [diagramDetailText, setDiagramDetailText] = useState<string>(() => {
-    return localStorage.getItem('academy_diagram_detail_text') || '';
+    return safeLocalStorage.getItem('academy_diagram_detail_text') || '';
   });
   const [diagramUrl, setDiagramUrl] = useState<string>(() => {
-    return localStorage.getItem('academy_diagram_url') || '';
+    return safeLocalStorage.getItem('academy_diagram_url') || '';
   });
   const [isGeneratingDiagram, setIsGeneratingDiagram] = useState<boolean>(false);
   const [showFullDiagram, setShowFullDiagram] = useState<boolean>(false);
@@ -758,57 +758,57 @@ export const AiAcademyRoom: React.FC = () => {
 
   // Sync state values to localStorage for complete reliability
   useEffect(() => {
-    localStorage.setItem('academy_selected_subject', selectedSubject);
+    safeLocalStorage.setItem('academy_selected_subject', selectedSubject);
   }, [selectedSubject]);
 
   useEffect(() => {
-    localStorage.setItem('academy_selected_paper', selectedPaper);
+    safeLocalStorage.setItem('academy_selected_paper', selectedPaper);
   }, [selectedPaper]);
 
   useEffect(() => {
-    localStorage.setItem('academy_curriculum', curriculum);
+    safeLocalStorage.setItem('academy_curriculum', curriculum);
   }, [curriculum]);
 
   useEffect(() => {
-    localStorage.setItem('academy_difficulty', difficulty);
+    safeLocalStorage.setItem('academy_difficulty', difficulty);
   }, [difficulty]);
 
   useEffect(() => {
-    localStorage.setItem('academy_selected_topic', selectedTopic);
+    safeLocalStorage.setItem('academy_selected_topic', selectedTopic);
   }, [selectedTopic]);
 
   useEffect(() => {
-    localStorage.setItem('academy_custom_topic', customTopic);
+    safeLocalStorage.setItem('academy_custom_topic', customTopic);
   }, [customTopic]);
 
   useEffect(() => {
     if (activeChapterIndex !== null) {
-      localStorage.setItem('academy_active_chapter_index', String(activeChapterIndex));
+      safeLocalStorage.setItem('academy_active_chapter_index', String(activeChapterIndex));
     }
   }, [activeChapterIndex]);
 
   useEffect(() => {
-    localStorage.setItem('academy_mode', mode);
+    safeLocalStorage.setItem('academy_mode', mode);
   }, [mode]);
 
   useEffect(() => {
-    localStorage.setItem('academy_response_html', responseHtml);
+    safeLocalStorage.setItem('academy_response_html', responseHtml);
   }, [responseHtml]);
 
   useEffect(() => {
-    localStorage.setItem('academy_chat_logs', JSON.stringify(chatLogs));
+    safeLocalStorage.setItem('academy_chat_logs', JSON.stringify(chatLogs));
   }, [chatLogs]);
 
   useEffect(() => {
-    localStorage.setItem('academy_diagram_style', diagramStyle);
+    safeLocalStorage.setItem('academy_diagram_style', diagramStyle);
   }, [diagramStyle]);
 
   useEffect(() => {
-    localStorage.setItem('academy_diagram_detail_text', diagramDetailText);
+    safeLocalStorage.setItem('academy_diagram_detail_text', diagramDetailText);
   }, [diagramDetailText]);
 
   useEffect(() => {
-    localStorage.setItem('academy_diagram_url', diagramUrl);
+    safeLocalStorage.setItem('academy_diagram_url', diagramUrl);
   }, [diagramUrl]);
 
   // Adjust scroll in chat window automatically
@@ -825,7 +825,7 @@ export const AiAcademyRoom: React.FC = () => {
 
   const handleLanguageChange = (lang: 'en' | 'bn_book') => {
     setAiLanguage(lang);
-    localStorage.setItem('ai_language', lang);
+    safeLocalStorage.setItem('ai_language', lang);
   };
 
   const getSubjectIcon = (sub: string) => {
@@ -918,7 +918,7 @@ export const AiAcademyRoom: React.FC = () => {
       const addition = 5;
       setKnowledgePoints(prev => {
         const nextVal = prev + addition;
-        localStorage.setItem('academy_kp', String(nextVal));
+        safeLocalStorage.setItem('academy_kp', String(nextVal));
         return nextVal;
       });
     }, 1500);
@@ -1037,7 +1037,7 @@ export const AiAcademyRoom: React.FC = () => {
       if (chosenMode === 'concept') {
         const nextLessons = completedLessons + 1;
         setCompletedLessons(nextLessons);
-        localStorage.setItem('academy_lessons', String(nextLessons));
+        safeLocalStorage.setItem('academy_lessons', String(nextLessons));
       }
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to download custom academic study guide.");
@@ -1050,7 +1050,7 @@ export const AiAcademyRoom: React.FC = () => {
   const databaseFallbackMilestone = (points: number) => {
     const nextVal = knowledgePoints + points;
     setKnowledgePoints(nextVal);
-    localStorage.setItem('academy_kp', String(nextVal));
+    safeLocalStorage.setItem('academy_kp', String(nextVal));
     return nextVal;
   };
 

@@ -55,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Initialize from local storage on mount (client only)
   useEffect(() => {
+    let cancelled = false;
     const storedToken = safeLocalStorage.getItem('png_token');
     const storedKey = safeLocalStorage.getItem('user_gemini_key') || '';
     const storedLang = safeLocalStorage.getItem('png_lang');
@@ -65,15 +66,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Validate token with the server
     const initializeAuth = async () => {
       if (!storedToken) {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
         return;
       }
       try {
         const res = await fetch('/api/auth/me', {
           headers: { Authorization: `Bearer ${storedToken}` },
         });
+        // Guard against unmount or rapid remount — if cancelled, don't
+        // update state (prevents stale response overwriting newer one).
+        if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
+          if (cancelled) return;
           if (data.user) {
             setUser(data.user);
           } else {
@@ -87,17 +92,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setToken(null);
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Failed to authenticate session token on startup:', err);
         // Network error or DB connection dropped — clear the stale token
         // so the user sees the login page instead of a broken state
         safeLocalStorage.removeItem('png_token');
         setToken(null);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     initializeAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const setGeminiApiKey = useCallback((key: string) => {

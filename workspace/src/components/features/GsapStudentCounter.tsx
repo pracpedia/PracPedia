@@ -12,6 +12,13 @@ export const GsapStudentCounter: React.FC<GsapStudentCounterProps> = ({ students
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Kill any tweens from a previous run before creating new ones.
+    // Without this, every `studentsCount` change stacks new tweens on top
+    // of the old ones, and the old onUpdate callbacks keep firing on
+    // stale refs (memory leak + visual jank).
+    gsap.killTweensOf(countRef.current);
+    gsap.killTweensOf(containerRef.current);
+
     if (countRef.current) {
       const obj = { val: 0 };
       gsap.to(obj, {
@@ -33,6 +40,13 @@ export const GsapStudentCounter: React.FC<GsapStudentCounterProps> = ({ students
         { scale: 1, opacity: 1, duration: 1.0, ease: "elastic.out(1, 0.8)" }
       );
     }
+
+    // Cleanup on unmount or before next re-run — kill all tweens targeting
+    // these elements so they don't fire onUpdate on stale refs.
+    return () => {
+      gsap.killTweensOf(countRef.current);
+      gsap.killTweensOf(containerRef.current);
+    };
   }, [studentsCount]);
 
   return (

@@ -1,27 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { isTestModeSafe } from '@/lib/test-mode';
 
 /**
  * Super-admin-only endpoint returning ALL users' plaintext credentials.
  *
  * ⚠️  TEST MODE ONLY — controlled by the `PRACPEDIA_TEST_PASSWORDS_VISIBLE`
- * env flag. When `true`, super admins can view all users' plaintext
- * passwords. When `false` (or unset), the endpoint returns 404.
- *
- * The user explicitly sets this flag in `.env` to enable the credentials
- * viewer. No production hard-block — the user controls their own deployment.
+ * env flag AND a hard production block. When both conditions are met
+ * (flag=true AND NODE_ENV !== 'production'), super admins can view all
+ * users' plaintext passwords. Otherwise the endpoint returns 404.
  *
  * Auth:
  *   1. `PRACPEDIA_TEST_PASSWORDS_VISIBLE=true` in env (hard gate)
- *   2. Caller must be authenticated
- *   3. Caller must have role === 'super_admin'
+ *   2. `NODE_ENV !== 'production'` (hard block — prevents accidental
+ *      exposure if the flag is left on in a deployed environment)
+ *   3. Caller must be authenticated
+ *   4. Caller must have role === 'super_admin'
  *
- * If the env flag is off, returns 404 (endpoint effectively doesn't exist).
+ * If any gate fails, returns 404 (endpoint effectively doesn't exist).
  */
 export async function GET(request: NextRequest) {
-  // Hard gate — even super admins cannot bypass this without the env flag.
-  if (process.env.PRACPEDIA_TEST_PASSWORDS_VISIBLE !== 'true') {
+  // Hard gate — test mode must be explicitly enabled AND not in production.
+  // This prevents accidental credential exposure if the env flag is left on
+  // in a deployed environment.
+  if (!isTestModeSafe()) {
     return NextResponse.json({ error: 'Not found.' }, { status: 404 });
   }
 

@@ -2535,7 +2535,7 @@ function PortalConsole() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
                         {activeFolder.images.map((img, index) => (
                           <div
-                            key={index}
+                            key={img.url || `img-${index}`}
                             onClick={() => setActiveLightboxIndex(index)}
                             className="group cursor-pointer aspect-[3/4] bg-slate-950 border border-slate-900 rounded-2xl overflow-hidden relative shadow-lg hover:shadow-indigo-950/10 transition-all flex flex-col hover:-translate-y-1.5 duration-300 hover:border-slate-800"
                           >
@@ -2584,7 +2584,7 @@ function PortalConsole() {
                       <div className="space-y-3" id="gallery-list-view">
                         {activeFolder.images.map((img, index) => (
                           <div
-                            key={index}
+                            key={img.url || `list-img-${index}`}
                             onClick={() => setActiveLightboxIndex(index)}
                             className="group cursor-pointer bg-slate-950/80 border border-slate-900/80 hover:border-slate-800/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:bg-slate-900/50 relative overflow-hidden"
                           >

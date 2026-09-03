@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { requirePermission } from '@/lib/permissions';
+import { safeJsonParseArray } from '@/lib/json';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,11 +14,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       subjectId: folder.subjectId,
       title: folder.title,
       description: folder.description,
-      images: JSON.parse(folder.imagesJson || '[]'),
+      images: safeJsonParseArray(folder.imagesJson),
       createdAt: folder.createdAt,
     });
-  } catch {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  } catch (err: any) {
+    console.error('GET /api/folders/[id] error:', err);
+    return NextResponse.json({ error: 'Could not load folder.' }, { status: 500 });
   }
 }
 

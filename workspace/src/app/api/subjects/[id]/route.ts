@@ -9,8 +9,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const subject = await db.subject.findUnique({ where: { id } });
     if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     return NextResponse.json({ ...subject, id: subject.id });
-  } catch {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  } catch (err: any) {
+    // Don't mask real errors (DB failures, code bugs) as 404 — log and
+    // return 500 so the client surfaces the error instead of treating
+    // it as "not found".
+    console.error('GET /api/subjects/[id] error:', err);
+    return NextResponse.json({ error: 'Could not load subject.' }, { status: 500 });
   }
 }
 

@@ -163,8 +163,11 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          {/* Demo credentials hint — only shown in development */}
-          {process.env.NODE_ENV !== 'production' && (
+          {/* Demo credentials hint — only shown when explicitly enabled via
+              SHOW_DEV_CREDENTIALS=true AND not in production. Showing real
+              passwords on a login page is a security risk if NODE_ENV is
+              misconfigured as non-production in a deployed environment. */}
+          {process.env.NODE_ENV !== 'production' && process.env.SHOW_DEV_CREDENTIALS === 'true' && (
             <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-200/80 text-[11px] leading-relaxed">
               <p className="font-bold text-amber-300 mb-1">Dev Mode — Demo Admin Credentials:</p>
               <p>Super Admin: <code className="font-mono">pracpedia@gmail.com / pracpedia123456789</code></p>

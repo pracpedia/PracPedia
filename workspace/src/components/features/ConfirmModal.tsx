@@ -7,7 +7,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  /** Confirmation handler. May be sync or async — the modal waits for it
+   *  to resolve before closing, so async operations (delete, fetch, etc.)
+   *  complete before the modal disappears. If it throws, the modal stays
+   *  open so the parent can surface the error. */
+  onConfirm: () => void | Promise<void>;
   title: string;
   message: string;
   confirmText?: string;
@@ -25,7 +29,25 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   cancelText = 'Cancel',
   isDestructive = true,
 }) => {
+  const [isConfirming, setIsConfirming] = React.useState(false);
+
   if (!isOpen) return null;
+
+  const handleConfirm = async () => {
+    // Await the onConfirm callback so async operations (delete, fetch, etc.)
+    // complete before the modal closes. If it throws, keep the modal open
+    // so the parent can surface the error.
+    try {
+      setIsConfirming(true);
+      await onConfirm();
+      onClose();
+    } catch {
+      // Parent's onConfirm is responsible for its own error UI.
+      // We keep the modal open on error so the user can retry.
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -35,7 +57,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
+          onClick={isConfirming ? undefined : onClose}
           className="absolute inset-0 bg-black/75 backdrop-blur-sm"
         />
 
@@ -70,23 +92,22 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 min-h-[44px] text-slate-400 hover:text-white hover:bg-white/5 font-semibold transition-all rounded-xl text-xs cursor-pointer"
+              disabled={isConfirming}
+              className="px-4 py-2 min-h-[44px] text-slate-400 hover:text-white hover:bg-white/5 font-semibold transition-all rounded-xl text-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {cancelText}
             </button>
             <button
               type="button"
-              onClick={() => {
-                onConfirm();
-                onClose();
-              }}
-              className={`px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
+              onClick={handleConfirm}
+              disabled={isConfirming}
+              className={`px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-60 disabled:cursor-wait ${
                 isDestructive
                   ? 'bg-rose-600 hover:bg-rose-500 text-white'
                   : 'bg-indigo-600 hover:bg-indigo-500 text-white'
               }`}
             >
-              {confirmText}
+              {isConfirming ? '…' : confirmText}
             </button>
           </div>
         </motion.div>

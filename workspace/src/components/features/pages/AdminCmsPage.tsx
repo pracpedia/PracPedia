@@ -574,7 +574,7 @@ const BugMonitorTab: React.FC<{ apiFetch: (url: string, opts?: RequestInit) => P
       ) : (
         <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
           {filtered.map((e, i) => (
-            <div key={i} className="p-3 rounded-xl bg-slate-950/80 border border-white/10 hover:border-rose-500/30 transition-all">
+            <div key={`${e.ts}-${i}`} className="p-3 rounded-xl bg-slate-950/80 border border-white/10 hover:border-rose-500/30 transition-all">
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                   <span className={`px-2 py-0.5 rounded-md text-[9px] font-mono font-bold border ${typeColor(e.type)}`}>
@@ -2345,7 +2345,7 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
               {filteredScans.map((scan, i) => (
-                <div key={i} className="group relative rounded-2xl overflow-hidden bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-cyan-500/40 transition-all duration-300 flex flex-col justify-between shadow-xl">
+                <div key={scan.url || `scan-${i}`} className="group relative rounded-2xl overflow-hidden bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-cyan-500/40 transition-all duration-300 flex flex-col justify-between shadow-xl">
                   <div className="aspect-square relative overflow-hidden bg-slate-900">
                     <img
                       src={scan.url}
@@ -3161,24 +3161,31 @@ export const AdminCmsPage: React.FC<AdminCmsPageProps> = ({
                           onClick={() => {
                             const url = ann.fileUrl!;
                             const name = ann.fileName || 'download';
-                            // For data URLs, create a blob and download
-                            if (url.startsWith('data:')) {
-                              const [meta, base64] = url.split(',');
-                              const mime = meta.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
-                              const binary = atob(base64);
-                              const bytes = new Uint8Array(binary.length);
-                              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                              const blob = new Blob([bytes], { type: mime });
-                              const blobUrl = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = blobUrl;
-                              a.download = name;
-                              document.body.appendChild(a);
-                              a.click();
-                              document.body.removeChild(a);
-                              URL.revokeObjectURL(blobUrl);
-                            } else {
-                              // External URL — open in new tab
+                            // For data URLs, create a blob and download.
+                            // Wrap in try/catch — atob() throws on malformed
+                            // base64, and we fall back to opening the URL.
+                            try {
+                              if (url.startsWith('data:')) {
+                                const [meta, base64] = url.split(',');
+                                const mime = meta.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
+                                const binary = atob(base64);
+                                const bytes = new Uint8Array(binary.length);
+                                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                                const blob = new Blob([bytes], { type: mime });
+                                const blobUrl = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = blobUrl;
+                                a.download = name;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(blobUrl);
+                              } else {
+                                // External URL — open in new tab
+                                window.open(url, '_blank');
+                              }
+                            } catch (err) {
+                              console.error('Download failed, falling back to window.open:', err);
                               window.open(url, '_blank');
                             }
                           }}
