@@ -1790,25 +1790,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </motion.section>
 
-        {/* "Still have questions?" — its own isolated section with solid bg
-            so the CTA card below can NEVER visually cover it. */}
-        <section
-          aria-label="Contact prompt"
-          className="relative isolate w-full bg-[#05070e] py-16 md:py-12 border-t border-white/[0.04]"
-        >
-          <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-[12px] text-slate-500 font-mono uppercase tracking-wider leading-7">
-              Still have questions?{' '}
-              <a
-                href="mailto:hello@pracpedia.bd"
-                className="text-cyan-400 hover:text-cyan-300 font-bold inline-flex items-center gap-1.5 cursor-pointer min-h-[28px] align-middle"
-              >
-                <Mail className="w-3.5 h-3.5" /> Contact us
-              </a>
-            </p>
-          </div>
-        </section>
-
         {/* Final CTA */}
         <motion.section
           style={isDesktop ? { y: sectionY6 } : undefined}
