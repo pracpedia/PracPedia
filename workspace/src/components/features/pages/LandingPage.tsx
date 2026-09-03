@@ -830,7 +830,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       id="landing_page_container"
       onMouseMove={isDesktop ? handleMouseParallax : undefined}
       onMouseLeave={isDesktop ? resetMouseParallax : undefined}
-      className="w-full min-h-screen text-slate-200 bg-[#05070e] relative font-sans flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300"
+      className="w-full text-slate-200 bg-[#05070e] relative font-sans flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300"
     >
       {/* ── REAL SPACE BACKGROUND ──
          A pure starfield — no nebula clouds, no 3D canvas (removed for performance).
@@ -1791,7 +1791,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Footer (3-column) — mt-auto pins to bottom of min-h-screen container */}
       <footer
         id="landing_footer"
-        className="relative z-10 mt-auto border-t border-white/[0.06] bg-[#05070e]/80"
+        className="relative z-10 border-t border-white/[0.06] bg-[#05070e]/80"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-3">
