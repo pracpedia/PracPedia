@@ -243,9 +243,9 @@ const ParallaxSectionHeading: React.FC<{ children: React.ReactNode; className?: 
 };
 
 /* ---------------- GsapHeading (SplitText char stagger on scroll-in — one-shot) ----------------
-   On mobile, SplitText is skipped: it splits each heading into 30-50 char
-   spans each animated with rotationX + scale + y, which overwhelms mobile
-   GPUs and causes scroll jank. Mobile falls back to a single fade+y reveal. */
+   SplitText char-by-char reveal on BOTH desktop and mobile.
+   Mobile uses a lighter animation (y + opacity only, no 3D rotationX/scale)
+   to avoid GPU overload while keeping the premium staggered feel. */
 
 const GsapHeading: React.FC<{
   as: 'h1' | 'h2';
@@ -272,8 +272,8 @@ const GsapHeading: React.FC<{
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            if (prefersReduced || isMobile) {
-              // Simple fade+y reveal — 1 tween instead of N char tweens.
+            if (prefersReduced) {
+              // Reduced motion — simple fade, no SplitText
               gsap.fromTo(
                 el,
                 { opacity: 0, y: 16 },
@@ -282,18 +282,30 @@ const GsapHeading: React.FC<{
             } else {
               const split = new SplitText(el, { type: 'chars,words' });
               splitRef.current = split;
-              // Character-by-character reveal: each char flies in from below
-              // with a slight rotation + scale for a premium staggered effect.
-              gsap.from(split.chars, {
-                opacity: 0,
-                y: 20,
-                rotationX: -90,
-                scale: 0.5,
-                duration: 0.6,
-                stagger: 0.025,
-                ease: 'back.out(1.7)',
-                transformOrigin: '50% 100%',
-              });
+              if (isMobile) {
+                // Mobile: char-by-char reveal with y + opacity only.
+                // No 3D rotationX/scale (those force GPU layer creation
+                // per char and overwhelm mobile GPUs).
+                gsap.from(split.chars, {
+                  opacity: 0,
+                  y: 12,
+                  duration: 0.4,
+                  stagger: 0.02,
+                  ease: 'power2.out',
+                });
+              } else {
+                // Desktop: full premium effect with 3D rotation + scale
+                gsap.from(split.chars, {
+                  opacity: 0,
+                  y: 20,
+                  rotationX: -90,
+                  scale: 0.5,
+                  duration: 0.6,
+                  stagger: 0.025,
+                  ease: 'back.out(1.7)',
+                  transformOrigin: '50% 100%',
+                });
+              }
             }
             observer.unobserve(el);
           }
@@ -367,24 +379,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // ── Spring config for scroll-linked parallax ──
   // Critically-damped (damping ratio ≈ 1) so the spring tracks scroll tightly
   // with minimal lag and NO bounce. High stiffness = fast response.
-  // Previous config (stiffness 80, damping 25, mass 0.8) was too soft —
-  // it lagged behind scroll and bounced, creating a "rubber band" jitter.
   const PARALLAX_SPRING = { stiffness: 400, damping: 40, mass: 0.3, restDelta: 0.5 };
 
-  // Subtle multipliers — previous values (-0.3, -0.5) were too aggressive,
-  // causing elements to fly off screen after minimal scroll. These values
-  // create a gentle depth effect without disorienting the user.
-  const rawHeroTextY = useTransform(scrollY, (v) => isDesktop ? v * -0.12 : 0);
-  const rawHeroVizY = useTransform(scrollY, (v) => isDesktop ? v * -0.18 : 0);
+  // Subtle parallax on BOTH desktop and mobile. Mobile uses ~40% of desktop
+  // strength — enough to feel alive, not enough to cause scroll jank.
+  // Previous version disabled parallax entirely on mobile (output 0) which
+  // made the page feel flat/dead on phones.
+  const rawHeroTextY = useTransform(scrollY, (v) => isDesktop ? v * -0.12 : v * -0.05);
+  const rawHeroVizY = useTransform(scrollY, (v) => isDesktop ? v * -0.18 : v * -0.07);
   const heroTextY = useSpring(rawHeroTextY, PARALLAX_SPRING);
   const heroVizY = useSpring(rawHeroVizY, PARALLAX_SPRING);
 
   /* Deep-space parallax layers — spring-smoothed for buttery scroll.
      Each moves at a different speed to create depth.
-     Mobile: disabled (0) to prevent scroll jank. */
-  const rawBgFarY = useTransform(scrollY, (v) => isDesktop ? v * 0.04 : 0);
-  const rawBgMidY = useTransform(scrollY, (v) => isDesktop ? v * 0.06 : 0);
-  const rawBgNearY = useTransform(scrollY, (v) => isDesktop ? v * 0.08 : 0);
+     Mobile uses ~40% of desktop strength. */
+  const rawBgFarY = useTransform(scrollY, (v) => isDesktop ? v * 0.04 : v * 0.016);
+  const rawBgMidY = useTransform(scrollY, (v) => isDesktop ? v * 0.06 : v * 0.024);
+  const rawBgNearY = useTransform(scrollY, (v) => isDesktop ? v * 0.08 : v * 0.032);
   const bgFarMountainY = useSpring(rawBgFarY, PARALLAX_SPRING);
   const bgMidMountainY = useSpring(rawBgMidY, PARALLAX_SPRING);
   const bgNearHillY = useSpring(rawBgNearY, PARALLAX_SPRING);
@@ -393,15 +404,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
      Each content section gets a subtle vertical parallax offset so the
      whole page feels 3D — not just the hero. Sections alternate between
      "near" (move up faster) and "far" (move up slower) to create depth.
-     Mobile: disabled (0) to prevent scroll jank.
-     These are now spring-smoothed (previously raw transforms caused jitter
-     on fast scroll because they tracked scrollY instantly with no easing). */
-  const rawSectionY1 = useTransform(scrollY, (v) => isDesktop ? v * -0.01 : 0);
-  const rawSectionY2 = useTransform(scrollY, (v) => isDesktop ? v * -0.015 : 0);
-  const rawSectionY3 = useTransform(scrollY, (v) => isDesktop ? v * -0.012 : 0);
-  const rawSectionY4 = useTransform(scrollY, (v) => isDesktop ? v * -0.02 : 0);
-  const rawSectionY5 = useTransform(scrollY, (v) => isDesktop ? v * -0.01 : 0);
-  const rawSectionY6 = useTransform(scrollY, (v) => isDesktop ? v * -0.025 : 0);
+     Mobile uses ~40% of desktop strength — subtle but visible. */
+  const rawSectionY1 = useTransform(scrollY, (v) => isDesktop ? v * -0.01 : v * -0.004);
+  const rawSectionY2 = useTransform(scrollY, (v) => isDesktop ? v * -0.015 : v * -0.006);
+  const rawSectionY3 = useTransform(scrollY, (v) => isDesktop ? v * -0.012 : v * -0.005);
+  const rawSectionY4 = useTransform(scrollY, (v) => isDesktop ? v * -0.02 : v * -0.008);
+  const rawSectionY5 = useTransform(scrollY, (v) => isDesktop ? v * -0.01 : v * -0.004);
+  const rawSectionY6 = useTransform(scrollY, (v) => isDesktop ? v * -0.025 : v * -0.01);
   const sectionY1 = useSpring(rawSectionY1, PARALLAX_SPRING);
   const sectionY2 = useSpring(rawSectionY2, PARALLAX_SPRING);
   const sectionY3 = useSpring(rawSectionY3, PARALLAX_SPRING);
@@ -694,19 +703,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   /* GSAP infinite animations for the final CTA — dots scroll loop + glow pulses.
      These are the only infinite loops alongside the Fourier ticker.
-     MOBILE: skipped entirely — infinite GSAP tweens on blurred backdrop-filter
-     layers cause continuous compositor repaints that wreck scroll perf. */
+     MOBILE: animations run but with longer durations (slower = less repaint). */
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    // Skip infinite CTA animations on mobile — they cause continuous
-    // compositor repaints on backdrop-filter layers and tank scroll perf.
-    if (window.innerWidth < 768) return;
+    const isMobile = window.innerWidth < 768;
     const tweens: gsap.core.Tween[] = [];
     if (ctaDotsRef.current) {
       tweens.push(
         gsap.to(ctaDotsRef.current, {
           backgroundPosition: '24px 24px',
-          duration: 2,
+          duration: isMobile ? 4 : 2,
           repeat: -1,
           ease: 'none',
         }),
@@ -716,7 +722,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       tweens.push(
         gsap.to(ctaGlow1Ref.current, {
           opacity: 0.4,
-          duration: 3,
+          duration: isMobile ? 5 : 3,
           repeat: -1,
           yoyo: true,
           ease: 'sine.inOut',
@@ -727,7 +733,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       tweens.push(
         gsap.to(ctaGlow2Ref.current, {
           opacity: 0.4,
-          duration: 4,
+          duration: isMobile ? 6 : 4,
           repeat: -1,
           yoyo: true,
           ease: 'sine.inOut',
@@ -760,11 +766,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     if (typeof window === 'undefined') return;
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReduced) return;
-    // Skip shooting stars on mobile — each spawned star is a separate
-    // compositor layer with a multi-layer box-shadow + transform: rotate,
-    // and they spawn every 0.6-1.8s. Combined with the static starfield,
-    // this pushes mobile GPUs past their layer budget and causes jank.
-    if (window.innerWidth < 768) return;
+    // Shooting stars on BOTH desktop and mobile. Mobile uses longer gaps
+    // between spawns (2-5s vs 0.6-1.8s) so fewer stars are in flight at
+    // once, keeping the compositor layer count manageable.
+    const isMobile = window.innerWidth < 768;
 
     let timer: ReturnType<typeof setTimeout>;
     let cancelled = false;
@@ -799,14 +804,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       }, duration + 200);
       evictTimers.add(evictTimer);
 
-      // Schedule the NEXT spawn — random 0.6..1.8 s gap for a high meteor
-      // shower feel (multiple stars often in flight simultaneously).
-      const nextGap = 600 + Math.random() * 1200;
+      // Schedule the NEXT spawn.
+      // Desktop: 0.6..1.8s gap (high meteor shower feel).
+      // Mobile: 2..5s gap (fewer stars in flight = less GPU load).
+      const nextGap = isMobile
+        ? 2000 + Math.random() * 3000
+        : 600 + Math.random() * 1200;
       timer = setTimeout(spawnStar, nextGap);
     };
 
     // First spawn after a short initial delay.
-    timer = setTimeout(spawnStar, 400);
+    timer = setTimeout(spawnStar, isMobile ? 1500 : 400);
 
     return () => {
       cancelled = true;

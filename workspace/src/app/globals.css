@@ -573,17 +573,10 @@ body::before {
 }
 
 /* ── MOBILE ANIMATION PERFORMANCE GUARDS ──
-   On mobile (max-width: 767px), disable the starfield twinkle keyframes.
-   Even with reduced star counts, ~77 simultaneously animating spans (each
-   its own compositor layer) cause GPU layer thrashing on mid-range phones.
-   The stars remain visible at their base opacity — they just don't twinkle.
-   This complements the JS-side mobile guards in LandingPage.tsx. */
-@media (max-width: 767px) {
-  [style*="pp-twinkle"] {
-    animation: none !important;
-    opacity: 0.6 !important;
-  }
-}
+   Previously disabled starfield twinkle on mobile entirely. Now re-enabled
+   with the reduced star count (40/25/12 vs 220/130/60) in LandingPage.tsx,
+   mobile GPUs can handle the twinkling. The reduced star count + single-layer
+   box-shadow glow keeps compositor layer count manageable. */
 
 /* ── GPU PROMOTION FOR PARALLAX ELEMENTS ──
    `will-change: transform` tells the browser to pre-promote these elements
