@@ -189,17 +189,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
     setLoading(true);
     setErrorMsg(null);
 
-    // Gmail emails must use the Google Sign-In button, not this normal form.
-    // Applies to BOTH login and signup.
-    // pracpedia@gmail.com (super admin) is exempt — can use any form.
-    if (isGmailAddress(email)) {
-      setLoading(false);
-      setErrorMsg("Gmail accounts must use the 'Sign in / Sign up with Google' button above. This form is for Yahoo, Outlook, Hotmail, and other providers only.");
-      return;
-    }
-
+    // Gmail emails can use the standard form for LOGIN (existing users).
+    // For SIGNUP, Gmail is blocked by the backend (shouldBlockEmail) — we
+    // don't block it here anymore because the backend returns a clear
+    // error message that gets displayed to the user.
+    // The "Google Sign-In" button is still available as an alternative
+    // flow for Gmail users who want to use the guided modal.
     if (isLogin) {
-      // Direct sign-in pathway for non-Gmail email providers
+      // Direct sign-in pathway — all email providers allowed
       try {
         const res = await apiFetch('/api/auth/login', {
           method: 'POST',
@@ -225,7 +222,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
         setLoading(false);
       }
     } else {
-      // Direct Signup pathway
+      // Direct Signup pathway — Gmail will be rejected by the backend
+      // with a clear error message if the user tries to sign up with Gmail.
       try {
         const endpoint = authType === 'artist' ? '/api/artists/register' : '/api/auth/register';
         const body = buildRegisterBody(authType === 'artist');
