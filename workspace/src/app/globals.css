@@ -585,6 +585,25 @@ body::before {
   }
 }
 
+/* ── GPU PROMOTION FOR PARALLAX ELEMENTS ──
+   `will-change: transform` tells the browser to pre-promote these elements
+   to their own compositor layer BEFORE the first transform, so scroll-linked
+   parallax runs entirely on the GPU compositor thread instead of triggering
+   main-thread layout/paint on every frame.
+   Applied via the `.parallax-layer` class on motion elements. */
+.parallax-layer {
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* ── PARALLAX LAYER CONTAINMENT ──
+   The starfield parallax layers should be contained so their transforms
+   don't cause the parent to resize or reflow. */
+.parallax-bg-layer {
+  contain: layout style paint;
+}
+
 /* Honor prefers-reduced-motion across the board — kill all decorative
    keyframe animations. Functional transitions (hover, focus) are kept. */
 @media (prefers-reduced-motion: reduce) {
@@ -595,6 +614,11 @@ body::before {
   [style*="pp-nebula-drift"],
   .cat-bubble-anim {
     animation: none !important;
+  }
+  /* Disable all parallax transforms under reduced-motion */
+  .parallax-layer {
+    will-change: auto !important;
+    transform: none !important;
   }
 }
 

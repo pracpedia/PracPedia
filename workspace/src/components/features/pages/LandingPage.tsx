@@ -353,6 +353,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
      On mobile, will-change:transform + useScroll listeners cause the scroll to
      stutter badly. We detect the viewport and conditionally apply parallax. */
   const [isDesktop, setIsDesktop] = useState(false);
+  // useLayoutEffect runs before paint, so isDesktop is set before the first
+  // render hits the screen. This prevents the hydration flip where parallax
+  // starts at 0 (mobile) then jumps to desktop values after mount.
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 768);
     check();
@@ -360,44 +363,51 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => window.removeEventListener('resize', check);
   }, []);
   const { scrollY } = useScroll();
-  // Spring-smoothed hero parallax — useSpring wraps the raw scroll transform
-  // so fast scrolling doesn't feel jerky. The spring gently catches up to
-  // the scroll position instead of snapping instantly.
-  // NOTE: useTransform with a function (not static arrays) so the output
-  // range re-evaluates when isDesktop changes. Static arrays capture the
-  // value of isDesktop at hook-call time and never update.
-  //
-  // MOBILE: all scroll-linked parallax is disabled (output 0). 11 motion
-  // values + 5 springs would otherwise fire on every scroll frame on
-  // mobile, causing severe scroll jank. The transforms are still mounted
-  // (hooks can't be conditional) but they output a constant 0, so the
-  // springs converge instantly and do no per-frame work.
-  const rawHeroTextY = useTransform(scrollY, (v) => isDesktop ? v * -0.3 : 0);
-  const rawHeroVizY = useTransform(scrollY, (v) => isDesktop ? v * -0.5 : 0);
-  const heroTextY = useSpring(rawHeroTextY, { stiffness: 100, damping: 30, mass: 0.5 });
-  const heroVizY = useSpring(rawHeroVizY, { stiffness: 100, damping: 30, mass: 0.5 });
+
+  // ── Spring config for scroll-linked parallax ──
+  // Critically-damped (damping ratio ≈ 1) so the spring tracks scroll tightly
+  // with minimal lag and NO bounce. High stiffness = fast response.
+  // Previous config (stiffness 80, damping 25, mass 0.8) was too soft —
+  // it lagged behind scroll and bounced, creating a "rubber band" jitter.
+  const PARALLAX_SPRING = { stiffness: 400, damping: 40, mass: 0.3, restDelta: 0.5 };
+
+  // Subtle multipliers — previous values (-0.3, -0.5) were too aggressive,
+  // causing elements to fly off screen after minimal scroll. These values
+  // create a gentle depth effect without disorienting the user.
+  const rawHeroTextY = useTransform(scrollY, (v) => isDesktop ? v * -0.12 : 0);
+  const rawHeroVizY = useTransform(scrollY, (v) => isDesktop ? v * -0.18 : 0);
+  const heroTextY = useSpring(rawHeroTextY, PARALLAX_SPRING);
+  const heroVizY = useSpring(rawHeroVizY, PARALLAX_SPRING);
 
   /* Deep-space parallax layers — spring-smoothed for buttery scroll.
      Each moves at a different speed to create depth.
      Mobile: disabled (0) to prevent scroll jank. */
-  const rawBgFarY = useTransform(scrollY, (v) => isDesktop ? v * 0.0875 : 0);
-  const rawBgMidY = useTransform(scrollY, (v) => isDesktop ? v * 0.125 : 0);
-  const rawBgNearY = useTransform(scrollY, (v) => isDesktop ? v * 0.175 : 0);
-  const bgFarMountainY = useSpring(rawBgFarY, { stiffness: 80, damping: 25, mass: 0.8 });
-  const bgMidMountainY = useSpring(rawBgMidY, { stiffness: 80, damping: 25, mass: 0.8 });
-  const bgNearHillY = useSpring(rawBgNearY, { stiffness: 80, damping: 25, mass: 0.8 });
+  const rawBgFarY = useTransform(scrollY, (v) => isDesktop ? v * 0.04 : 0);
+  const rawBgMidY = useTransform(scrollY, (v) => isDesktop ? v * 0.06 : 0);
+  const rawBgNearY = useTransform(scrollY, (v) => isDesktop ? v * 0.08 : 0);
+  const bgFarMountainY = useSpring(rawBgFarY, PARALLAX_SPRING);
+  const bgMidMountainY = useSpring(rawBgMidY, PARALLAX_SPRING);
+  const bgNearHillY = useSpring(rawBgNearY, PARALLAX_SPRING);
 
   /* ── Content section parallax ──
      Each content section gets a subtle vertical parallax offset so the
      whole page feels 3D — not just the hero. Sections alternate between
      "near" (move up faster) and "far" (move up slower) to create depth.
-     Mobile: disabled (0) to prevent scroll jank. */
-  const sectionY1 = useTransform(scrollY, (v) => isDesktop ? v * -0.02 : 0);
-  const sectionY2 = useTransform(scrollY, (v) => isDesktop ? v * -0.04 : 0);
-  const sectionY3 = useTransform(scrollY, (v) => isDesktop ? v * -0.03 : 0);
-  const sectionY4 = useTransform(scrollY, (v) => isDesktop ? v * -0.05 : 0);
-  const sectionY5 = useTransform(scrollY, (v) => isDesktop ? v * -0.025 : 0);
-  const sectionY6 = useTransform(scrollY, (v) => isDesktop ? v * -0.06 : 0);
+     Mobile: disabled (0) to prevent scroll jank.
+     These are now spring-smoothed (previously raw transforms caused jitter
+     on fast scroll because they tracked scrollY instantly with no easing). */
+  const rawSectionY1 = useTransform(scrollY, (v) => isDesktop ? v * -0.01 : 0);
+  const rawSectionY2 = useTransform(scrollY, (v) => isDesktop ? v * -0.015 : 0);
+  const rawSectionY3 = useTransform(scrollY, (v) => isDesktop ? v * -0.012 : 0);
+  const rawSectionY4 = useTransform(scrollY, (v) => isDesktop ? v * -0.02 : 0);
+  const rawSectionY5 = useTransform(scrollY, (v) => isDesktop ? v * -0.01 : 0);
+  const rawSectionY6 = useTransform(scrollY, (v) => isDesktop ? v * -0.025 : 0);
+  const sectionY1 = useSpring(rawSectionY1, PARALLAX_SPRING);
+  const sectionY2 = useSpring(rawSectionY2, PARALLAX_SPRING);
+  const sectionY3 = useSpring(rawSectionY3, PARALLAX_SPRING);
+  const sectionY4 = useSpring(rawSectionY4, PARALLAX_SPRING);
+  const sectionY5 = useSpring(rawSectionY5, PARALLAX_SPRING);
+  const sectionY6 = useSpring(rawSectionY6, PARALLAX_SPRING);
 
   /* ── State-of-the-art mouse parallax ──
      The cursor position drives a spring-smoothed motion value that's mapped
@@ -406,7 +416,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
      this creates a buttery 3D depth effect as the user moves their mouse.
      Uses requestAnimationFrame throttling to avoid scroll jank. */
   const mouseX = useMotionValue(0);
-  const springMouseX = useSpring(mouseX, { stiffness: 60, damping: 20, mass: 0.6 });
+  // Tighter spring — previous config (60/20/0.6) was too soft, causing
+  // visible lag between mouse movement and layer response.
+  const springMouseX = useSpring(mouseX, { stiffness: 200, damping: 30, mass: 0.3, restDelta: 0.001 });
   // Distant layer — moves slowest (0.3x of mouse delta)
   const farMouseX = useTransform(springMouseX, [-0.5, 0.5], [-10, 10]);
   // Mid layer — medium (0.7x)
@@ -415,13 +427,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const nearMouseX = useTransform(springMouseX, [-0.5, 0.5], [-40, 40]);
 
   // Throttled mouse handler — uses rAF to avoid flooding the main thread.
+  // Stores the latest event in a ref so we always use the most recent mouse
+  // position when the rAF fires (previous version captured `e` in the closure,
+  // so if 2 mousemove events fired before the rAF, the 2nd was dropped and
+  // the layer always lagged one frame behind).
   const rafRef = useRef<number | null>(null);
+  const latestMouseXRef = useRef(0);
   const handleMouseParallax = (e: React.MouseEvent) => {
+    latestMouseXRef.current = e.clientX / window.innerWidth - 0.5;
     if (rafRef.current !== null) return;
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
-      const x = e.clientX / window.innerWidth - 0.5;
-      mouseX.set(x);
+      mouseX.set(latestMouseXRef.current);
     });
   };
   const resetMouseParallax = () => {
@@ -569,11 +586,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     if (!prefersReduced) {
       let fourierVisible = true;
+      // threshold 0.25 — only animate when ≥25% of the scene is visible.
+      // Previous threshold 0.01 meant the animation ran even when the scene
+      // was barely peeking into view (e.g., 3px visible at the edge during
+      // scroll), wasting CPU/GPU on an off-screen animation.
       const fourierObserver = new IntersectionObserver(
         (entries) => {
           fourierVisible = entries[0]?.isIntersecting ?? false;
         },
-        { threshold: 0.01 },
+        { threshold: 0.25 },
       );
       if (sceneRef.current) fourierObserver.observe(sceneRef.current);
 
@@ -918,7 +939,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <motion.div
         aria-hidden
         style={isDesktop ? { y: bgFarMountainY, x: farMouseX } : undefined}
-        className="absolute inset-0 pointer-events-none"
+        className="parallax-layer parallax-bg-layer absolute inset-0 pointer-events-none"
       >
         {Array.from({ length: isDesktop ? 220 : 40 }).map((_, i) => {
           const seed = (i * 137) % 100;
@@ -956,7 +977,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <motion.div
         aria-hidden
         style={isDesktop ? { y: bgMidMountainY, x: midMouseX } : undefined}
-        className="absolute inset-0 pointer-events-none"
+        className="parallax-layer parallax-bg-layer absolute inset-0 pointer-events-none"
       >
         {Array.from({ length: isDesktop ? 130 : 25 }).map((_, i) => {
           const top = ((i * 71) % 100);
@@ -994,7 +1015,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <motion.div
         aria-hidden
         style={isDesktop ? { y: bgNearHillY, x: nearMouseX } : undefined}
-        className="absolute inset-0 pointer-events-none"
+        className="parallax-layer parallax-bg-layer absolute inset-0 pointer-events-none"
       >
         {Array.from({ length: isDesktop ? 60 : 12 }).map((_, i) => {
           const top = ((i * 31) % 100);
@@ -1224,7 +1245,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           {/* Text column — parallax (heroTextY), first on mobile AND first on desktop */}
           <motion.div
             style={isDesktop ? { y: heroTextY } : undefined}
-            className="text-center md:text-left space-y-6 order-1 md:order-1"
+            className="parallax-layer text-center md:text-left space-y-6 order-1 md:order-1"
           >
             {/* Trust badge with avatar stack — smaller on mobile */}
             <div
@@ -1317,7 +1338,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Floating math glyphs (∑ π ω ƒ) were removed per user request ("floating balls"). */}
           <motion.div
             style={isDesktop ? { y: heroVizY } : undefined}
-            className="relative mx-auto w-full max-w-[260px] sm:max-w-[320px] md:max-w-[360px] lg:max-w-[440px] order-2 md:order-2"
+            className="parallax-layer relative mx-auto w-full max-w-[260px] sm:max-w-[320px] md:max-w-[360px] lg:max-w-[440px] order-2 md:order-2"
           >
             {/* Soft static glow under the scene */}
             <div
@@ -1438,7 +1459,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* Stats bar — one-shot count-up only, no infinite animations */}
-        <motion.section id="stats" style={isDesktop ? { y: sectionY1 } : undefined} className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
+        <motion.section id="stats" style={isDesktop ? { y: sectionY1 } : undefined} className="parallax-layer max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
           <div id="stats_counter_banner" className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {stats.map((stat) => (
               <div
@@ -1463,7 +1484,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </motion.section>
 
         {/* Subjects showcase */}
-        <motion.section id="subjects" style={isDesktop ? { y: sectionY2 } : undefined} className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
+        <motion.section id="subjects" style={isDesktop ? { y: sectionY2 } : undefined} className="parallax-layer max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
           <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-10">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               Subjects
@@ -1507,7 +1528,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <motion.section
           style={isDesktop ? { y: sectionY3 } : undefined}
           id="features"
-          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
+          className="parallax-layer max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
           <ParallaxSectionHeading className="text-center space-y-3 max-w-2xl mx-auto mb-12">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
@@ -1555,7 +1576,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <motion.section
           style={isDesktop ? { y: sectionY4 } : undefined}
           id="how-it-works"
-          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
+          className="parallax-layer max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
           <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-12">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
@@ -1733,7 +1754,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <motion.section
           style={isDesktop ? { y: sectionY5 } : undefined}
           id="faq"
-          className="relative isolate max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-20 md:py-16 lg:py-24 border-t border-white/[0.06]"
+          className="parallax-layer relative isolate max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-20 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
           <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-10">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
@@ -1794,7 +1815,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <motion.section
           style={isDesktop ? { y: sectionY6 } : undefined}
           id="final-cta"
-          className="relative isolate max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-24 md:py-16 lg:py-24"
+          className="parallax-layer relative isolate max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-24 md:py-16 lg:py-24"
         >
           <div
             className="gsap-reveal relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-6 sm:p-8 md:p-12 lg:p-16 text-center"
