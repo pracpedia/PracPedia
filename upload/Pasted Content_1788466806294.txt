@@ -1,0 +1,735 @@
+Compiling / ...
+ GET / 200 in 5.8s (next.js: 5.1s, application-code: 693ms)
+prisma:error 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].announcement.findFirst()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__1qzsm4_._.js:79:164
+
+  76 ;
+  77 async function GET() {
+  78     try {
+→ 79         const config = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].announcement.findFirst(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+GET /api/settings/banner error: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].announcement.findFirst()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__1qzsm4_._.js:79:164
+
+  76 ;
+  77 async function GET() {
+  78     try {
+→ 79         const config = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].announcement.findFirst(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/app/api/settings/banner/route.ts:12:42)
+    at <unknown> (-->  schema.prisma:13)
+    at async GET (src/app/api/settings/banner/route.ts:12:20)
+  10 | export async function GET() {
+  11 |   try {
+> 12 |     const config = await db.announcement.findFirst({
+     |                                          ^
+  13 |       where: { targetUserId: 'banner-config' },
+  14 |     });
+  15 | {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ GET /api/settings/banner 500 in 1129ms (next.js: 334ms, application-code: 795ms)
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 1/2), retrying...
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 2/2), retrying...
+Login error: Error [PrismaClientInitializationError]: 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/app/api/auth/login/route.ts:56:15)
+    at <unknown> (-->  schema.prisma:13)
+    at async withRetry (src/app/api/auth/login/route.ts:17:14)
+    at async POST (src/app/api/auth/login/route.ts:55:15)
+  54 |     // ── DB query with retry — handles Neon connection drops ──
+  55 |     const u = await withRetry(() =>
+> 56 |       db.user.findUnique({ where: { email: String(email).toLowe...
+     |               ^
+  57 |     );
+  58 |
+  59 |     if (!u) { {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/auth/login 503 in 3.5s (next.js: 1433ms, application-code: 2.1s)
+prisma:error 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+[activity-log] Failed to log: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/lib/activity-log.ts:49:26)
+    at <unknown> (-->  schema.prisma:13)
+    at async logActivity (src/lib/activity-log.ts:49:5)
+    at async POST (src/app/api/error-log/route.ts:102:5)
+  47 |     const ipAddress = input.request ? getClientIp(input.request...
+  48 |
+> 49 |     await db.activityLog.create({
+     |                          ^
+  50 |       data: {
+  51 |         userId: input.userId || null,
+  52 |         userName: input.userName || 'Anonymous', {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/error-log 200 in 240ms (next.js: 210ms, application-code: 30ms)
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 1/2), retrying...
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 2/2), retrying...
+Login error: Error [PrismaClientInitializationError]: 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/app/api/auth/login/route.ts:56:15)
+    at <unknown> (-->  schema.prisma:13)
+    at async withRetry (src/app/api/auth/login/route.ts:17:14)
+    at async POST (src/app/api/auth/login/route.ts:55:15)
+  54 |     // ── DB query with retry — handles Neon connection drops ──
+  55 |     const u = await withRetry(() =>
+> 56 |       db.user.findUnique({ where: { email: String(email).toLowe...
+     |               ^
+  57 |     );
+  58 |
+  59 |     if (!u) { {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/auth/login 503 in 2.2s (next.js: 77ms, application-code: 2.1s)
+prisma:error 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+[activity-log] Failed to log: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/lib/activity-log.ts:49:26)
+    at <unknown> (-->  schema.prisma:13)
+    at async logActivity (src/lib/activity-log.ts:49:5)
+    at async POST (src/app/api/error-log/route.ts:102:5)
+  47 |     const ipAddress = input.request ? getClientIp(input.request...
+  48 |
+> 49 |     await db.activityLog.create({
+     |                          ^
+  50 |       data: {
+  51 |         userId: input.userId || null,
+  52 |         userName: input.userName || 'Anonymous', {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/error-log 200 in 15ms (next.js: 4ms, application-code: 11ms)
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 1/2), retrying...
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 2/2), retrying...
+Login error: Error [PrismaClientInitializationError]: 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/app/api/auth/login/route.ts:56:15)
+    at <unknown> (-->  schema.prisma:13)
+    at async withRetry (src/app/api/auth/login/route.ts:17:14)
+    at async POST (src/app/api/auth/login/route.ts:55:15)
+  54 |     // ── DB query with retry — handles Neon connection drops ──
+  55 |     const u = await withRetry(() =>
+> 56 |       db.user.findUnique({ where: { email: String(email).toLowe...
+     |               ^
+  57 |     );
+  58 |
+  59 |     if (!u) { {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/auth/login 503 in 2.0s (next.js: 3ms, application-code: 2.0s)
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 1/2), retrying...
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 2/2), retrying...
+Login error: Error [PrismaClientInitializationError]: 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/app/api/auth/login/route.ts:56:15)
+    at <unknown> (-->  schema.prisma:13)
+    at async withRetry (src/app/api/auth/login/route.ts:17:14)
+    at async POST (src/app/api/auth/login/route.ts:55:15)
+  54 |     // ── DB query with retry — handles Neon connection drops ──
+  55 |     const u = await withRetry(() =>
+> 56 |       db.user.findUnique({ where: { email: String(email).toLowe...
+     |               ^
+  57 |     );
+  58 |
+  59 |     if (!u) { {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/auth/login 503 in 2.0s (next.js: 4ms, application-code: 2.0s)
+prisma:error 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+[activity-log] Failed to log: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/lib/activity-log.ts:49:26)
+    at <unknown> (-->  schema.prisma:13)
+    at async logActivity (src/lib/activity-log.ts:49:5)
+    at async POST (src/app/api/error-log/route.ts:102:5)
+  47 |     const ipAddress = input.request ? getClientIp(input.request...
+  48 |
+> 49 |     await db.activityLog.create({
+     |                          ^
+  50 |       data: {
+  51 |         userId: input.userId || null,
+  52 |         userName: input.userName || 'Anonymous', {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/error-log 200 in 15ms (next.js: 5ms, application-code: 11ms)
+  Reload env: .env
+ GET / 200 in 542ms (next.js: 503ms, application-code: 40ms)
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 1/2), retrying...
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 2/2), retrying...
+Login error: Error [PrismaClientInitializationError]: 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/app/api/auth/login/route.ts:56:15)
+    at <unknown> (-->  schema.prisma:13)
+    at async withRetry (src/app/api/auth/login/route.ts:17:14)
+    at async POST (src/app/api/auth/login/route.ts:55:15)
+  54 |     // ── DB query with retry — handles Neon connection drops ──
+  55 |     const u = await withRetry(() =>
+> 56 |       db.user.findUnique({ where: { email: String(email).toLowe...
+     |               ^
+  57 |     );
+  58 |
+  59 |     if (!u) { {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/auth/login 503 in 2.2s (next.js: 61ms, application-code: 2.1s)
+prisma:error 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+[activity-log] Failed to log: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/lib/activity-log.ts:49:26)
+    at <unknown> (-->  schema.prisma:13)
+    at async logActivity (src/lib/activity-log.ts:49:5)
+    at async POST (src/app/api/error-log/route.ts:102:5)
+  47 |     const ipAddress = input.request ? getClientIp(input.request...
+  48 |
+> 49 |     await db.activityLog.create({
+     |                          ^
+  50 |       data: {
+  51 |         userId: input.userId || null,
+  52 |         userName: input.userName || 'Anonymous', {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/error-log 200 in 54ms (next.js: 26ms, application-code: 28ms)
+ GET / 200 in 598ms (next.js: 7ms, application-code: 591ms)
+prisma:error 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].announcement.findFirst()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__1qzsm4_._.js:79:164
+
+  76 ;
+  77 async function GET() {
+  78     try {
+→ 79         const config = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].announcement.findFirst(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+GET /api/settings/banner error: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].announcement.findFirst()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__1qzsm4_._.js:79:164
+
+  76 ;
+  77 async function GET() {
+  78     try {
+→ 79         const config = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].announcement.findFirst(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/app/api/settings/banner/route.ts:12:42)
+    at <unknown> (-->  schema.prisma:13)
+    at async GET (src/app/api/settings/banner/route.ts:12:20)
+  10 | export async function GET() {
+  11 |   try {
+> 12 |     const config = await db.announcement.findFirst({
+     |                                          ^
+  13 |       where: { targetUserId: 'banner-config' },
+  14 |     });
+  15 | {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ GET /api/settings/banner 500 in 80ms (next.js: 43ms, application-code: 37ms)
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 1/2), retrying...
+prisma:error 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+DB connection error (attempt 2/2), retrying...
+Login error: Error [PrismaClientInitializationError]: 
+Invalid `withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:127:165
+
+  124 // NOTE: Gmail blocking is ONLY for registration, NOT login.
+  125 // Existing users (including admins with Gmail) should be able to log in.
+  126 // ── DB query with retry — handles Neon connection drops ──
+→ 127 const u = await withRetry(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].user.findUnique(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/app/api/auth/login/route.ts:56:15)
+    at <unknown> (-->  schema.prisma:13)
+    at async withRetry (src/app/api/auth/login/route.ts:17:14)
+    at async POST (src/app/api/auth/login/route.ts:55:15)
+  54 |     // ── DB query with retry — handles Neon connection drops ──
+  55 |     const u = await withRetry(() =>
+> 56 |       db.user.findUnique({ where: { email: String(email).toLowe...
+     |               ^
+  57 |     );
+  58 |
+  59 |     if (!u) { {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/auth/login 503 in 2.0s (next.js: 8ms, application-code: 2.0s)
+prisma:error 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+[activity-log] Failed to log: Error [PrismaClientInitializationError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create()` invocation in
+/Users/mahabuburraahmanakash/Downloads/welp3/workspace/.next/dev/server/chunks/[root-of-the-server]__00mgce5._.js:231:148
+
+  228 async function logActivity(input) {
+  229     try {
+  230         const ipAddress = input.request ? getClientIp(input.request) : null;
+→ 231         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["db"].activityLog.create(
+error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:13
+   | 
+12 |   provider = "postgresql"
+13 |   url      = env("DATABASE_URL")
+   | 
+
+Validation Error Count: 1
+    at <unknown> (src/lib/activity-log.ts:49:26)
+    at <unknown> (-->  schema.prisma:13)
+    at async logActivity (src/lib/activity-log.ts:49:5)
+    at async POST (src/app/api/error-log/route.ts:102:5)
+  47 |     const ipAddress = input.request ? getClientIp(input.request...
+  48 |
+> 49 |     await db.activityLog.create({
+     |                          ^
+  50 |       data: {
+  51 |         userId: input.userId || null,
+  52 |         userName: input.userName || 'Anonymous', {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+ POST /api/error-log 200 in 13ms (next.js: 3ms, application-code: 10ms)
