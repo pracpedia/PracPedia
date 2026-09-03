@@ -1788,8 +1788,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               );
             })}
           </div>
+        </motion.section>
 
-          <div className="text-center mt-12 mb-16 relative z-10">
+        {/* "Still have questions?" — its own isolated section with solid bg
+            so the CTA card below can NEVER visually cover it. */}
+        <section
+          aria-label="Contact prompt"
+          className="relative isolate w-full bg-[#05070e] py-16 md:py-12 border-t border-white/[0.04]"
+        >
+          <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 text-center">
             <p className="text-[12px] text-slate-500 font-mono uppercase tracking-wider leading-7">
               Still have questions?{' '}
               <a
@@ -1800,13 +1807,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </a>
             </p>
           </div>
-        </motion.section>
+        </section>
 
         {/* Final CTA */}
         <motion.section
           style={isDesktop ? { y: sectionY6 } : undefined}
           id="final-cta"
-          className="relative isolate max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-24 pb-24 md:py-16 lg:py-24"
+          className="relative isolate max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-24 md:py-16 lg:py-24"
         >
           <div
             className="gsap-reveal relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-6 sm:p-8 md:p-12 lg:p-16 text-center"
