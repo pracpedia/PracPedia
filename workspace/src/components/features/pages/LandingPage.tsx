@@ -230,6 +230,9 @@ const ParallaxSectionHeading: React.FC<{ children: React.ReactNode; className?: 
     return () => {
       window.removeEventListener('scroll', onScroll);
       cancelAnimationFrame(raf);
+      // Reset transform when switching to mobile so the heading isn't
+      // stuck at the last parallax offset.
+      el.style.transform = '';
     };
   }, [isDesktop]);
   return (
@@ -429,14 +432,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     mouseX.set(0);
   };
 
-  /* Close mobile drawer on Escape */
+  /* Close mobile drawer on Escape + lock body scroll while open */
   useEffect(() => {
     if (!mobileNavOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMobileNavOpen(false);
     };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    // Lock body scroll to prevent background scroll bleed-through on iOS
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handler);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [mobileNavOpen]);
 
   /* GSAP-animated Fourier series epicycles — infinite rotation.
@@ -738,6 +747,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     let timer: ReturnType<typeof setTimeout>;
     let cancelled = false;
+    // Track auto-evict timeouts so they can be cleared on unmount.
+    // Without this, setState would fire on an unmounted component.
+    const evictTimers = new Set<ReturnType<typeof setTimeout>>();
 
     const spawnStar = () => {
       if (cancelled) return;
@@ -759,9 +771,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         { id, top, left, angle, distance, duration, delay, thickness, color },
       ]);
       // Auto-evict after the animation completes (so the array doesn't grow).
-      setTimeout(() => {
+      const evictTimer = setTimeout(() => {
+        evictTimers.delete(evictTimer);
+        if (cancelled) return;
         setShootingStars((prev) => prev.filter((s) => s.id !== id));
       }, duration + 200);
+      evictTimers.add(evictTimer);
 
       // Schedule the NEXT spawn — random 0.6..1.8 s gap for a high meteor
       // shower feel (multiple stars often in flight simultaneously).
@@ -775,6 +790,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      evictTimers.forEach((t) => clearTimeout(t));
+      evictTimers.clear();
     };
   }, []);
 
@@ -855,7 +872,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   /* Subjects to display (real subjects from props if provided, otherwise fallback) */
   const realSubjects = (subjects || []).map((s: any, i: number) => ({
-    id: s?.id ?? String(s?.name ?? Math.random()),
+    id: s?.id ?? s?.name ?? `subject-${i}`,
     name: s?.name ?? 'Untitled subject',
     count: folders.filter((f: any) => f.subjectId === s?.id).length,
     Icon: subjectIconFor(s?.name ?? ''),
@@ -879,7 +896,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       id="landing_page_container"
       onMouseMove={isDesktop ? handleMouseParallax : undefined}
       onMouseLeave={isDesktop ? resetMouseParallax : undefined}
-      className="w-full text-slate-200 bg-[#05070e] relative font-sans flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300"
+      className="w-full min-h-screen text-slate-200 bg-[#05070e] relative font-sans flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300"
     >
       {/* ── REAL SPACE BACKGROUND ──
          A pure starfield — no nebula clouds, no 3D canvas (removed for performance).
@@ -1716,7 +1733,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <motion.section
           style={{ y: sectionY5 }}
           id="faq"
-          className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
+          className="relative isolate max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
           <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-10">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
@@ -1772,12 +1789,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             })}
           </div>
 
-          <div className="text-center mt-10">
-            <p className="text-[12px] text-slate-500 font-mono uppercase tracking-wider">
+          <div className="text-center mt-10 relative z-10">
+            <p className="text-[12px] text-slate-500 font-mono uppercase tracking-wider leading-7">
               Still have questions?{' '}
               <a
                 href="mailto:hello@pracpedia.bd"
-                className="text-cyan-400 hover:text-cyan-300 font-bold inline-flex items-center gap-1.5 cursor-pointer min-h-[28px]"
+                className="text-cyan-400 hover:text-cyan-300 font-bold inline-flex items-center gap-1.5 cursor-pointer min-h-[28px] align-middle"
               >
                 <Mail className="w-3.5 h-3.5" /> Contact us
               </a>
@@ -1789,10 +1806,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <motion.section
           style={{ y: sectionY6 }}
           id="final-cta"
-          className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24"
+          className="relative isolate max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:py-16 lg:py-24"
         >
           <div
-            className="gsap-reveal relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-6 sm:p-8 md:p-12 lg:p-16 text-center"
+            className="gsap-reveal relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-6 sm:p-8 md:p-12 lg:p-16 text-center transform-gpu"
             style={{ opacity: 0 }}
           >
             {/* GSAP-animated decorative dot pattern (infinite loop) */}
