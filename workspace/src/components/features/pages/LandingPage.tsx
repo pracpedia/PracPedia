@@ -343,16 +343,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // Spring-smoothed hero parallax — useSpring wraps the raw scroll transform
   // so fast scrolling doesn't feel jerky. The spring gently catches up to
   // the scroll position instead of snapping instantly.
-  const rawHeroTextY = useTransform(scrollY, [0, 700], isDesktop ? [0, -210] : [0, 0]);
-  const rawHeroVizY = useTransform(scrollY, [0, 700], isDesktop ? [0, -350] : [0, 0]);
+  // NOTE: useTransform with a function (not static arrays) so the output
+  // range re-evaluates when isDesktop changes. Static arrays capture the
+  // value of isDesktop at hook-call time and never update.
+  const rawHeroTextY = useTransform(scrollY, (v) => isDesktop ? v * -0.3 : 0);
+  const rawHeroVizY = useTransform(scrollY, (v) => isDesktop ? v * -0.5 : 0);
   const heroTextY = useSpring(rawHeroTextY, { stiffness: 100, damping: 30, mass: 0.5 });
   const heroVizY = useSpring(rawHeroVizY, { stiffness: 100, damping: 30, mass: 0.5 });
 
   /* Deep-space parallax layers — spring-smoothed for buttery scroll.
      Each moves at a different speed to create depth. */
-  const rawBgFarY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 350] : [0, 0]);
-  const rawBgMidY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 500] : [0, 0]);
-  const rawBgNearY = useTransform(scrollY, [0, 4000], isDesktop ? [0, 700] : [0, 0]);
+  const rawBgFarY = useTransform(scrollY, (v) => isDesktop ? v * 0.0875 : 0);
+  const rawBgMidY = useTransform(scrollY, (v) => isDesktop ? v * 0.125 : 0);
+  const rawBgNearY = useTransform(scrollY, (v) => isDesktop ? v * 0.175 : 0);
   const bgFarMountainY = useSpring(rawBgFarY, { stiffness: 80, damping: 25, mass: 0.8 });
   const bgMidMountainY = useSpring(rawBgMidY, { stiffness: 80, damping: 25, mass: 0.8 });
   const bgNearHillY = useSpring(rawBgNearY, { stiffness: 80, damping: 25, mass: 0.8 });
