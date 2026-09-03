@@ -572,6 +572,32 @@ body::before {
   to { stroke-dashoffset: -20; }
 }
 
+/* ── MOBILE ANIMATION PERFORMANCE GUARDS ──
+   On mobile (max-width: 767px), disable the starfield twinkle keyframes.
+   Even with reduced star counts, ~77 simultaneously animating spans (each
+   its own compositor layer) cause GPU layer thrashing on mid-range phones.
+   The stars remain visible at their base opacity — they just don't twinkle.
+   This complements the JS-side mobile guards in LandingPage.tsx. */
+@media (max-width: 767px) {
+  [style*="pp-twinkle"] {
+    animation: none !important;
+    opacity: 0.6 !important;
+  }
+}
+
+/* Honor prefers-reduced-motion across the board — kill all decorative
+   keyframe animations. Functional transitions (hover, focus) are kept. */
+@media (prefers-reduced-motion: reduce) {
+  [style*="pp-twinkle"],
+  [style*="pp-shooting-star"],
+  [style*="pp-dash-flow"],
+  [style*="pp-orb-drift"],
+  [style*="pp-nebula-drift"],
+  .cat-bubble-anim {
+    animation: none !important;
+  }
+}
+
 /* Print styles for invoices */
 @media print {
   body * {

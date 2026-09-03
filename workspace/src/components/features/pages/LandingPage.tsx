@@ -239,7 +239,10 @@ const ParallaxSectionHeading: React.FC<{ children: React.ReactNode; className?: 
   );
 };
 
-/* ---------------- GsapHeading (SplitText char stagger on scroll-in — one-shot) ---------------- */
+/* ---------------- GsapHeading (SplitText char stagger on scroll-in — one-shot) ----------------
+   On mobile, SplitText is skipped: it splits each heading into 30-50 char
+   spans each animated with rotationX + scale + y, which overwhelms mobile
+   GPUs and causes scroll jank. Mobile falls back to a single fade+y reveal. */
 
 const GsapHeading: React.FC<{
   as: 'h1' | 'h2';
@@ -257,24 +260,38 @@ const GsapHeading: React.FC<{
     // doesn't fire on mount — e.g. element is already in viewport on load).
     gsap.set(el, { opacity: 1 });
 
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            const split = new SplitText(el, { type: 'chars,words' });
-            splitRef.current = split;
-            // Character-by-character reveal: each char flies in from below
-            // with a slight rotation + scale for a premium staggered effect.
-            gsap.from(split.chars, {
-              opacity: 0,
-              y: 20,
-              rotationX: -90,
-              scale: 0.5,
-              duration: 0.6,
-              stagger: 0.025,
-              ease: 'back.out(1.7)',
-              transformOrigin: '50% 100%',
-            });
+            if (prefersReduced || isMobile) {
+              // Simple fade+y reveal — 1 tween instead of N char tweens.
+              gsap.fromTo(
+                el,
+                { opacity: 0, y: 16 },
+                { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' },
+              );
+            } else {
+              const split = new SplitText(el, { type: 'chars,words' });
+              splitRef.current = split;
+              // Character-by-character reveal: each char flies in from below
+              // with a slight rotation + scale for a premium staggered effect.
+              gsap.from(split.chars, {
+                opacity: 0,
+                y: 20,
+                rotationX: -90,
+                scale: 0.5,
+                duration: 0.6,
+                stagger: 0.025,
+                ease: 'back.out(1.7)',
+                transformOrigin: '50% 100%',
+              });
+            }
             observer.unobserve(el);
           }
         });
@@ -346,17 +363,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // NOTE: useTransform with a function (not static arrays) so the output
   // range re-evaluates when isDesktop changes. Static arrays capture the
   // value of isDesktop at hook-call time and never update.
-  const rawHeroTextY = useTransform(scrollY, (v) => isDesktop ? v * -0.3 : v * -0.12);
-  const rawHeroVizY = useTransform(scrollY, (v) => isDesktop ? v * -0.5 : v * -0.2);
+  //
+  // MOBILE: all scroll-linked parallax is disabled (output 0). 11 motion
+  // values + 5 springs would otherwise fire on every scroll frame on
+  // mobile, causing severe scroll jank. The transforms are still mounted
+  // (hooks can't be conditional) but they output a constant 0, so the
+  // springs converge instantly and do no per-frame work.
+  const rawHeroTextY = useTransform(scrollY, (v) => isDesktop ? v * -0.3 : 0);
+  const rawHeroVizY = useTransform(scrollY, (v) => isDesktop ? v * -0.5 : 0);
   const heroTextY = useSpring(rawHeroTextY, { stiffness: 100, damping: 30, mass: 0.5 });
   const heroVizY = useSpring(rawHeroVizY, { stiffness: 100, damping: 30, mass: 0.5 });
 
   /* Deep-space parallax layers — spring-smoothed for buttery scroll.
      Each moves at a different speed to create depth.
-     Mobile uses 40% of the desktop effect — subtle but visible. */
-  const rawBgFarY = useTransform(scrollY, (v) => isDesktop ? v * 0.0875 : v * 0.035);
-  const rawBgMidY = useTransform(scrollY, (v) => isDesktop ? v * 0.125 : v * 0.05);
-  const rawBgNearY = useTransform(scrollY, (v) => isDesktop ? v * 0.175 : v * 0.07);
+     Mobile: disabled (0) to prevent scroll jank. */
+  const rawBgFarY = useTransform(scrollY, (v) => isDesktop ? v * 0.0875 : 0);
+  const rawBgMidY = useTransform(scrollY, (v) => isDesktop ? v * 0.125 : 0);
+  const rawBgNearY = useTransform(scrollY, (v) => isDesktop ? v * 0.175 : 0);
   const bgFarMountainY = useSpring(rawBgFarY, { stiffness: 80, damping: 25, mass: 0.8 });
   const bgMidMountainY = useSpring(rawBgMidY, { stiffness: 80, damping: 25, mass: 0.8 });
   const bgNearHillY = useSpring(rawBgNearY, { stiffness: 80, damping: 25, mass: 0.8 });
@@ -365,13 +388,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
      Each content section gets a subtle vertical parallax offset so the
      whole page feels 3D — not just the hero. Sections alternate between
      "near" (move up faster) and "far" (move up slower) to create depth.
-     Mobile uses 40% of the desktop effect. */
-  const sectionY1 = useTransform(scrollY, (v) => isDesktop ? v * -0.02 : v * -0.008);
-  const sectionY2 = useTransform(scrollY, (v) => isDesktop ? v * -0.04 : v * -0.016);
-  const sectionY3 = useTransform(scrollY, (v) => isDesktop ? v * -0.03 : v * -0.012);
-  const sectionY4 = useTransform(scrollY, (v) => isDesktop ? v * -0.05 : v * -0.02);
-  const sectionY5 = useTransform(scrollY, (v) => isDesktop ? v * -0.025 : v * -0.01);
-  const sectionY6 = useTransform(scrollY, (v) => isDesktop ? v * -0.06 : v * -0.024);
+     Mobile: disabled (0) to prevent scroll jank. */
+  const sectionY1 = useTransform(scrollY, (v) => isDesktop ? v * -0.02 : 0);
+  const sectionY2 = useTransform(scrollY, (v) => isDesktop ? v * -0.04 : 0);
+  const sectionY3 = useTransform(scrollY, (v) => isDesktop ? v * -0.03 : 0);
+  const sectionY4 = useTransform(scrollY, (v) => isDesktop ? v * -0.05 : 0);
+  const sectionY5 = useTransform(scrollY, (v) => isDesktop ? v * -0.025 : 0);
+  const sectionY6 = useTransform(scrollY, (v) => isDesktop ? v * -0.06 : 0);
 
   /* ── State-of-the-art mouse parallax ──
      The cursor position drives a spring-smoothed motion value that's mapped
@@ -640,9 +663,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   }, []);
 
   /* GSAP infinite animations for the final CTA — dots scroll loop + glow pulses.
-     These are the only infinite loops alongside the Fourier ticker. */
+     These are the only infinite loops alongside the Fourier ticker.
+     MOBILE: skipped entirely — infinite GSAP tweens on blurred backdrop-filter
+     layers cause continuous compositor repaints that wreck scroll perf. */
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // Skip infinite CTA animations on mobile — they cause continuous
+    // compositor repaints on backdrop-filter layers and tank scroll perf.
+    if (window.innerWidth < 768) return;
     const tweens: gsap.core.Tween[] = [];
     if (ctaDotsRef.current) {
       tweens.push(
@@ -702,6 +730,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     if (typeof window === 'undefined') return;
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReduced) return;
+    // Skip shooting stars on mobile — each spawned star is a separate
+    // compositor layer with a multi-layer box-shadow + transform: rotate,
+    // and they spawn every 0.6-1.8s. Combined with the static starfield,
+    // this pushes mobile GPUs past their layer budget and causes jank.
+    if (window.innerWidth < 768) return;
 
     let timer: ReturnType<typeof setTimeout>;
     let cancelled = false;
@@ -859,20 +892,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({
          transformed layers can't extend below the footer (fixes blank space). */}
       <div aria-hidden className="absolute inset-0 overflow-clip pointer-events-none" style={{ zIndex: 0 }}>
 
-      {/* Layer 2: Distant star field — slow parallax (scroll-Y + mouse-X) */}
+      {/* Layer 2: Distant star field — slow parallax (scroll-Y + mouse-X).
+          Mobile: drastically fewer stars (40 vs 220) and a single-layer
+          box-shadow glow instead of 3 layers. 410 multi-shadow twinkling
+          spans across 3 layers was the #1 cause of mobile scroll jank —
+          each span forces its own compositor layer, and mobile GPUs run
+          out of layer memory and fall back to CPU painting. */}
       <motion.div
         aria-hidden
         style={{ y: bgFarMountainY, x: farMouseX }}
         className="absolute inset-0 pointer-events-none"
       >
-        {Array.from({ length: 220 }).map((_, i) => {
+        {Array.from({ length: isDesktop ? 220 : 40 }).map((_, i) => {
           const seed = (i * 137) % 100;
           const top = ((i * 53) % 100);
           const left = ((i * 91) % 100);
           const size = 0.5 + (seed / 100) * 0.8; // 0.5-1.3px — tiny but glowy
           const dur = 3 + (seed % 5);
-          // Strong multi-layer glow: tight bright core + wide diffuse halo
-          const glow = `0 0 ${size * 3}px rgba(255,255,255,0.95), 0 0 ${size * 6}px rgba(255,255,255,0.5), 0 0 ${size * 12}px rgba(99,179,237,0.25)`;
+          // Desktop: strong multi-layer glow (tight core + diffuse halo).
+          // Mobile: single-layer glow — 3-layer box-shadow on 410 spans
+          // is too expensive for mobile GPUs to composite at 60fps.
+          const glow = isDesktop
+            ? `0 0 ${size * 3}px rgba(255,255,255,0.95), 0 0 ${size * 6}px rgba(255,255,255,0.5), 0 0 ${size * 12}px rgba(99,179,237,0.25)`
+            : `0 0 ${size * 2}px rgba(255,255,255,0.7)`;
           return (
             <span
               key={`far-${i}`}
@@ -892,21 +934,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         })}
       </motion.div>
 
-      {/* Layer 3: Mid star field — medium parallax (scroll-Y + mouse-X) */}
+      {/* Layer 3: Mid star field — medium parallax (scroll-Y + mouse-X).
+          Mobile: 25 stars vs 130, single-layer glow. */}
       <motion.div
         aria-hidden
         style={{ y: bgMidMountainY, x: midMouseX }}
         className="absolute inset-0 pointer-events-none"
       >
-        {Array.from({ length: 130 }).map((_, i) => {
+        {Array.from({ length: isDesktop ? 130 : 25 }).map((_, i) => {
           const top = ((i * 71) % 100);
           const left = ((i * 47) % 100);
           const size = 0.8 + (i % 3) * 0.4; // 0.8-1.6px — tiny but glowy
           const dur = 2.5 + (i % 4);
           const tint = i % 4 === 0 ? '#a5f3fc' : i % 4 === 1 ? '#c4b5fd' : i % 4 === 2 ? '#fde68a' : '#ffffff';
-          // Color-matched strong multi-layer glow
+          // Color-matched glow — multi-layer on desktop, single on mobile.
           const glowColor = i % 4 === 0 ? 'rgba(165,243,252' : i % 4 === 1 ? 'rgba(196,181,253' : i % 4 === 2 ? 'rgba(253,230,138' : 'rgba(255,255,255';
-          const glow = `0 0 ${size * 3}px ${glowColor},1), 0 0 ${size * 6}px ${glowColor},0.5), 0 0 ${size * 14}px ${glowColor},0.2)`;
+          const glow = isDesktop
+            ? `0 0 ${size * 3}px ${glowColor},1), 0 0 ${size * 6}px ${glowColor},0.5), 0 0 ${size * 14}px ${glowColor},0.2)`
+            : `0 0 ${size * 2}px ${glowColor},0.7)`;
           return (
             <span
               key={`mid-${i}`}
@@ -927,17 +972,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         })}
       </motion.div>
 
-      {/* Layer 4: Near dust + shooting stars — fast parallax (scroll-Y + mouse-X) */}
+      {/* Layer 4: Near dust + shooting stars — fast parallax (scroll-Y + mouse-X).
+          Mobile: 12 stars vs 60, single-layer glow. */}
       <motion.div
         aria-hidden
         style={{ y: bgNearHillY, x: nearMouseX }}
         className="absolute inset-0 pointer-events-none"
       >
-        {Array.from({ length: 60 }).map((_, i) => {
+        {Array.from({ length: isDesktop ? 60 : 12 }).map((_, i) => {
           const top = ((i * 31) % 100);
           const left = ((i * 67) % 100);
           const size = 1 + (i % 3) * 0.3; // 1-1.6px — tiny but bright
-          const glow = `0 0 ${size * 4}px rgba(255,255,255,1), 0 0 ${size * 8}px rgba(255,255,255,0.6), 0 0 ${size * 16}px rgba(99,179,237,0.3)`;
+          const glow = isDesktop
+            ? `0 0 ${size * 4}px rgba(255,255,255,1), 0 0 ${size * 8}px rgba(255,255,255,0.6), 0 0 ${size * 16}px rgba(99,179,237,0.3)`
+            : `0 0 ${size * 3}px rgba(255,255,255,0.8)`;
           return (
             <span
               key={`near-${i}`}
