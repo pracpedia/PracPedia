@@ -917,7 +917,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           out of layer memory and fall back to CPU painting. */}
       <motion.div
         aria-hidden
-        style={{ y: bgFarMountainY, x: farMouseX }}
+        style={isDesktop ? { y: bgFarMountainY, x: farMouseX } : undefined}
         className="absolute inset-0 pointer-events-none"
       >
         {Array.from({ length: isDesktop ? 220 : 40 }).map((_, i) => {
@@ -955,7 +955,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           Mobile: 25 stars vs 130, single-layer glow. */}
       <motion.div
         aria-hidden
-        style={{ y: bgMidMountainY, x: midMouseX }}
+        style={isDesktop ? { y: bgMidMountainY, x: midMouseX } : undefined}
         className="absolute inset-0 pointer-events-none"
       >
         {Array.from({ length: isDesktop ? 130 : 25 }).map((_, i) => {
@@ -993,7 +993,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           Mobile: 12 stars vs 60, single-layer glow. */}
       <motion.div
         aria-hidden
-        style={{ y: bgNearHillY, x: nearMouseX }}
+        style={isDesktop ? { y: bgNearHillY, x: nearMouseX } : undefined}
         className="absolute inset-0 pointer-events-none"
       >
         {Array.from({ length: isDesktop ? 60 : 12 }).map((_, i) => {
@@ -1223,7 +1223,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         >
           {/* Text column — parallax (heroTextY), first on mobile AND first on desktop */}
           <motion.div
-            style={{ y: heroTextY }}
+            style={isDesktop ? { y: heroTextY } : undefined}
             className="text-center md:text-left space-y-6 order-1 md:order-1"
           >
             {/* Trust badge with avatar stack — smaller on mobile */}
@@ -1316,7 +1316,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           {/* Fourier series animation — parallax (heroVizY), BELOW text on mobile, RIGHT on desktop.
               Floating math glyphs (∑ π ω ƒ) were removed per user request ("floating balls"). */}
           <motion.div
-            style={{ y: heroVizY }}
+            style={isDesktop ? { y: heroVizY } : undefined}
             className="relative mx-auto w-full max-w-[260px] sm:max-w-[320px] md:max-w-[360px] lg:max-w-[440px] order-2 md:order-2"
           >
             {/* Soft static glow under the scene */}
@@ -1438,7 +1438,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* Stats bar — one-shot count-up only, no infinite animations */}
-        <motion.section id="stats" style={{ y: sectionY1 }} className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
+        <motion.section id="stats" style={isDesktop ? { y: sectionY1 } : undefined} className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
           <div id="stats_counter_banner" className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {stats.map((stat) => (
               <div
@@ -1463,7 +1463,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </motion.section>
 
         {/* Subjects showcase */}
-        <motion.section id="subjects" style={{ y: sectionY2 }} className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
+        <motion.section id="subjects" style={isDesktop ? { y: sectionY2 } : undefined} className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
           <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-10">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               Subjects
@@ -1505,7 +1505,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         {/* Features — 4 cards (Progress Tracking removed) */}
         <motion.section
-          style={{ y: sectionY3 }}
+          style={isDesktop ? { y: sectionY3 } : undefined}
           id="features"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
@@ -1553,7 +1553,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         {/* How it works — 3-step timeline with CSS-keyframe flowing dashed line */}
         <motion.section
-          style={{ y: sectionY4 }}
+          style={isDesktop ? { y: sectionY4 } : undefined}
           id="how-it-works"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
@@ -1731,9 +1731,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         {/* FAQ — accordion with 4 items */}
         <motion.section
-          style={{ y: sectionY5 }}
+          style={isDesktop ? { y: sectionY5 } : undefined}
           id="faq"
-          className="relative isolate max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:py-16 lg:py-24 border-t border-white/[0.06]"
+          className="relative isolate max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-20 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
           <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-10">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
@@ -1804,12 +1804,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         {/* Final CTA */}
         <motion.section
-          style={{ y: sectionY6 }}
+          style={isDesktop ? { y: sectionY6 } : undefined}
           id="final-cta"
-          className="relative isolate max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-8 pb-16 md:py-16 lg:py-24"
+          className="relative isolate max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-12 pb-20 md:py-16 lg:py-24"
         >
           <div
-            className="gsap-reveal relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-6 sm:p-8 md:p-12 lg:p-16 text-center transform-gpu"
+            className="gsap-reveal relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-600 via-indigo-600 to-purple-700 p-6 sm:p-8 md:p-12 lg:p-16 text-center"
             style={{ opacity: 0 }}
           >
             {/* GSAP-animated decorative dot pattern (infinite loop) */}
