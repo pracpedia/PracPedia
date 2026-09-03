@@ -731,17 +731,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   /* ── Footer scramble text effect ──
      Scrambles random characters and resolves into "DEVELOPED BY MR. AKASH"
-     ONCE on mount, then stops. Uses useEffect (runs once) instead of a ref
-     callback (which runs on every render and starts multiple loops). */
+     when the footer scrolls into view. Uses IntersectionObserver so the
+     animation only starts when the user can actually see the footer.
+     Runs once, then stops permanently at the final text. */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const el = document.getElementById('footer-akash-text');
     if (!el) return;
+
     const finalText = 'DEVELOPED BY MR. AKASH';
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#&%';
     let frame = 0;
     const totalFrames = 50;
     let rafId: number;
+    let hasAnimated = false;
 
     const scramble = () => {
       frame++;
@@ -760,15 +763,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       if (frame < totalFrames) {
         rafId = requestAnimationFrame(scramble);
       } else {
-        el.textContent = finalText; // Final text — stops here, no re-scramble
+        el.textContent = finalText; // Final text — stops here permanently
       }
     };
 
-    // Start after a short delay
-    const startTimer = setTimeout(scramble, 800);
+    // Start the scramble animation
+    const startScramble = () => {
+      if (hasAnimated) return; // Only animate once
+      hasAnimated = true;
+      frame = 0;
+      scramble();
+    };
+
+    // Use IntersectionObserver to detect when the footer is visible
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          startScramble();
+          observer.disconnect(); // Stop observing after first trigger
+        }
+      },
+      { threshold: 0.3 }, // Trigger when 30% of the element is visible
+    );
+    observer.observe(el);
 
     return () => {
-      clearTimeout(startTimer);
+      observer.disconnect();
       cancelAnimationFrame(rafId);
     };
   }, []);
