@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { isPlatformOwner } from '@/lib/platform-owner';
+import { requirePermission } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +10,11 @@ export async function POST(request: NextRequest) {
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // Demoting an admin is a high-privilege action — require manage_admins
+    // permission (super_admin only). Previous code allowed ANY admin to
+    // demote peers, which is a privilege-escalation surface.
+    const denied = await requirePermission(request, 'manage_admins');
+    if (denied) return NextResponse.json({ error: 'Forbidden — requires permission: manage_admins (super admin only).' }, { status: 403 });
     const requester = await db.user.findUnique({ where: { id: payload.userId } });
     if (!requester || (requester.role !== 'super_admin' && requester.role !== 'admin')) {
       return NextResponse.json({ error: 'Access forbidden.' }, { status: 403 });

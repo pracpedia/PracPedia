@@ -122,6 +122,9 @@ export const chatLimiter = new RateLimiter({ windowMs: 60_000, max: 30 });
  * boundary) without being throttled, but blocks deliberate flooding. */
 export const errorLogLimiter = new RateLimiter({ windowMs: 60_000, max: 20 });
 
+/** 5 hire requests per 10 minutes per IP — blocks spam on the public hire form. */
+export const hireLimiter = new RateLimiter({ windowMs: 10 * 60_000, max: 5 });
+
 // Periodic cleanup every 5 minutes to free memory
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
@@ -130,6 +133,7 @@ if (typeof setInterval !== 'undefined') {
     aiLimiter.sweep();
     chatLimiter.sweep();
     errorLogLimiter.sweep();
+    hireLimiter.sweep();
   }, 5 * 60_000).unref?.();
 }
 

@@ -110,22 +110,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updateData.artistEarnings = totalPrice - commAmount;
     }
 
-    const updated = await db.booking.update({ where: { id }, data: updateData });
+    const updated = await db.$transaction(async (tx) => {
+      // Re-fetch inside transaction to get the freshest status (prevents
+      // race condition where two concurrent requests both see 'pending').
+      const fresh = await tx.booking.findUniqueOrThrow({ where: { id } });
+      const updateResult = await tx.booking.update({ where: { id }, data: updateData });
 
-    // If status changed to 'completed', increment artist's completedOrders
-    if (newStatus === 'completed' && booking.status !== 'completed') {
-      await db.user.update({
-        where: { id: booking.artistId },
-        data: { completedOrders: { increment: 1 } },
-      });
-    }
-    // If rolling back from completed (rare), decrement
-    if (booking.status === 'completed' && newStatus && newStatus !== 'completed') {
-      await db.user.update({
-        where: { id: booking.artistId },
-        data: { completedOrders: { decrement: 1 } },
-      });
-    }
+      // If status changed to 'completed', increment artist's completedOrders
+      // — only if the PREVIOUS status (from `fresh`) wasn't already completed.
+      // This prevents double-increment on concurrent requests.
+      if (newStatus === 'completed' && fresh.status !== 'completed') {
+        await tx.user.update({
+          where: { id: booking.artistId },
+          data: { completedOrders: { increment: 1 } },
+        });
+      }
+      // If rolling back from completed (rare), decrement
+      if (fresh.status === 'completed' && newStatus && newStatus !== 'completed') {
+        await tx.user.update({
+          where: { id: booking.artistId },
+          data: { completedOrders: { decrement: 1 } },
+        });
+      }
+      return updateResult;
+    });
 
     // Log status/payment changes to activity feed
     if (newStatus || paymentStatus !== undefined) {

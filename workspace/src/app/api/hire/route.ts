@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { hireLimiter, getClientIp } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +19,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit — 5 hire requests per 10 minutes per IP (public endpoint,
+    // no auth required, so IP-based is the only option).
+    const ip = getClientIp(request);
+    const limit = hireLimiter.check(ip);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 },
+      );
+    }
+
     const body = await request.json();
     const { fullName, email, phone, subject, message } = body;
     if (!fullName || !email || !message) {
@@ -25,11 +37,11 @@ export async function POST(request: NextRequest) {
     }
     const created = await db.hireRequest.create({
       data: {
-        fullName: String(fullName),
-        email: String(email),
-        phone: String(phone || ''),
-        subject: String(subject || ''),
-        message: String(message),
+        fullName: String(fullName).slice(0, 100),
+        email: String(email).slice(0, 200),
+        phone: String(phone || '').slice(0, 50),
+        subject: String(subject || '').slice(0, 200),
+        message: String(message).slice(0, 5000),
       },
     });
     return NextResponse.json({ ...created, id: created.id });

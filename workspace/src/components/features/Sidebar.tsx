@@ -16,7 +16,8 @@ import {
   Clock,
   GraduationCap,
   Palette,
-  Key
+  Key,
+  Calendar
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -126,9 +127,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ) : (
               <div className={`
                 p-2 rounded-lg flex items-center justify-center shrink-0
-                ${user.role === 'admin' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20'}
+                ${user.role === 'admin' || user.role === 'super_admin' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20'}
               `}>
-                {user.role === 'admin' ? <ShieldCheck className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                {user.role === 'admin' || user.role === 'super_admin' ? <ShieldCheck className="w-4 h-4" /> : <User className="w-4 h-4" />}
               </div>
             )}
             <div className="overflow-hidden min-w-0 flex-1">
@@ -137,12 +138,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 <span className={`
                   inline-block px-1.5 py-0.5 rounded text-[8px] font-mono tracking-wider uppercase font-bold
-                  ${user.role === 'admin' ? 'bg-amber-400/10 text-amber-300' : 'bg-cyan-400/10 text-cyan-300'}
+                  ${user.role === 'admin' || user.role === 'super_admin' ? 'bg-amber-400/10 text-amber-300' : 'bg-cyan-400/10 text-cyan-300'}
                 `}>
                   {user.role}
                 </span>
 
-                {user.role === 'admin' && !isPlatformOwner(user.email) && (
+                {user.role === 'admin' || user.role === 'super_admin' && !isPlatformOwner(user.email) && (
                   <button
                     onClick={async () => {
                       if (!confirmResign) {
@@ -385,6 +386,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
 
+            {/* Bookings & Hire Requests — visible to all authenticated users.
+                Students see their own bookings, artists see commissions received,
+                admins see all bookings + hire requests across the platform. */}
+            <button
+              onClick={() => handleNav('bookings')}
+              className={`
+                w-full flex items-center gap-3 px-3.5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold tracking-wide
+                transition-all duration-200 group border text-left cursor-pointer
+                ${currentView === 'bookings'
+                  ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-300 font-bold shadow-lg shadow-cyan-500/5'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02] border-transparent'}
+              `}
+            >
+              <Calendar className={`w-4 h-4 transition-transform group-hover:scale-110 shrink-0 ${currentView === 'bookings' ? 'text-cyan-400' : 'text-slate-500'}`} />
+              <span className="truncate">
+                {language === 'en' ? 'Bookings' : 'বুকিং'}
+              </span>
+            </button>
+
             {/* Marketplace browse link for artists (so they can also view other artists) */}
             {user?.role === 'artist' && (
               <button
@@ -457,7 +477,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             {/* Admin actions shortcut within the dashboard structure */}
-            {user.role === 'admin' && (
+            {user.role === 'admin' || user.role === 'super_admin' && (
               <button
                 onClick={onOpenFolderCreate}
                 className="w-full mt-2 flex items-center justify-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl text-xs font-bold tracking-wide shadow-md shadow-indigo-950/50 transition-all active:scale-[0.98] cursor-pointer"

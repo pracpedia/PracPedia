@@ -86,18 +86,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             safeLocalStorage.removeItem('png_token');
             setToken(null);
           }
-        } else {
-          // Server returned 401 — token is invalid, clear it
+        } else if (res.status === 401) {
+          // 401 = token is genuinely invalid — clear it
           safeLocalStorage.removeItem('png_token');
           setToken(null);
+        } else {
+          // 503 (DB down), 500 (server error), network blip — DON'T clear the
+          // token. Keep the user logged in so they can retry when the DB
+          // comes back. Previous code cleared the token on ANY non-200,
+          // which logged everyone out during transient Neon connection drops.
+          console.warn(`Auth check returned ${res.status}, keeping token`);
         }
       } catch (err) {
         if (cancelled) return;
         console.error('Failed to authenticate session token on startup:', err);
-        // Network error or DB connection dropped — clear the stale token
-        // so the user sees the login page instead of a broken state
-        safeLocalStorage.removeItem('png_token');
-        setToken(null);
+        // Network error or DB connection dropped — DON'T clear the token.
+        // Keep the user logged in so they can retry when the network/DB
+        // comes back. Previous code cleared the token on every network error,
+        // logging users out during transient Neon connection drops.
+        // The user will see a "reconnecting" state in the UI instead.
       } finally {
         if (!cancelled) setIsLoading(false);
       }

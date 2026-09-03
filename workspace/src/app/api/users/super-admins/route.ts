@@ -9,7 +9,11 @@ export async function GET(request: NextRequest) {
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    // Any authenticated user can list super_admins (for CMS display)
+    // Only admins/super_admins can list super_admins — exposing the list of
+    // highest-privilege emails to every student/artist is a phishing risk.
+    if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Forbidden — admin only.' }, { status: 403 });
+    }
     const superAdmins = await db.user.findMany({
       where: { role: 'super_admin' },
       orderBy: { createdAt: 'asc' },

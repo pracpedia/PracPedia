@@ -22,6 +22,7 @@ import { ArtistsPage } from '@/components/features/pages/ArtistsPage';
 import { PublicMarketplace } from '@/components/features/pages/PublicMarketplace';
 import { AdminCmsPage } from '@/components/features/pages/AdminCmsPage';
 import { ArtistDashboard } from '@/components/features/pages/ArtistDashboard';
+import { BookingsPage } from '@/components/features/pages/BookingsPage';
 import { CredentialsView } from '@/components/features/pages/CredentialsView';
 import { GeminiKeyModal } from '@/components/features/GeminiKeyModal';
 import { gsap } from 'gsap';
@@ -93,7 +94,7 @@ export interface AnnouncementType {
   targetUserId?: string | null;
 }
 
-type ViewState = 'landing' | 'auth' | 'dashboard' | 'subject' | 'folder' | 'admins' | 'chat' | 'academy' | 'profile' | 'artists' | 'artist_dashboard' | 'creds';
+type ViewState = 'landing' | 'auth' | 'dashboard' | 'subject' | 'folder' | 'admins' | 'chat' | 'academy' | 'profile' | 'artists' | 'artist_dashboard' | 'creds' | 'bookings';
 
 // Unused-import guards: preserve original API surface so tree-shaking does not strip
 // icons/components referenced by the original Vite file (kept for behavioral parity).
@@ -487,7 +488,7 @@ function PortalConsole() {
       setStats(statData);
 
       // Fetch students list if user is an Administrator
-      if (user?.role === 'admin') {
+      if (user?.role === 'admin' || user?.role === 'super_admin') {
         try {
           const studRes = await apiFetch('/api/users/students');
           if (studRes.ok) {
@@ -923,7 +924,10 @@ function PortalConsole() {
       }
     };
 
-    const interval = setInterval(checkScareStatus, 1000);
+    // Poll every 10 seconds (was 1s — 1Hz per user was hammering the DB for
+    // a feature that's rarely triggered). 10s is responsive enough for the
+    // scare/cat overlay while reducing DB load by 10x.
+    const interval = setInterval(checkScareStatus, 10000);
     return () => clearInterval(interval);
   }, [user?.id]);
 
@@ -1503,7 +1507,7 @@ function PortalConsole() {
       )}
 
       {/* 🐾 PET STUDY COMPANION CONTROLLER OVERLAY */}
-      {false && user?.role === 'admin' && (
+      {false && user?.role === 'admin' || user?.role === 'super_admin' && (
         <div className="fixed bottom-6 right-6 z-[9000] flex flex-col items-end gap-3 font-sans select-none pointer-events-auto">
           {isCatControlOpen && (
             <div className="w-80 max-w-[90vw] bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-[0_12px_40px_rgba(0,0,0,0.6)] flex flex-col gap-3.5 text-slate-200 animate-in slide-in-from-bottom duration-300">
@@ -1712,6 +1716,7 @@ function PortalConsole() {
               · {currentView === 'artists' ? 'Marketplace' :
                  currentView === 'artist_dashboard' ? 'Artist Dashboard' :
                  currentView === 'creds' ? 'System Credentials' :
+                 currentView === 'bookings' ? 'Bookings' :
                  currentView === 'academy' ? 'AI Academy' :
                  currentView === 'profile' ? 'Profile' :
                  currentView === 'chat' ? 'Discussion Chat' :
@@ -2043,7 +2048,7 @@ function PortalConsole() {
                                   </span>
 
                                   <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                                    {user?.role === 'admin' && (
+                                    {user?.role === 'admin' || user?.role === 'super_admin' && (
                                       <button
                                         onClick={async (e) => {
                                           e.stopPropagation();
@@ -2208,7 +2213,7 @@ function PortalConsole() {
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-                        {user?.role === 'admin' && (
+                        {user?.role === 'admin' || user?.role === 'super_admin' && (
                           <button
                             onClick={() => {
                               setEditFolderData(null);
@@ -2313,7 +2318,7 @@ function PortalConsole() {
                               </span>
 
                               <div className="flex gap-1 sm:gap-1.5 items-center justify-end flex-wrap">
-                                {user?.role === 'admin' && (
+                                {user?.role === 'admin' || user?.role === 'super_admin' && (
                                   <>
                                     <button
                                       onClick={(e) => {
@@ -2393,7 +2398,7 @@ function PortalConsole() {
                           </div>
                         </div>
 
-                        {user?.role === 'admin' && (
+                        {user?.role === 'admin' || user?.role === 'super_admin' && (
                           <>
                             <button
                               onClick={() => {
@@ -2561,7 +2566,7 @@ function PortalConsole() {
                                   <Eye className="w-3.5 h-3.5" />
                                 </span>
 
-                                {user?.role === 'admin' && (
+                                {user?.role === 'admin' || user?.role === 'super_admin' && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -2632,7 +2637,7 @@ function PortalConsole() {
                                   <span>View & Inspect</span>
                                 </span>
 
-                                {user?.role === 'admin' && (
+                                {user?.role === 'admin' || user?.role === 'super_admin' && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -2731,6 +2736,15 @@ function PortalConsole() {
               {currentView === 'artist_dashboard' && user?.role === 'artist' && (
                 <div className="space-y-6 animate-in fade-in duration-300">
                   <ArtistDashboard activeTheme={activeTheme} />
+                </div>
+              )}
+
+              {/* ==============================================
+                  📅 VIEW: BOOKINGS & HIRE REQUESTS
+                  ============================================== */}
+              {currentView === 'bookings' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <BookingsPage activeTheme={activeTheme} />
                 </div>
               )}
 

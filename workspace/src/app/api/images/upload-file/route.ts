@@ -19,6 +19,13 @@ export async function POST(request: NextRequest) {
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // Only admins/super_admins can upload images — the attach step
+    // (POST /api/images) also requires admin, so allowing students/artists
+    // to upload here would let them consume storage without being able to
+    // attach the result to any folder.
+    if (payload.role !== 'admin' && payload.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Forbidden — admin only.' }, { status: 403 });
+    }
 
     const formData = await request.formData();
     const file = formData.get('image');
