@@ -1931,10 +1931,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Contact
             </h4>
             <a
-              href="mailto:hello@pracpedia.bd"
+              href="mailto:pracpedia@gmail.com"
               className="flex items-center gap-2 text-xs sm:text-sm text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer min-h-[28px]"
             >
-              <Mail className="w-4 h-4" /> hello@pracpedia.bd
+              <Mail className="w-4 h-4" /> pracpedia@gmail.com
             </a>
             <button
               type="button"
