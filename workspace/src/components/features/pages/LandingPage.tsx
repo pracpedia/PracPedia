@@ -360,6 +360,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const bgMidMountainY = useSpring(rawBgMidY, { stiffness: 80, damping: 25, mass: 0.8 });
   const bgNearHillY = useSpring(rawBgNearY, { stiffness: 80, damping: 25, mass: 0.8 });
 
+  /* ── Content section parallax ──
+     Each content section gets a subtle vertical parallax offset so the
+     whole page feels 3D — not just the hero. Sections alternate between
+     "near" (move up faster) and "far" (move up slower) to create depth.
+     Only on desktop (≥768px) — mobile gets 0 to prevent scroll jank. */
+  const sectionY1 = useTransform(scrollY, (v) => isDesktop ? v * -0.02 : 0);   // stats — barely moves
+  const sectionY2 = useTransform(scrollY, (v) => isDesktop ? v * -0.04 : 0);   // subjects — slight
+  const sectionY3 = useTransform(scrollY, (v) => isDesktop ? v * -0.03 : 0);   // features — slight
+  const sectionY4 = useTransform(scrollY, (v) => isDesktop ? v * -0.05 : 0);   // how it works — more
+  const sectionY5 = useTransform(scrollY, (v) => isDesktop ? v * -0.025 : 0);  // FAQ — barely
+  const sectionY6 = useTransform(scrollY, (v) => isDesktop ? v * -0.06 : 0);   // final CTA — most
+
   /* ── State-of-the-art mouse parallax ──
      The cursor position drives a spring-smoothed motion value that's mapped
      to horizontal + vertical offsets for each star layer at different rates
@@ -1360,7 +1372,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* Stats bar — one-shot count-up only, no infinite animations */}
-        <section id="stats" className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
+        <motion.section id="stats" style={{ y: sectionY1 }} className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8">
           <div id="stats_counter_banner" className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {stats.map((stat) => (
               <div
@@ -1382,10 +1394,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             ))}
           </div>
-        </section>
+        </motion.section>
 
         {/* Subjects showcase */}
-        <section id="subjects" className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
+        <motion.section id="subjects" style={{ y: sectionY2 }} className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
           <ParallaxSectionHeading className="text-center space-y-2 max-w-2xl mx-auto mb-10">
             <span className="inline-block text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-400 font-bold">
               Subjects
@@ -1423,10 +1435,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </a>
             ))}
           </div>
-        </section>
+        </motion.section>
 
         {/* Features — 4 cards (Progress Tracking removed) */}
-        <section
+        <motion.section
+          style={{ y: sectionY3 }}
           id="features"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
@@ -1470,10 +1483,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             ))}
           </div>
-        </section>
+        </motion.section>
 
         {/* How it works — 3-step timeline with CSS-keyframe flowing dashed line */}
-        <section
+        <motion.section
+          style={{ y: sectionY4 }}
           id="how-it-works"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
@@ -1523,7 +1537,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             ))}
           </div>
-        </section>
+        </motion.section>
 
         {/* Announcements — keep existing logic, no infinite per-card animations */}
         <section
@@ -1650,7 +1664,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* FAQ — accordion with 4 items */}
-        <section
+        <motion.section
+          style={{ y: sectionY5 }}
           id="faq"
           className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24 border-t border-white/[0.06]"
         >
@@ -1719,10 +1734,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </a>
             </p>
           </div>
-        </section>
+        </motion.section>
 
         {/* Final CTA */}
-        <section
+        <motion.section
+          style={{ y: sectionY6 }}
           id="final-cta"
           className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24"
         >
@@ -1788,7 +1804,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             </div>
           </div>
-        </section>
+        </motion.section>
       </main>
 
       {/* Footer (3-column) — mt-auto pins to bottom of min-h-screen container */}
