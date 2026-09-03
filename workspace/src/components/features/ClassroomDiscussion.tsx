@@ -64,6 +64,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
   const [typedMessage, setTypedMessage] = useState<string>('');
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [revealedTimeId, setRevealedTimeId] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -647,7 +648,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
 
                     {/* Bubble column — sizes to content, max 80% width */}
                     <div className="min-w-0 flex flex-col" style={{ maxWidth: '80%' }}>
-                      {/* Name + meta */}
+                      {/* Name + meta — timestamp hidden by default, click to reveal (like Messenger) */}
                       <div className={`flex items-center gap-1.5 text-[10px] mb-1 flex-wrap ${isMine ? 'justify-end' : 'justify-start'}`}>
                         <span className={`font-bold ${isTeacher ? 'text-amber-300' : 'text-slate-300'}`}>
                           {isMine ? 'You' : msg.userName}
@@ -657,7 +658,14 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
                             {t('teacher')}
                           </span>
                         )}
-                        <span className="text-slate-500 font-mono text-[9px]">{formatDateLabel(msg.createdAt)}</span>
+                        <button
+                          onClick={() => setRevealedTimeId(revealedTimeId === (msg.id || msg._id) ? null : (msg.id || msg._id || ''))}
+                          className="text-slate-600 hover:text-slate-400 font-mono text-[9px] transition-colors cursor-pointer"
+                        >
+                          {revealedTimeId === (msg.id || msg._id)
+                            ? new Date(msg.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : '◦◦◦'}
+                        </button>
                       </div>
 
                       {/* Image (if present) */}

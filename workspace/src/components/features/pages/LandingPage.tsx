@@ -1790,7 +1790,51 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="border-t border-white/[0.04]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-500 font-mono uppercase tracking-wider text-center">
             <span>© 2026 Bangladesh HSC Science Practical Portal · All Rights Reserved</span>
-            <span>Built with care in Dhaka</span>
+            <span
+              ref={(el) => {
+                if (!el || typeof window === 'undefined') return;
+                const finalText = 'DEVELOPED BY MR. AKASH';
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#&%';
+                let frame = 0;
+                const totalFrames = 60;
+                let isScrambling = true;
+                let scrambleTimer: ReturnType<typeof setTimeout>;
+
+                const scramble = () => {
+                  frame++;
+                  const progress = frame / totalFrames;
+                  let display = '';
+                  for (let i = 0; i < finalText.length; i++) {
+                    if (progress * finalText.length > i) {
+                      display += finalText[i];
+                    } else if (finalText[i] === ' ') {
+                      display += ' ';
+                    } else {
+                      display += chars[Math.floor(Math.random() * chars.length)];
+                    }
+                  }
+                  el.textContent = display;
+                  if (frame < totalFrames) {
+                    requestAnimationFrame(scramble);
+                  } else {
+                    el.textContent = finalText;
+                    isScrambling = false;
+                    // Re-scramble every 8 seconds
+                    scrambleTimer = setTimeout(() => {
+                      frame = 0;
+                      isScrambling = true;
+                      scramble();
+                    }, 8000);
+                  }
+                };
+                // Start after a short delay
+                setTimeout(scramble, 500);
+              }}
+              className="text-cyan-400 font-bold tracking-wider"
+              style={{ textShadow: '0 0 8px rgba(34,211,238,0.6), 0 0 16px rgba(34,211,238,0.3)' }}
+            >
+              DEVELOPED BY MR. AKASH
+            </span>
           </div>
         </div>
       </footer>
