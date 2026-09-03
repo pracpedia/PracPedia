@@ -346,16 +346,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // NOTE: useTransform with a function (not static arrays) so the output
   // range re-evaluates when isDesktop changes. Static arrays capture the
   // value of isDesktop at hook-call time and never update.
-  const rawHeroTextY = useTransform(scrollY, (v) => isDesktop ? v * -0.3 : 0);
-  const rawHeroVizY = useTransform(scrollY, (v) => isDesktop ? v * -0.5 : 0);
+  const rawHeroTextY = useTransform(scrollY, (v) => isDesktop ? v * -0.3 : v * -0.12);
+  const rawHeroVizY = useTransform(scrollY, (v) => isDesktop ? v * -0.5 : v * -0.2);
   const heroTextY = useSpring(rawHeroTextY, { stiffness: 100, damping: 30, mass: 0.5 });
   const heroVizY = useSpring(rawHeroVizY, { stiffness: 100, damping: 30, mass: 0.5 });
 
   /* Deep-space parallax layers — spring-smoothed for buttery scroll.
-     Each moves at a different speed to create depth. */
-  const rawBgFarY = useTransform(scrollY, (v) => isDesktop ? v * 0.0875 : 0);
-  const rawBgMidY = useTransform(scrollY, (v) => isDesktop ? v * 0.125 : 0);
-  const rawBgNearY = useTransform(scrollY, (v) => isDesktop ? v * 0.175 : 0);
+     Each moves at a different speed to create depth.
+     Mobile uses 40% of the desktop effect — subtle but visible. */
+  const rawBgFarY = useTransform(scrollY, (v) => isDesktop ? v * 0.0875 : v * 0.035);
+  const rawBgMidY = useTransform(scrollY, (v) => isDesktop ? v * 0.125 : v * 0.05);
+  const rawBgNearY = useTransform(scrollY, (v) => isDesktop ? v * 0.175 : v * 0.07);
   const bgFarMountainY = useSpring(rawBgFarY, { stiffness: 80, damping: 25, mass: 0.8 });
   const bgMidMountainY = useSpring(rawBgMidY, { stiffness: 80, damping: 25, mass: 0.8 });
   const bgNearHillY = useSpring(rawBgNearY, { stiffness: 80, damping: 25, mass: 0.8 });
@@ -364,13 +365,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
      Each content section gets a subtle vertical parallax offset so the
      whole page feels 3D — not just the hero. Sections alternate between
      "near" (move up faster) and "far" (move up slower) to create depth.
-     Only on desktop (≥768px) — mobile gets 0 to prevent scroll jank. */
-  const sectionY1 = useTransform(scrollY, (v) => isDesktop ? v * -0.02 : 0);   // stats — barely moves
-  const sectionY2 = useTransform(scrollY, (v) => isDesktop ? v * -0.04 : 0);   // subjects — slight
-  const sectionY3 = useTransform(scrollY, (v) => isDesktop ? v * -0.03 : 0);   // features — slight
-  const sectionY4 = useTransform(scrollY, (v) => isDesktop ? v * -0.05 : 0);   // how it works — more
-  const sectionY5 = useTransform(scrollY, (v) => isDesktop ? v * -0.025 : 0);  // FAQ — barely
-  const sectionY6 = useTransform(scrollY, (v) => isDesktop ? v * -0.06 : 0);   // final CTA — most
+     Mobile uses 40% of the desktop effect. */
+  const sectionY1 = useTransform(scrollY, (v) => isDesktop ? v * -0.02 : v * -0.008);
+  const sectionY2 = useTransform(scrollY, (v) => isDesktop ? v * -0.04 : v * -0.016);
+  const sectionY3 = useTransform(scrollY, (v) => isDesktop ? v * -0.03 : v * -0.012);
+  const sectionY4 = useTransform(scrollY, (v) => isDesktop ? v * -0.05 : v * -0.02);
+  const sectionY5 = useTransform(scrollY, (v) => isDesktop ? v * -0.025 : v * -0.01);
+  const sectionY6 = useTransform(scrollY, (v) => isDesktop ? v * -0.06 : v * -0.024);
 
   /* ── State-of-the-art mouse parallax ──
      The cursor position drives a spring-smoothed motion value that's mapped
