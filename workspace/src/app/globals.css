@@ -349,17 +349,22 @@ body {
   }
 
   .glass-sidebar {
-    background: rgba(8, 10, 20, 0.5);
+    /* Solid background — previous 0.5 opacity caused main content to show
+       through on mobile, making the sidebar text overlap with page content.
+       Use a near-opaque background so the sidebar is fully readable. */
+    background: rgba(5, 7, 14, 0.97);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border-right: 1px solid var(--theme-glow, rgba(255, 255, 255, 0.03));
+    border-right: 1px solid var(--theme-glow, rgba(255, 255, 255, 0.06));
   }
 
   .glass-header {
-    background: rgba(5, 7, 14, 0.6);
+    /* Slightly more opaque than before (0.6 → 0.88) so scrolling content
+       doesn't bleed through and reduce header text readability. */
+    background: rgba(5, 7, 14, 0.88);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--theme-glow, rgba(255, 255, 255, 0.03));
+    border-bottom: 1px solid var(--theme-glow, rgba(255, 255, 255, 0.06));
   }
 
   .glass-card {
