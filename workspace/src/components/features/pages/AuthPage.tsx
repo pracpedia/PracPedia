@@ -276,14 +276,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
     }
   };
 
-  const handleQuickFill = (targetEmail: string, targetPass: string, authSegment: 'student' | 'artist') => {
-    setEmail(targetEmail);
-    setPassword(targetPass);
-    setIsLogin(true);
-    setAuthType(authSegment);
-    setErrorMsg(null);
-  };
-
   return (
     <div id="auth_page_container" className="min-h-screen text-slate-100 flex flex-col justify-center items-center relative bg-[#05070e] px-3 sm:px-6 py-6 md:py-12 select-none">
 
@@ -811,36 +803,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                   )}
                 </button>
               </form>
-
-              {/* Instant Developer / Testing Presets */}
-              <div className="pt-3 border-t border-white/[0.06] space-y-2 select-none">
-                <div className="text-[9px] font-mono tracking-widest text-slate-400 uppercase font-bold text-center">
-                  ⚡ 1-Click Quick Demo Presets
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFill('student@gallery.com', 'user123', 'student')}
-                    className="p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-950 border border-white/[0.06] hover:border-indigo-500/40 text-left transition-all duration-200 cursor-pointer group min-h-[56px]"
-                  >
-                    <div className="font-extrabold text-indigo-400 flex items-center gap-1.5 text-xs">
-                      <GraduationCap className="w-3.5 h-3.5 shrink-0" /> Student Demo
-                    </div>
-                    <div className="text-[9px] text-slate-400 truncate mt-0.5 group-hover:text-slate-300 font-mono">student@gallery.com</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFill('sajid@draw.com', 'user123', 'artist')}
-                    className="p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-950 border border-white/[0.06] hover:border-amber-500/40 text-left transition-all duration-200 cursor-pointer group min-h-[56px]"
-                  >
-                    <div className="font-extrabold text-amber-400 flex items-center gap-1.5 text-xs">
-                      <Paintbrush className="w-3.5 h-3.5 shrink-0" /> Artist Demo
-                    </div>
-                    <div className="text-[9px] text-slate-400 truncate mt-0.5 group-hover:text-slate-300 font-mono">sajid@draw.com</div>
-                  </button>
-                </div>
-              </div>
 
             </div>
           </div>
