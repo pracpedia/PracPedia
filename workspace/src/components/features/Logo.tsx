@@ -8,28 +8,30 @@ interface LogoProps {
 }
 
 /**
- * PracPedia logo — renders the pracpedia-logo.png image from /public.
+ * PracPedia text-based logo.
  *
- * Used everywhere: sidebar, header, landing page, footer, auth pages.
- * Change the file at public/pracpedia-logo.png to update the logo
- * across the entire app.
+ * Both parts use Lobster Two — a playful, bold display font with
+ * distinctive swashes and curves. "Prac" in cyan, "Pedia" in purple.
  */
 export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '' }) => {
-  const sizePx = {
-    sm: 24,
-    md: 32,
-    lg: 40,
-    xl: 56,
+  const sizeClasses = {
+    sm: 'text-sm',
+    md: 'text-base',
+    lg: 'text-xl',
+    xl: 'text-3xl sm:text-4xl',
   };
 
   return (
-    <img
-      src="/pracpedia-logo.png"
-      alt="PracPedia"
-      width={sizePx[size]}
-      height={sizePx[size]}
-      className={`object-contain ${className}`}
-      style={{ maxHeight: sizePx[size], width: 'auto' }}
-    />
+    <span
+      className={`inline-flex items-baseline ${sizeClasses[size]} ${className}`}
+      style={{ fontFamily: 'var(--font-lobster-two), cursive' }}
+    >
+      <span className="text-cyan-400 font-bold">
+        Prac
+      </span>
+      <span className="text-purple-400 font-bold italic">
+        Pedia
+      </span>
+    </span>
   );
 };

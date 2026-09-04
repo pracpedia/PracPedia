@@ -71,8 +71,13 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "PracPedia Team" }],
   icons: {
-    icon: "/pracpedia-logo.png",
-    apple: "/pracpedia-logo.png",
+    icon: [
+      { url: "/pracpedia-logo.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/pracpedia-logo.png", type: "image/png" },
+    ],
+    shortcut: ["/pracpedia-logo.png"],
   },
   openGraph: {
     title: "PracPedia — Practical Notebook Gallery",
@@ -80,12 +85,14 @@ export const metadata: Metadata = {
       "The ultimate practical notebook encyclopedia and study gallery.",
     siteName: "PracPedia",
     type: "website",
+    images: [{ url: "/pracpedia-logo.png", width: 512, height: 512, alt: "PracPedia" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "PracPedia — Practical Notebook Gallery",
     description:
       "The ultimate practical notebook encyclopedia and study gallery.",
+    images: ["/pracpedia-logo.png"],
   },
 };
 
