@@ -71,7 +71,8 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "PracPedia Team" }],
   icons: {
-    icon: "/logo.svg",
+    icon: "/pracpedia-logo.png",
+    apple: "/pracpedia-logo.png",
   },
   openGraph: {
     title: "PracPedia — Practical Notebook Gallery",
