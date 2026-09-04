@@ -1057,3 +1057,39 @@ Stage Summary:
 - The landing page hero now shows a real-space constellation (Orion pattern) instead of moving balls.
 - The background is real space: ~3,000 3D stars (Three.js, scattered through a cube, no sphere) + 410 2D twinkling stars (3 parallax layers with mouse + scroll parallax) + random shooting stars + the constellation in the hero.
 - State-of-the-art parallax: spring-smoothed mouse parallax (3 rates) + scroll parallax (3 rates) + the constellation's own internal mouse parallax (3 layers). Move your mouse to see the stars shift in 3D depth.
+
+---
+Task ID: 17
+Agent: general-purpose
+Task: Remove ALL pet (cat) and scare summon features from src/app/page.tsx
+
+Work Log:
+- Read /home/z/my-project/worklog.md to review prior agent history (Tasks 1-16: API cataloging, OOM diagnosis/fix, deep audit, Three.js landing page, Fourier removal, constellation hero, etc.).
+- Read the full 3,030-line src/app/page.tsx in chunks to map every cat/scare reference. Confirmed 6 distinct code regions needed removal.
+- Removed the `Cat` icon import (line 53) from lucide-react — was only referenced by the cat UI JSX. Also removed `Volume2` import — was only referenced by the cat "Speak" button (verified via grep; `Eye`, `Bell`, etc. are still used elsewhere).
+- Removed the 13 cat/scare state variables (`isScaredActive`, `scareOverlayText`, `isCatActive`, `isPersistentCat`, `catSpeedSetting`, `isCatControlOpen`, `customCatText`, `activeCatGif`, `activeCatMessage`, `activeCatColor`, `catPos`, `catTarget`, `catFacingLeft`, `catBehavior`, `catClickCount`) from the state declarations block. Renamed the section comment from "Horror jumpscare and student administration controls" to "Student administration controls" (only `studentsList` remains in that block).
+- Removed `triggerHorrorScreamerSound` function (~32 lines, uses `window.AudioContext`) and `triggerCuteCatMeowSound` function (~158 lines, 4 sub-synths: meow beep, boing, laser meow, purr LFO, plus `navigator.vibrate`). These were the only `AudioContext` users in the file.
+- Removed `selectRandomRealCat` helper (random-pick from 4-cat gif pool) and `selectCatBreedByName` helper (4-breed gif map).
+- Removed the cat movement animation `useEffect` (~105 lines, 45ms `setInterval`, calls `setCatPos`/`setCatTarget`/`setCatBehavior`/`setCatFacingLeft`/`setActiveCatMessage`, dependency array `[isCatActive, isPersistentCat, catSpeedSetting]`).
+- Removed the entire `checkScareStatus` polling `useEffect` (~63 lines, polled `/api/users/scare-status` + `/api/users/clear-scare` + `/api/users/clear-cat` every 10 seconds). This was the CRITICAL removal — it hammered the DB every 10s per active user. The empty `if (!user) return;` guard + `setInterval(checkScareStatus, 10000)` + cleanup are all gone.
+- Updated the stale comment on the workspace-refresh `useEffect` that mentioned "plus the existing 1s polling for scare/cat status" — that line was now factually wrong, replaced with a clean "We now use a lightweight 30s polling interval for workspace refresh." note.
+- Removed 33 `void X;` / `void setX;` suppressions for the deleted cat/scare state vars + helpers from the unused-import guard block. Kept the legitimate ones (`void setUser;`, `void studentsList;`, `void promoteEmail;`, etc.) intact.
+- Removed the JSX rendering block (~297 lines):
+  - The `{isScaredActive && (...)}` fullscreen "Instructor Broadcast Spotlight" overlay (gradient flares, ✦ badge, `scareOverlayText` heading).
+  - The `{false && (isCatActive || isPersistentCat) && (...)}` walking-cat overlay (speech bubble, clickable gif, `setCatClickCount`/`setCatBehavior`/`setCatTarget`/`triggerCuteCatMeowSound` calls).
+  - The `{false && user?.role === 'admin' || user?.role === 'super_admin' && (...)}` pet companion controller (admin-only floating panel with breed picker, speed toggle, custom-speech input, "Speak" button, and the floating "Summon Pet Companion" trigger button).
+- Verified no remaining references via targeted regex grep with word boundaries (`\bscare\b`, `\bcat\b`, `horrorScreamer`, `cuteCat`, `\bmeow\b`, `AudioContext`, `catPos`, `catBehavior`, `isPersistentCat`, `isCatActive`, `triggerHorror`, `triggerCute`, `selectRandomRealCat`, `selectCatBreed`, `isScaredActive`, `setScaredActive`, `scareOverlayText`, `isCatControlOpen`, `catSpeedSetting`, `customCatText`, `activeCatGif`, `activeCatMessage`, `activeCatColor`, `catTarget`, `catFacingLeft`, `catClickCount`) — 0 matches.
+- Verified the file still compiles cleanly: `npx tsc --noEmit` exits 0; `npx eslint src/app/page.tsx` exits 0.
+
+Verification:
+- `npx tsc --noEmit` — clean (exit 0)
+- `npx eslint src/app/page.tsx` — clean (exit 0)
+- File reduced from 3,029 lines to 2,257 lines (−772 lines of dead cat/scare code).
+- Zero remaining references to scare/cat/horrorScreamer/cuteCat/meow/AudioContext/catPos/catBehavior/isPersistentCat/isCatActive/triggerHorror/triggerCute.
+- View routing logic, sidebar, header, footer, subject/folder/gallery/dashboard views, API calls, and data fetching are all untouched.
+
+Stage Summary:
+- Files changed: src/app/page.tsx (single-file surgical removal of all cat/scare summon features)
+- Removed 2 lucide-react imports (`Cat`, `Volume2`), 15 state variables, 2 sound synth functions (with AudioContext), 2 helper functions, 2 useEffect hooks (cat animation + scare-status DB polling), 33 `void` suppressions, and 3 JSX overlay blocks (scare overlay, walking-cat overlay, pet companion controller).
+- The 10-second `/api/users/scare-status` polling loop that was hammering the DB is fully gone — every active user no longer adds a 1Hz-equivalent DB read for a feature that has been visually disabled with `{false && ...}` for the entire cat UI.
+- All non-cat/non-scare code is intact; the file builds clean with no dangling references.

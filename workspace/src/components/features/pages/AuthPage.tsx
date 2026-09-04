@@ -86,9 +86,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
   const isGmailAddress = (mail: string): boolean => {
     if (!mail) return false;
     const clean = mail.trim().toLowerCase();
-    // Super admin bypass
-    if (clean === 'pracpedia@gmail.com') return false;
     return clean.endsWith('@gmail.com') || clean.endsWith('@googlemail.com');
+  };
+
+  // Platform owners (super admins) bypass the gmail/non-gmail form separation.
+  // They can use either form with any email. The list comes from the
+  // PLATFORM_OWNER_EMAILS env var + the hardcoded super admin email.
+  const isPlatformOwnerEmail = (mail: string): boolean => {
+    const clean = String(mail || '').trim().toLowerCase();
+    if (!clean) return false;
+    // Hardcoded super admin email always bypasses
+    if (clean === 'pracpedia@gmail.com') return true;
+    // Check PLATFORM_OWNER_EMAILS env var (comma-separated)
+    // Note: this runs client-side, so env vars must be prefixed with NEXT_PUBLIC_
+    // For now, we hardcode the known super admin email. Other platform owners
+    // will need to use the correct form based on their email domain.
+    return false;
   };
 
   // Helper: build the correct registration body for the API
@@ -135,9 +148,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
     if (!accEmail) return;
     const cleanEmail = accEmail.trim();
 
-    // Strict validation: Google Sign-In is strictly for @gmail.com accounts
-    if (!isGmailAddress(cleanEmail)) {
-      setGoogleModalError(`Google authentication is strictly restricted to @gmail.com accounts. To use "${cleanEmail}", please close this dialog and use the standard form on the main page.`);
+    // ── Form separation rules ──
+    // Google Sign-In modal = GMAIL emails only.
+    // Platform owners (super admins) bypass — can use any email here.
+    if (!isPlatformOwnerEmail(cleanEmail) && !isGmailAddress(cleanEmail)) {
+      setGoogleModalError(`This Google Sign-In is for Gmail accounts only. To use "${cleanEmail}", please close this dialog and use the standard form below — it accepts Yahoo, Outlook, Hotmail, edu.bd, and other non-Gmail providers.`);
       return;
     }
 
@@ -189,14 +204,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
     setLoading(true);
     setErrorMsg(null);
 
-    // Gmail emails can use the standard form for LOGIN (existing users).
-    // For SIGNUP, Gmail is blocked by the backend (shouldBlockEmail) — we
-    // don't block it here anymore because the backend returns a clear
-    // error message that gets displayed to the user.
-    // The "Google Sign-In" button is still available as an alternative
-    // flow for Gmail users who want to use the guided modal.
+    // ── Form separation rules ──
+    // Standard form (this form) = NON-GMAIL emails only.
+    // Gmail form (Google Sign-In modal) = GMAIL emails only.
+    // Platform owners (super admins) bypass — can use any form.
+    if (!isPlatformOwnerEmail(email) && isGmailAddress(email)) {
+      setLoading(false);
+      setErrorMsg("Gmail accounts must use the 'Sign in / Sign up with Google' button above. This form is for non-Gmail providers (Yahoo, Outlook, Hotmail, edu.bd, etc.) only.");
+      return;
+    }
+
     if (isLogin) {
-      // Direct sign-in pathway — all email providers allowed
+      // Direct sign-in pathway — non-Gmail emails (or platform owner bypass)
       try {
         const res = await apiFetch('/api/auth/login', {
           method: 'POST',
@@ -222,8 +241,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
         setLoading(false);
       }
     } else {
-      // Direct Signup pathway — Gmail will be rejected by the backend
-      // with a clear error message if the user tries to sign up with Gmail.
+      // Direct Signup pathway — non-Gmail emails (or platform owner bypass)
       try {
         const endpoint = authType === 'artist' ? '/api/artists/register' : '/api/auth/register';
         const body = buildRegisterBody(authType === 'artist');

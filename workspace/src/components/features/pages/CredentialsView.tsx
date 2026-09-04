@@ -283,6 +283,14 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ onBack, active
         setForbidden(true);
         return;
       }
+      if (res.status === 404) {
+        // 404 = test mode is disabled (isTestModeSafe() returned false).
+        // This means PRACPEDIA_TEST_PASSWORDS_VISIBLE is not set to 'true'
+        // OR the app is running in production. Show a clear message instead
+        // of a confusing "Not found" error.
+        setErrorMsg('Credentials viewer is disabled. Set PRACPEDIA_TEST_PASSWORDS_VISIBLE=true in your .env file and ensure NODE_ENV is not "production".');
+        return;
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setErrorMsg(err.error || `Failed to load credentials (HTTP ${res.status})`);
