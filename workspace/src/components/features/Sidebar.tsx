@@ -143,7 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {user.role}
                 </span>
 
-                {user.role === 'admin' || user.role === 'super_admin' && !isPlatformOwner(user.email) && (
+                {((user.role === 'admin' || user.role === 'super_admin') && !isPlatformOwner(user.email)) && (
                   <button
                     onClick={async () => {
                       if (!confirmResign) {
@@ -161,12 +161,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         } else {
                           const err = await res.json().catch(() => ({}));
                           setConfirmResign(false);
-                          // Temporarily display on console or keep flow safe
-                          console.error("Resignation failure:", err.error || "Declined");
+                          // Surface the error to the user instead of silently
+                          // logging to console. Platform owners get 403.
+                          alert(err.error || 'Resignation declined. You may not have permission to resign.');
                         }
                       } catch (e) {
                         setConfirmResign(false);
-                        console.error("Resignation failure:", e);
+                        alert('Network error during resignation. Please try again.');
                       }
                     }}
                     className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded cursor-pointer transition-all ${

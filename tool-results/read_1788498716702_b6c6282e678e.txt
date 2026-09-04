@@ -1,0 +1,1049 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useRef } from 'react';
+     4→import { useAuth } from '@/contexts/AuthContext';
+     5→import { Logo } from '@/components/features/Logo';
+     6→import {
+     7→  User,
+     8→  Mail,
+     9→  Lock,
+    10→  ArrowLeft,
+    11→  Loader2,
+    12→  Sparkles,
+    13→  AlertCircle,
+    14→  Paintbrush,
+    15→  GraduationCap,
+    16→  ShieldCheck,
+    17→  CheckCircle2,
+    18→  X,
+    19→  Shield,
+    20→  Eye,
+    21→  EyeOff,
+    22→  Check,
+    23→  ArrowRight,
+    24→  Atom,
+    25→} from 'lucide-react';
+    26→import { motion, AnimatePresence } from 'framer-motion';
+    27→
+    28→interface AuthPageProps {
+    29→  onSuccess: () => void;
+    30→  onGoBack: () => void;
+    31→  /** Initial mode for the auth form. 'login' (default) or 'register'. */
+    32→  initialMode?: 'login' | 'register';
+    33→}
+    34→
+    35→export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initialMode = 'login' }) => {
+    36→  const { login, apiFetch } = useAuth();
+    37→  const passwordRef = useRef<HTMLInputElement>(null);
+    38→
+    39→  // Safely parse a fetch Response as JSON. If the server returned an HTML error
+    40→  // page (404 / 500 / Next.js error boundary), `res.json()` would throw a
+    41→  // cryptic "Unexpected token '<'" — this helper converts that into a friendly
+    42→  // error message that gets shown in the form's error banner.
+    43→  const safeJson = async (res: Response): Promise<{ error?: string; token?: string; user?: any }> => {
+    44→    const contentType = res.headers.get('content-type') || '';
+    45→    if (!contentType.includes('application/json')) {
+    46→      // Non-JSON response — likely an HTML error page from Next.js or a proxy.
+    47→      return { error: `Server returned a non-JSON response (HTTP ${res.status}). Please try again.` };
+    48→    }
+    49→    try {
+    50→      return await res.json();
+    51→    } catch {
+    52→      return { error: 'Server returned an invalid response. Please try again.' };
+    53→    }
+    54→  };
+    55→
+    56→  // Custom 2-way Auth Segment Choice: 'student' | 'artist'
+    57→  const [authType, setAuthType] = useState<'student' | 'artist'>('student');
+    58→  const [isLogin, setIsLogin] = useState(initialMode === 'login');
+    59→
+    60→  // Standard Fields
+    61→  const [name, setName] = useState('');
+    62→  const [email, setEmail] = useState('');
+    63→  const [password, setPassword] = useState('');
+    64→  const [showPassword, setShowPassword] = useState(false);
+    65→  const [phoneNumber, setPhoneNumber] = useState('');
+    66→  const [loading, setLoading] = useState(false);
+    67→  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    68→
+    69→  // Google Sign-In Modal State
+    70→  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+    71→  const [googleEmailInput, setGoogleEmailInput] = useState('');
+    72→  const [googlePasswordInput, setGooglePasswordInput] = useState('');
+    73→  const [googleShowPassword, setGoogleShowPassword] = useState(false);
+    74→  const [googleModalError, setGoogleModalError] = useState<string | null>(null);
+    75→  const [googleModalLoading, setGoogleModalLoading] = useState(false);
+    76→  const [googleNotice, setGoogleNotice] = useState<string | null>(null);
+    77→
+    78→  // Artist Special Signup Fields
+    79→  const [artistRate, setArtistRate] = useState('150');
+    80→  const [artistBio, setArtistBio] = useState('Senior STEM scholar & precision illustrator specializing in optical diagrams and anatomical specimens.');
+    81→  const [artistSpecialties, setArtistSpecialties] = useState('Physics Optics, Biology Physiology, Chemistry Apparatus');
+    82→
+    83→  // Avatar Profile Pic Field
+    84→  const [profilePic, setProfilePic] = useState('');
+    85→
+    86→  const isGmailAddress = (mail: string): boolean => {
+    87→    if (!mail) return false;
+    88→    const clean = mail.trim().toLowerCase();
+    89→    return clean.endsWith('@gmail.com') || clean.endsWith('@googlemail.com');
+    90→  };
+    91→
+    92→  // Platform owners (super admins) bypass the gmail/non-gmail form separation.
+    93→  // They can use either form with any email. The list comes from the
+    94→  // PLATFORM_OWNER_EMAILS env var + the hardcoded super admin email.
+    95→  const isPlatformOwnerEmail = (mail: string): boolean => {
+    96→    const clean = String(mail || '').trim().toLowerCase();
+    97→    if (!clean) return false;
+    98→    // Hardcoded super admin email always bypasses
+    99→    if (clean === 'pracpedia@gmail.com') return true;
+   100→    // Check PLATFORM_OWNER_EMAILS env var (comma-separated)
+   101→    // Note: this runs client-side, so env vars must be prefixed with NEXT_PUBLIC_
+   102→    // For now, we hardcode the known super admin email. Other platform owners
+   103→    // will need to use the correct form based on their email domain.
+   104→    return false;
+   105→  };
+   106→
+   107→  // Helper: build the correct registration body for the API
+   108→  const buildRegisterBody = (isArtist: boolean) => {
+   109→    const avatarUrl = profilePic || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name || email)}`;
+   110→    if (isArtist) {
+   111→      return {
+   112→        name: name.trim(),
+   113→        email: email.trim().toLowerCase(),
+   114→        password,
+   115→        phoneNumber: phoneNumber.trim() || undefined,
+   116→        profilePic: avatarUrl,
+   117→        bio: artistBio || undefined,
+   118→        rateDrawingOnly: Number(artistRate) || 150,
+   119→        rateDrawingWriting: (Number(artistRate) || 150) * 2,
+   120→        notebookCost: 100,
+   121→        specialties: artistSpecialties.split(',').map(s => s.trim()).filter(Boolean),
+   122→        isAvailable: true,
+   123→      };
+   124→    }
+   125→    return {
+   126→      name: name.trim(),
+   127→      email: email.trim().toLowerCase(),
+   128→      password,
+   129→      phoneNumber: phoneNumber.trim() || undefined,
+   130→      role: 'user',
+   131→      profilePic: avatarUrl,
+   132→    };
+   133→  };
+   134→
+   135→  const getPasswordStrength = (pass: string) => {
+   136→    if (!pass) return 0;
+   137→    let score = 0;
+   138→    if (pass.length >= 6) score += 1;
+   139→    if (pass.length >= 8) score += 1;
+   140→    if (/[A-Z]/.test(pass) && /[a-z]/.test(pass)) score += 1;
+   141→    if (/[0-9]/.test(pass) || /[^A-Za-z0-9]/.test(pass)) score += 1;
+   142→    return score;
+   143→  };
+   144→
+   145→  const passScore = getPasswordStrength(password);
+   146→
+   147→  const handleSelectGoogleAccount = async (accEmail: string, accName?: string, accAvatar?: string, accPassword?: string) => {
+   148→    if (!accEmail) return;
+   149→    const cleanEmail = accEmail.trim();
+   150→
+   151→    // ── Form separation rules ──
+   152→    // Google Sign-In modal = GMAIL emails only.
+   153→    // Platform owners (super admins) bypass — can use any email here.
+   154→    if (!isPlatformOwnerEmail(cleanEmail) && !isGmailAddress(cleanEmail)) {
+   155→      setGoogleModalError(`This Google Sign-In is for Gmail accounts only. To use "${cleanEmail}", please close this dialog and use the standard form below — it accepts Yahoo, Outlook, Hotmail, edu.bd, and other non-Gmail providers.`);
+   156→      return;
+   157→    }
+   158→
+   159→    setGoogleModalLoading(true);
+   160→    setGoogleModalError(null);
+   161→
+   162→    try {
+   163→      const res = await apiFetch('/api/auth/google', {
+   164→        method: 'POST',
+   165→        headers: { 'Content-Type': 'application/json' },
+   166→        body: JSON.stringify({
+   167→          email: cleanEmail,
+   168→          name: accName,
+   169→          role: authType,
+   170→          profilePic: accAvatar,
+   171→          password: accPassword || googlePasswordInput || 'google-pass-123'
+   172→        }),
+   173→      });
+   174→
+   175→      const data = await safeJson(res);
+   176→
+   177→      if (!res.ok) {
+   178→        throw new Error(data.error || 'Google authentication failed.');
+   179→      }
+   180→
+   181→      if (data.token && data.user) {
+   182→        setIsGoogleModalOpen(false);
+   183→        login(data.token, data.user);
+   184→        onSuccess();
+   185→      } else {
+   186→        throw new Error('Invalid server Google authentication response.');
+   187→      }
+   188→    } catch (err: any) {
+   189→      setGoogleModalError(err.message || 'Google authentication encountered a network error.');
+   190→    } finally {
+   191→      setGoogleModalLoading(false);
+   192→    }
+   193→  };
+   194→
+   195→  const triggerRealGoogleSignIn = () => {
+   196→    setGoogleNotice(null);
+   197→    setErrorMsg(null);
+   198→    setGoogleModalError(null);
+   199→    setIsGoogleModalOpen(true);
+   200→  };
+   201→
+   202→  const handleSubmit = async (e: React.FormEvent) => {
+   203→    e.preventDefault();
+   204→    setLoading(true);
+   205→    setErrorMsg(null);
+   206→
+   207→    // ── Form separation rules ──
+   208→    // Standard form (this form) = NON-GMAIL emails only.
+   209→    // Gmail form (Google Sign-In modal) = GMAIL emails only.
+   210→    // Platform owners (super admins) bypass — can use any form.
+   211→    if (!isPlatformOwnerEmail(email) && isGmailAddress(email)) {
+   212→      setLoading(false);
+   213→      setErrorMsg("Gmail accounts must use the 'Sign in / Sign up with Google' button above. This form is for non-Gmail providers (Yahoo, Outlook, Hotmail, edu.bd, etc.) only.");
+   214→      return;
+   215→    }
+   216→
+   217→    if (isLogin) {
+   218→      // Direct sign-in pathway — non-Gmail emails (or platform owner bypass)
+   219→      try {
+   220→        const res = await apiFetch('/api/auth/login', {
+   221→          method: 'POST',
+   222→          headers: { 'Content-Type': 'application/json' },
+   223→          body: JSON.stringify({ email, password }),
+   224→        });
+   225→
+   226→        const data = await safeJson(res);
+   227→
+   228→        if (!res.ok) {
+   229→          throw new Error(data.error || 'Authentication process failed.');
+   230→        }
+   231→
+   232→        if (data.token && data.user) {
+   233→          login(data.token, data.user);
+   234→          onSuccess();
+   235→        } else {
+   236→          throw new Error('Invalid server authentication payload returned.');
+   237→        }
+   238→      } catch (err: any) {
+   239→        setErrorMsg(err.message || 'Error executing connection to server API.');
+   240→      } finally {
+   241→        setLoading(false);
+   242→      }
+   243→    } else {
+   244→      // Direct Signup pathway — non-Gmail emails (or platform owner bypass)
+   245→      try {
+   246→        const endpoint = authType === 'artist' ? '/api/artists/register' : '/api/auth/register';
+   247→        const body = buildRegisterBody(authType === 'artist');
+   248→
+   249→        const regRes = await apiFetch(endpoint, {
+   250→          method: 'POST',
+   251→          headers: { 'Content-Type': 'application/json' },
+   252→          body: JSON.stringify(body),
+   253→        });
+   254→
+   255→        const regData = await safeJson(regRes);
+   256→
+   257→        if (!regRes.ok) {
+   258→          throw new Error(regData.error || 'Account registration failed.');
+   259→        }
+   260→
+   261→        if (regData.token && regData.user) {
+   262→          login(regData.token, regData.user);
+   263→          onSuccess();
+   264→        } else {
+   265→          throw new Error('Invalid server registration response.');
+   266→        }
+   267→      } catch (err: any) {
+   268→        setErrorMsg(err.message || 'Error creating account.');
+   269→      } finally {
+   270→        setLoading(false);
+   271→      }
+   272→    }
+   273→  };
+   274→
+   275→  const handleQuickFill = (targetEmail: string, targetPass: string, authSegment: 'student' | 'artist') => {
+   276→    setEmail(targetEmail);
+   277→    setPassword(targetPass);
+   278→    setIsLogin(true);
+   279→    setAuthType(authSegment);
+   280→    setErrorMsg(null);
+   281→  };
+   282→
+   283→  return (
+   284→    <div id="auth_page_container" className="min-h-screen text-slate-100 flex flex-col justify-center items-center relative bg-[#05070e] px-3 sm:px-6 py-6 md:py-12 select-none">
+   285→
+   286→      {/* Background Lighting & Grid */}
+   287→      <div className="absolute top-[-10%] left-[15%] w-[65vw] h-[45vh] rounded-full bg-gradient-to-br from-indigo-600/12 via-cyan-600/8 to-transparent blur-[160px] pointer-events-none" />
+   288→      <div className="absolute bottom-[-10%] right-[10%] w-[55vw] h-[45vh] rounded-full bg-gradient-to-tl from-amber-500/8 via-purple-600/5 to-transparent blur-[160px] pointer-events-none" />
+   289→
+   290→      {/* Main Container Layout */}
+   291→      <div className="w-full max-w-5xl relative z-10 space-y-4 sm:space-y-6">
+   292→
+   293→        {/* Top bar header navigation */}
+   294→        <div className="flex items-center justify-between gap-3 sm:gap-4 px-1">
+   295→          <button
+   296→            id="auth_back_btn"
+   297→            onClick={onGoBack}
+   298→            className="inline-flex items-center gap-2 text-[10px] sm:text-[11px] font-mono font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-400 hover:text-cyan-400 hover:-translate-x-1 transition-all duration-300 cursor-pointer group min-h-[40px]"
+   299→          >
+   300→            <ArrowLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-0.5 transition-transform shrink-0" />
+   301→            <span className="hidden sm:inline">Back to Explorer</span>
+   302→            <span className="sm:hidden">Back</span>
+   303→          </button>
+   304→
+   305→          <div className="flex items-center gap-2.5 min-w-0">
+   306→            <Logo size="lg" />
+   307→            <span className="text-[8px] font-mono uppercase tracking-widest text-slate-400 hidden sm:block">
+   308→              STEM Practical Hub
+   309→            </span>
+   310→          </div>
+   311→
+   312→          <div className="hidden sm:inline-flex items-center gap-2 text-[9px] font-mono font-bold bg-slate-950/80 border border-white/[0.06] px-3.5 py-1.5 rounded-full text-slate-300 uppercase tracking-widest shadow-inner backdrop-blur-md">
+   313→            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
+   314→            <span>256-BIT SSL GATEWAY</span>
+   315→          </div>
+   316→        </div>
+   317→
+   318→        {/* Dynamic Dual-Column Split Architecture */}
+   319→        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
+   320→
+   321→          {/* Left Column: Brand, Spiritual Scholar Blessing & Feature Showcase (Visible on lg+) */}
+   322→          <div className="hidden lg:flex lg:col-span-5 flex-col justify-between p-8 rounded-3xl bg-slate-900/30 border border-white/[0.06] backdrop-blur-xl relative overflow-hidden shadow-2xl">
+   323→            {/* Corner ambient glow */}
+   324→            <div className="absolute top-0 left-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+   325→            <div className="absolute bottom-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+   326→
+   327→            <div className="space-y-6 relative z-10">
+   328→              {/* Rabbi Zidni Ilma Spiritual Blessing */}
+   329→              <motion.div
+   330→                initial={{ opacity: 0, y: -10 }}
+   331→                animate={{ opacity: 1, y: 0 }}
+   332→                transition={{ duration: 0.6 }}
+   333→                className="p-5 rounded-2xl bg-gradient-to-b from-indigo-950/40 via-slate-950/70 to-slate-950/40 border border-indigo-500/20 shadow-lg text-center space-y-2 relative overflow-hidden group"
+   334→              >
+   335→                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-400/40 to-transparent" />
+   336→                <div className="text-2xl font-serif text-amber-200/95 font-semibold tracking-wider leading-relaxed filter drop-shadow-[0_0_10px_rgba(251,191,36,0.25)]">
+   337→                  رَبِّ زِدْنِي عِلْمًا
+   338→                </div>
+   339→                <div className="text-[10px] font-mono font-bold uppercase tracking-[0.25em] text-cyan-300">
+   340→                  Rabbi Zidni Ilma
+   341→                </div>
+   342→                <p className="text-[11px] font-sans text-slate-400 italic">
+   343→                  &quot;O my Lord! Increase me in knowledge &amp; practical mastery.&quot;
+   344→                </p>
+   345→              </motion.div>
+   346→
+   347→              {/* Dynamic Role Highlights */}
+   348→              <div className="space-y-3 pt-2">
+   349→                <div className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+   350→                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+   351→                  <span>Platform Advantages</span>
+   352→                </div>
+   353→
+   354→                <div className="space-y-2.5">
+   355→                  <div className="p-3.5 rounded-2xl bg-slate-950/50 border border-white/[0.04] flex items-start gap-3 group hover:border-cyan-500/30 transition-all">
+   356→                    <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+   357→                      <Atom className="w-4 h-4" />
+   358→                    </div>
+   359→                    <div className="space-y-0.5">
+   360→                      <h4 className="text-xs font-bold text-slate-200 group-hover:text-cyan-300 transition-colors">100% Board Standard Diagrams</h4>
+   361→                      <p className="text-[11px] text-slate-400 leading-relaxed">Exact syllabus alignment for Physics, Chemistry, Biology &amp; Higher Math experiments.</p>
+   362→                    </div>
+   363→                  </div>
+   364→
+   365→                  <div className="p-3.5 rounded-2xl bg-slate-950/50 border border-white/[0.04] flex items-start gap-3 group hover:border-amber-500/30 transition-all">
+   366→                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+   367→                      <Paintbrush className="w-4 h-4" />
+   368→                    </div>
+   369→                    <div className="space-y-0.5">
+   370→                      <h4 className="text-xs font-bold text-slate-200 group-hover:text-amber-300 transition-colors">Specialist Sketch Marketplace</h4>
+   371→                      <p className="text-[11px] text-slate-400 leading-relaxed">Connect directly with verified STEM illustrators for custom hand-drawn lab sheets.</p>
+   372→                    </div>
+   373→                  </div>
+   374→
+   375→                  <div className="p-3.5 rounded-2xl bg-slate-950/50 border border-white/[0.04] flex items-start gap-3 group hover:border-emerald-500/30 transition-all">
+   376→                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+   377→                      <ShieldCheck className="w-4 h-4" />
+   378→                    </div>
+   379→                    <div className="space-y-0.5">
+   380→                      <h4 className="text-xs font-bold text-slate-200 group-hover:text-emerald-300 transition-colors">Direct Verified Safety</h4>
+   381→                      <p className="text-[11px] text-slate-400 leading-relaxed">Direct verified artist collaboration with transparent milestone updates and order accountability.</p>
+   382→                    </div>
+   383→                  </div>
+   384→                </div>
+   385→              </div>
+   386→            </div>
+   387→
+   388→            {/* Bottom active stats snapshot */}
+   389→            <div className="pt-4 border-t border-white/[0.05] flex items-center justify-between text-[11px] text-slate-400">
+   390→              <div className="flex items-center gap-1.5">
+   391→                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+   392→                <span className="font-mono font-semibold text-slate-300">54+ Modules Ready</span>
+   393→              </div>
+   394→              <div className="font-mono text-[10px] text-slate-400">
+   395→                v2.4 Production Build
+   396→              </div>
+   397→            </div>
+   398→          </div>
+   399→
+   400→          {/* Right Column: Central Interactive Auth Form Card */}
+   401→          <div className="lg:col-span-7 flex flex-col justify-center">
+   402→            <div
+   403→              id="auth_card"
+   404→              className="rounded-3xl border border-white/[0.07] bg-slate-900/40 backdrop-blur-2xl p-4 sm:p-7 md:p-8 shadow-[0_30px_90px_-20px_rgba(0,0,0,0.9)] hover:border-white/[0.12] transition-all duration-300 relative overflow-hidden space-y-5 sm:space-y-6"
+   405→            >
+   406→              {/* Subtle top laser glow bar */}
+   407→              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/60 to-indigo-500/60" />
+   408→
+   409→              {/* Mobile Rabbi Zidni Ilma Banner (Small Screens Only) */}
+   410→              <div className="lg:hidden block text-center pb-2 border-b border-white/[0.04]">
+   411→                <div className="text-lg sm:text-xl font-serif text-amber-200/90 font-medium tracking-wide">
+   412→                  رَبِّ زِدْنِي عِلْمًا
+   413→                </div>
+   414→                <div className="text-[9px] font-mono text-cyan-400 uppercase tracking-widest mt-0.5">
+   415→                  &quot;O my Lord! Increase me in knowledge&quot;
+   416→                </div>
+   417→              </div>
+   418→
+   419→              {/* Modern Segmented Class Selector */}
+   420→              <div className="space-y-2">
+   421→                <div className="flex items-center justify-between px-1 gap-2">
+   422→                  <span className="text-[9px] font-mono font-bold uppercase tracking-[0.16em] text-slate-400 truncate">
+   423→                    Account Classification
+   424→                  </span>
+   425→                  <span className="text-[9px] font-mono text-cyan-400/90 whitespace-nowrap">
+   426→                    {authType === 'student' ? 'Scholar Access' : 'Illustrator Access'}
+   427→                  </span>
+   428→                </div>
+   429→
+   430→                <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-slate-950/80 border border-white/[0.05] shadow-inner">
+   431→                  {/* Option 1: Student */}
+   432→                  <button
+   433→                    type="button"
+   434→                    onClick={() => {
+   435→                      setAuthType('student');
+   436→                      setErrorMsg(null);
+   437→                    }}
+   438→                    className={`relative flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 cursor-pointer text-xs font-bold min-h-[44px] ${
+   439→                      authType === 'student'
+   440→                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/20 border border-indigo-400/30'
+   441→                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
+   442→                    }`}
+   443→                  >
+   444→                    <GraduationCap className={`w-4 h-4 shrink-0 ${authType === 'student' ? 'text-amber-300' : 'text-slate-400'}`} />
+   445→                    <span className="tracking-tight">Student / Scholar</span>
+   446→                  </button>
+   447→
+   448→                  {/* Option 2: Artist */}
+   449→                  <button
+   450→                    type="button"
+   451→                    onClick={() => {
+   452→                      setAuthType('artist');
+   453→                      setErrorMsg(null);
+   454→                    }}
+   455→                    className={`relative flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 cursor-pointer text-xs font-bold min-h-[44px] ${
+   456→                      authType === 'artist'
+   457→                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20 border border-amber-300/40'
+   458→                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
+   459→                    }`}
+   460→                  >
+   461→                    <Paintbrush className="w-4 h-4 shrink-0" />
+   462→                    <span className="tracking-tight">Sketch Artist</span>
+   463→                  </button>
+   464→                </div>
+   465→              </div>
+   466→
+   467→              {/* Title & Purpose Header */}
+   468→              <div className="space-y-1">
+   469→                <div className="flex items-center justify-between gap-3 flex-wrap">
+   470→                  <h2 className="text-xl sm:text-2xl font-extrabold font-sans tracking-tight text-white">
+   471→                    {isLogin ? (
+   472→                      authType === 'artist' ? 'Artist Studio Login' : 'Welcome Back'
+   473→                    ) : (
+   474→                      authType === 'artist' ? 'Join as Lab Artist' : 'Create Scholar Account'
+   475→                    )}
+   476→                  </h2>
+   477→
+   478→                  {/* Switch Login / Register Toggle Badge */}
+   479→                  <button
+   480→                    type="button"
+   481→                    onClick={() => {
+   482→                      setIsLogin(!isLogin);
+   483→                      setErrorMsg(null);
+   484→                    }}
+   485→                    className="text-[11px] font-sans text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer underline underline-offset-4 decoration-cyan-500/40 hover:decoration-cyan-400 transition-colors min-h-[32px]"
+   486→                  >
+   487→                    {isLogin ? "Need an account?" : "Already registered?"}
+   488→                  </button>
+   489→                </div>
+   490→                <p className="text-xs text-slate-400 leading-relaxed">
+   491→                  {authType === 'student' ? (
+   492→                    isLogin
+   493→                      ? 'Sign in to access diagrams, AI Academy experiments, and commission sketch artists.'
+   494→                      : 'Create your account to download interactive lab files and request custom sketch plates.'
+   495→                  ) : (
+   496→                    isLogin
+   497→                      ? 'Log in to manage drawing orders, publish portfolio plates, and withdraw earnings.'
+   498→                      : 'Register your studio to offer precision practical sketches to students nationwide.'
+   499→                  )}
+   500→                </p>
+   501→              </div>
+   502→
+   503→              {/* Fast Google Auth Pathway (Strictly for @gmail.com) */}
+   504→              <div className="space-y-3">
+   505→                <button
+   506→                  type="button"
+   507→                  onClick={triggerRealGoogleSignIn}
+   508→                  className="w-full py-3.5 px-4 bg-slate-950/80 hover:bg-slate-950 text-slate-100 font-bold border border-blue-500/30 hover:border-blue-400/70 rounded-2xl transition-all duration-200 flex items-center justify-between shadow-lg shadow-blue-500/5 cursor-pointer active:scale-[0.99] group min-h-[48px]"
+   509→                >
+   510→                  <div className="flex items-center gap-3 min-w-0">
+   511→                    <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+   512→                      <path
+   513→                        fill="#4285F4"
+   514→                        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+   515→                      />
+   516→                      <path
+   517→                        fill="#34A853"
+   518→                        d="M12 24c3.24 0 5.95-1.08 7.93-2.92l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.15C3.26 21.3 7.31 24 12 24z"
+   519→                      />
+   520→                      <path
+   521→                        fill="#FBBC05"
+   522→                        d="M5.28 14.23c-.25-.72-.38-1.49-.38-2.23s.13-1.51.38-2.23V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.15z"
+   523→                      />
+   524→                      <path
+   525→                        fill="#EA4335"
+   526→                        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.15c.95-2.85 3.6-4.96 6.72-4.96z"
+   527→                      />
+   528→                    </svg>
+   529→                    <span className="text-xs font-sans font-semibold tracking-tight text-slate-200 group-hover:text-white truncate text-left">
+   530→                      {isLogin ? 'Sign in with Google (Gmail only)' : `Sign up with Google (Gmail only)`}
+   531→                    </span>
+   532→                  </div>
+   533→                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/40 group-hover:bg-blue-500/30 transition-all whitespace-nowrap shrink-0">
+   534→                    GMAIL ONLY
+   535→                  </span>
+   536→                </button>
+   537→
+   538→                <div className="relative flex items-center justify-center my-2">
+   539→                  <div className="border-t border-white/[0.08] w-full" />
+   540→                  <span className="bg-[#0b0f19] px-3 text-[8.5px] font-mono font-bold text-slate-400 uppercase tracking-widest shrink-0 text-center">
+   541→                    OR USE YAHOO, OUTLOOK &amp; ALL OTHER EMAIL PROVIDERS
+   542→                  </span>
+   543→                  <div className="border-t border-white/[0.08] w-full" />
+   544→                </div>
+   545→              </div>
+   546→
+   547→              {/* Feedback Notices */}
+   548→              {googleNotice && (
+   549→                <div className="p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl flex items-start gap-2.5 text-xs text-emerald-300 animate-in fade-in slide-in-from-top-1 duration-200">
+   550→                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+   551→                  <div className="min-w-0">
+   552→                    <span className="font-bold text-emerald-200 block">Gmail Account Linked</span>
+   553→                    <span className="text-[11px] text-emerald-300/80 break-words">{googleNotice}</span>
+   554→                  </div>
+   555→                </div>
+   556→              )}
+   557→
+   558→              {errorMsg && (
+   559→                <div id="auth_error_box" className="p-3.5 bg-rose-500/10 border border-rose-500/25 rounded-2xl flex flex-col gap-2 text-xs text-rose-300 animate-in fade-in slide-in-from-top-1 duration-200">
+   560→                  <div className="flex items-start gap-2.5">
+   561→                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+   562→                    <span className="leading-relaxed font-sans flex-1 break-words">{errorMsg}</span>
+   563→                  </div>
+   564→                  {isGmailAddress(email) && (
+   565→                    <div className="pl-6 pt-1">
+   566→                      <button
+   567→                        type="button"
+   568→                        onClick={triggerRealGoogleSignIn}
+   569→                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition-colors cursor-pointer shadow-sm min-h-[40px]"
+   570→                      >
+   571→                        <span>Open Google Sign-In</span>
+   572→                        <ArrowRight className="w-3.5 h-3.5" />
+   573→                      </button>
+   574→                    </div>
+   575→                  )}
+   576→                </div>
+   577→              )}
+   578→
+   579→              {/* Standard Email Authentication Form (Strictly for Yahoo, Outlook, Hotmail, etc.) */}
+   580→              <form onSubmit={handleSubmit} className="space-y-4">
+   581→
+   582→                {/* 1. Name Field (Only on Register) */}
+   583→                {!isLogin && (
+   584→                  <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+   585→                    <label className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-400 block px-1">
+   586→                      Full Name <span className="text-cyan-400">*</span>
+   587→                    </label>
+   588→                    <div className="relative flex items-center">
+   589→                      <span className="absolute left-3.5 text-slate-500">
+   590→                        <User className="w-4 h-4 text-cyan-400" />
+   591→                      </span>
+   592→                      <input
+   593→                        type="text"
+   594→                        required
+   595→                        value={name}
+   596→                        onChange={(e) => setName(e.target.value)}
+   597→                        placeholder="e.g. Mahabub Rahman"
+   598→                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 rounded-xl pl-11 pr-4 py-2.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none transition-all font-sans min-h-[44px]"
+   599→                      />
+   600→                    </div>
+   601→                  </div>
+   602→                )}
+   603→
+   604→                {/* 2. Universal Email Field (Non-Gmail) */}
+   605→                <div className="space-y-1.5">
+   606→                  <div className="flex items-center justify-between px-1 gap-2">
+   607→                    <label className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-400 block">
+   608→                      Email Address (Non-Gmail) <span className="text-cyan-400">*</span>
+   609→                    </label>
+   610→                    <span className="text-[8.5px] font-mono text-amber-400/90 font-bold whitespace-nowrap">
+   611→                      Yahoo / Outlook / Other
+   612→                    </span>
+   613→                  </div>
+   614→                  <div className="relative flex items-center">
+   615→                    <span className="absolute left-3.5 text-slate-500">
+   616→                      <Mail className="w-4 h-4 text-cyan-400" />
+   617→                    </span>
+   618→                    <input
+   619→                      type="email"
+   620→                      required
+   621→                      value={email}
+   622→                      onChange={(e) => {
+   623→                        setEmail(e.target.value);
+   624→                        if (errorMsg) setErrorMsg(null);
+   625→                      }}
+   626→                      placeholder="e.g. user@yahoo.com, student@outlook.com, scholar@hotmail.com"
+   627→                      className={`w-full bg-slate-950/80 border rounded-xl pl-11 pr-4 py-2.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none transition-all font-sans min-h-[44px] ${
+   628→                        isGmailAddress(email)
+   629→                          ? 'border-amber-500/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20'
+   630→                          : 'border-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10'
+   631→                      }`}
+   632→                    />
+   633→                  </div>
+   634→
+   635→                  {/* Real-time Inline Helper Warning if user types a @gmail.com address in standard form */}
+   636→                  {isGmailAddress(email) && (
+   637→                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2 text-[11px] text-amber-300 animate-in fade-in duration-200 mt-1.5">
+   638→                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+   639→                      <div className="leading-snug">
+   640→                        <strong className="block text-amber-200">Gmail Address Detected</strong>
+   641→                        <span>
+   642→                          Please use the <strong>&quot;Sign in with Google&quot;</strong> button above. This form is reserved for Yahoo, Outlook, Hotmail, and other non-Google providers.
+   643→                        </span>
+   644→                        <button
+   645→                          type="button"
+   646→                          onClick={triggerRealGoogleSignIn}
+   647→                          className="mt-1 block text-cyan-300 hover:text-cyan-200 underline font-bold cursor-pointer"
+   648→                        >
+   649→                          Switch to Google Sign-In →
+   650→                        </button>
+   651→                      </div>
+   652→                    </div>
+   653→                  )}
+   654→                </div>
+   655→
+   656→                {/* 3. Password Field with Visibility Toggle */}
+   657→                <div className="space-y-1.5">
+   658→                  <div className="flex items-center justify-between px-1 gap-2">
+   659→                    <label className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-400 block">
+   660→                      Password <span className="text-cyan-400">*</span>
+   661→                    </label>
+   662→                    {!isLogin && (
+   663→                      <span className="text-[8.5px] font-mono text-slate-400 whitespace-nowrap">
+   664→                        {passScore <= 1 ? 'Weak' : passScore <= 3 ? 'Medium' : 'Strong'}
+   665→                      </span>
+   666→                    )}
+   667→                  </div>
+   668→                  <div className="relative flex items-center">
+   669→                    <span className="absolute left-3.5 text-slate-500">
+   670→                      <Lock className="w-4 h-4 text-amber-400/80" />
+   671→                    </span>
+   672→                    <input
+   673→                      ref={passwordRef}
+   674→                      type={showPassword ? 'text' : 'password'}
+   675→                      required
+   676→                      value={password}
+   677→                      onChange={(e) => setPassword(e.target.value)}
+   678→                      placeholder="••••••••"
+   679→                      className="w-full bg-slate-950/80 border border-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 rounded-xl pl-11 pr-11 py-2.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none transition-all font-sans min-h-[44px]"
+   680→                    />
+   681→                    <button
+   682→                      type="button"
+   683→                      onClick={() => setShowPassword(!showPassword)}
+   684→                      className="absolute right-3 text-slate-500 hover:text-slate-300 p-1 cursor-pointer transition-colors min-h-[32px] min-w-[32px] flex items-center justify-center"
+   685→                      title={showPassword ? "Hide password" : "Show password"}
+   686→                    >
+   687→                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+   688→                    </button>
+   689→                  </div>
+   690→
+   691→                  {/* Visual password strength meter on registration */}
+   692→                  {!isLogin && password && (
+   693→                    <div className="grid grid-cols-4 gap-1.5 pt-1 px-0.5">
+   694→                      <div className={`h-1 rounded-full transition-all duration-300 ${passScore >= 1 ? 'bg-rose-500' : 'bg-slate-800'}`} />
+   695→                      <div className={`h-1 rounded-full transition-all duration-300 ${passScore >= 2 ? 'bg-amber-500' : 'bg-slate-800'}`} />
+   696→                      <div className={`h-1 rounded-full transition-all duration-300 ${passScore >= 3 ? 'bg-cyan-400' : 'bg-slate-800'}`} />
+   697→                      <div className={`h-1 rounded-full transition-all duration-300 ${passScore >= 4 ? 'bg-emerald-400' : 'bg-slate-800'}`} />
+   698→                    </div>
+   699→                  )}
+   700→                </div>
+   701→
+   702→                {/* 4. Phone number input (signup only) */}
+   703→                {!isLogin && (
+   704→                  <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+   705→                    <label className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-400 block px-1">
+   706→                      Mobile Number (For Order SMS Notifications)
+   707→                    </label>
+   708→                    <div className="relative flex items-center">
+   709→                      <span className="absolute left-3.5 text-slate-500 font-mono text-xs">
+   710→                        +88
+   711→                      </span>
+   712→                      <input
+   713→                        type="tel"
+   714→                        value={phoneNumber}
+   715→                        onChange={(e) => setPhoneNumber(e.target.value)}
+   716→                        placeholder="01XXXXXXXXX"
+   717→                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 rounded-xl pl-12 pr-4 py-2.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none transition-all font-sans min-h-[44px]"
+   718→                      />
+   719→                    </div>
+   720→                  </div>
+   721→                )}
+   722→
+   723→                {/* 5. Artist Custom Registration Fields */}
+   724→                {!isLogin && authType === 'artist' && (
+   725→                  <div className="space-y-3 p-4 bg-amber-500/[0.03] rounded-2xl border border-amber-500/15 animate-in fade-in slide-in-from-top-2 duration-300">
+   726→                    <div className="text-[10px] uppercase font-mono font-bold tracking-widest text-amber-400 pb-1.5 border-b border-white/[0.06] flex items-center justify-between gap-2 flex-wrap">
+   727→                      <span className="flex items-center gap-1.5">
+   728→                        <Paintbrush className="w-3.5 h-3.5 shrink-0" /> Illustrator Parameters
+   729→                      </span>
+   730→                      <span className="text-[9px] font-mono text-slate-400">BDT Rates</span>
+   731→                    </div>
+   732→
+   733→                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   734→                      <div className="space-y-1">
+   735→                        <label className="text-[8.5px] font-mono uppercase font-bold text-slate-400 block px-1">
+   736→                          Base Rate (৳ BDT Per Sheet)
+   737→                        </label>
+   738→                        <input
+   739→                          type="number"
+   740→                          value={artistRate}
+   741→                          onChange={(e) => setArtistRate(e.target.value)}
+   742→                          required
+   743→                          min={50}
+   744→                          max={2000}
+   745→                          placeholder="150"
+   746→                          className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-700 focus:outline-none font-mono min-h-[44px]"
+   747→                        />
+   748→                      </div>
+   749→
+   750→                      <div className="space-y-1">
+   751→                        <label className="text-[8.5px] font-mono uppercase font-bold text-slate-400 block px-1">
+   752→                          Subject Specialties
+   753→                        </label>
+   754→                        <input
+   755→                          type="text"
+   756→                          value={artistSpecialties}
+   757→                          onChange={(e) => setArtistSpecialties(e.target.value)}
+   758→                          required
+   759→                          placeholder="Optics, Circuits, Botany..."
+   760→                          className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-700 focus:outline-none font-sans min-h-[44px]"
+   761→                        />
+   762→                      </div>
+   763→                    </div>
+   764→
+   765→                    <div className="space-y-1">
+   766→                      <label className="text-[8.5px] font-mono uppercase font-bold text-slate-400 block px-1">
+   767→                        Artist Pitch &amp; Bio
+   768→                      </label>
+   769→                      <textarea
+   770→                        value={artistBio}
+   771→                        onChange={(e) => setArtistBio(e.target.value)}
+   772→                        required
+   773→                        rows={2}
+   774→                        placeholder="Tell students about your drawing precision, pencil grading, and turnaround speed..."
+   775→                        className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-700 focus:outline-none resize-none leading-relaxed font-sans"
+   776→                      />
+   777→                    </div>
+   778→                  </div>
+   779→                )}
+   780→
+   781→                {/* Submit Action Button */}
+   782→                <button
+   783→                  id="auth_submit_btn"
+   784→                  type="submit"
+   785→                  disabled={loading}
+   786→                  className={`w-full py-3 rounded-xl text-xs font-black tracking-wider uppercase shadow-xl transition-all duration-200 transform active:scale-[0.98] disabled:opacity-50 disabled:scale-100 cursor-pointer flex items-center justify-center gap-2 border mt-2 min-h-[48px] ${
+   787→                    authType === 'artist'
+   788→                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 border-amber-300/30 shadow-amber-500/10'
+   789→                      : 'bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white border-cyan-400/30 shadow-indigo-600/20'
+   790→                  }`}
+   791→                >
+   792→                  {loading ? (
+   793→                    <>
+   794→                      <Loader2 className="w-4 h-4 animate-spin" />
+   795→                      <span>Authenticating...</span>
+   796→                    </>
+   797→                  ) : isLogin ? (
+   798→                    <>
+   799→                      <span>Enter Platform</span>
+   800→                      <ArrowRight className="w-4 h-4" />
+   801→                    </>
+   802→                  ) : (
+   803→                    <>
+   804→                      <span>Complete Account Setup</span>
+   805→                      <Check className="w-4 h-4" />
+   806→                    </>
+   807→                  )}
+   808→                </button>
+   809→              </form>
+   810→
+   811→              {/* Instant Developer / Testing Presets */}
+   812→              <div className="pt-3 border-t border-white/[0.06] space-y-2 select-none">
+   813→                <div className="text-[9px] font-mono tracking-widest text-slate-400 uppercase font-bold text-center">
+   814→                  ⚡ 1-Click Quick Demo Presets
+   815→                </div>
+   816→                <div className="grid grid-cols-2 gap-2">
+   817→                  <button
+   818→                    type="button"
+   819→                    onClick={() => handleQuickFill('student@gallery.com', 'user123', 'student')}
+   820→                    className="p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-950 border border-white/[0.06] hover:border-indigo-500/40 text-left transition-all duration-200 cursor-pointer group min-h-[56px]"
+   821→                  >
+   822→                    <div className="font-extrabold text-indigo-400 flex items-center gap-1.5 text-xs">
+   823→                      <GraduationCap className="w-3.5 h-3.5 shrink-0" /> Student Demo
+   824→                    </div>
+   825→                    <div className="text-[9px] text-slate-400 truncate mt-0.5 group-hover:text-slate-300 font-mono">student@gallery.com</div>
+   826→                  </button>
+   827→
+   828→                  <button
+   829→                    type="button"
+   830→                    onClick={() => handleQuickFill('sajid@draw.com', 'user123', 'artist')}
+   831→                    className="p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-950 border border-white/[0.06] hover:border-amber-500/40 text-left transition-all duration-200 cursor-pointer group min-h-[56px]"
+   832→                  >
+   833→                    <div className="font-extrabold text-amber-400 flex items-center gap-1.5 text-xs">
+   834→                      <Paintbrush className="w-3.5 h-3.5 shrink-0" /> Artist Demo
+   835→                    </div>
+   836→                    <div className="text-[9px] text-slate-400 truncate mt-0.5 group-hover:text-slate-300 font-mono">sajid@draw.com</div>
+   837→                  </button>
+   838→                </div>
+   839→              </div>
+   840→
+   841→            </div>
+   842→          </div>
+   843→
+   844→        </div>
+   845→
+   846→      </div>
+   847→
+   848→      {/* Modern Google OAuth Modal Dialog */}
+   849→      <AnimatePresence>
+   850→        {isGoogleModalOpen && (
+   851→          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+   852→            <motion.div
+   853→              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+   854→              animate={{ opacity: 1, scale: 1, y: 0 }}
+   855→              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+   856→              className="w-full max-w-md max-h-[92vh] overflow-y-auto bg-[#0d121f] border border-slate-700/70 rounded-3xl p-5 sm:p-6 md:p-7 shadow-[0_25px_70px_rgba(0,0,0,0.9)] relative overflow-hidden space-y-5 font-sans my-auto"
+   857→            >
+   858→              {/* Google Brand Header */}
+   859→              <div className="flex items-center justify-between pb-3 border-b border-white/10 gap-2">
+   860→                <div className="flex items-center gap-2.5 min-w-0">
+   861→                  <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24">
+   862→                    <path
+   863→                      fill="#4285F4"
+   864→                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+   865→                    />
+   866→                    <path
+   867→                      fill="#34A853"
+   868→                      d="M12 24c3.24 0 5.95-1.08 7.93-2.92l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.15C3.26 21.3 7.31 24 12 24z"
+   869→                    />
+   870→                    <path
+   871→                      fill="#FBBC05"
+   872→                      d="M5.28 14.23c-.25-.72-.38-1.49-.38-2.23s.13-1.51.38-2.23V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.15z"
+   873→                    />
+   874→                    <path
+   875→                      fill="#EA4335"
+   876→                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.15c.95-2.85 3.6-4.96 6.72-4.96z"
+   877→                    />
+   878→                  </svg>
+   879→                  <span className="text-sm font-extrabold text-white tracking-tight truncate">Google Accounts</span>
+   880→                </div>
+   881→
+   882→                <button
+   883→                  type="button"
+   884→                  onClick={() => setIsGoogleModalOpen(false)}
+   885→                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer shrink-0 min-h-[32px] min-w-[32px] flex items-center justify-center"
+   886→                >
+   887→                  <X className="w-5 h-5" />
+   888→                </button>
+   889→              </div>
+   890→
+   891→              {/* Title & Subtitle */}
+   892→              <div className="space-y-1">
+   893→                <div className="flex items-center justify-between gap-2 flex-wrap">
+   894→                  <h3 className="text-lg font-bold text-white">Sign in with Google</h3>
+   895→                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 whitespace-nowrap">
+   896→                    @gmail.com ONLY
+   897→                  </span>
+   898→                </div>
+   899→                <p className="text-xs text-slate-400">
+   900→                  Google Sign-In is strictly for <span className="font-bold text-cyan-400">@gmail.com</span> addresses. (For Yahoo, Outlook, or custom domains, use the standard form).
+   901→                </p>
+   902→              </div>
+   903→
+   904→              {/* In-Modal Error Warning */}
+   905→              {googleModalError && (
+   906→                <div className="p-3 bg-rose-500/15 border border-rose-500/30 rounded-xl flex items-start gap-2.5 text-xs text-rose-300 animate-in fade-in slide-in-from-top-1 duration-200">
+   907→                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+   908→                  <div className="leading-relaxed font-sans break-words">{googleModalError}</div>
+   909→                </div>
+   910→              )}
+   911→
+   912→              {/* Quick Select Preset Gmail */}
+   913→              <div className="space-y-1.5">
+   914→                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block">
+   915→                  Quick Select Verified Gmail Account
+   916→                </label>
+   917→                <div className="grid grid-cols-1 gap-2">
+   918→                  <button
+   919→                    type="button"
+   920→                    onClick={() => {
+   921→                      setGoogleModalError(null);
+   922→                      setGoogleEmailInput('scholar.student@gmail.com');
+   923→                      setGooglePasswordInput('student123');
+   924→                    }}
+   925→                    className="p-2.5 bg-slate-950/80 hover:bg-slate-900 border border-slate-700/80 rounded-xl text-left transition-all cursor-pointer flex items-center gap-2 group min-h-[56px]"
+   926→                  >
+   927→                    <div className="w-7 h-7 rounded-full bg-emerald-900/90 text-emerald-300 font-extrabold text-xs flex items-center justify-center shrink-0 border border-emerald-500/30">
+   928→                      S
+   929→                    </div>
+   930→                    <div className="truncate min-w-0">
+   931→                      <div className="text-[11px] font-bold text-slate-200 truncate group-hover:text-emerald-300">scholar...</div>
+   932→                      <div className="text-[9px] text-slate-400 font-mono truncate">@gmail.com (Student)</div>
+   933→                    </div>
+   934→                  </button>
+   935→                </div>
+   936→              </div>
+   937→
+   938→              {/* Google Modal Form */}
+   939→              <form
+   940→                onSubmit={(e) => {
+   941→                  e.preventDefault();
+   942→                  if (!googleEmailInput) return;
+   943→                  if (!isGmailAddress(googleEmailInput)) {
+   944→                    setGoogleModalError('Google Sign-In is strictly restricted to @gmail.com accounts. For Yahoo, Outlook, Hotmail, and all other email providers, please use the standard form on the main page.');
+   945→                    return;
+   946→                  }
+   947→                  handleSelectGoogleAccount(googleEmailInput, undefined, undefined, googlePasswordInput);
+   948→                }}
+   949→                className="space-y-4 pt-1"
+   950→              >
+   951→                <div className="space-y-1.5">
+   952→                  <div className="flex justify-between items-center gap-2">
+   953→                    <label className="text-xs font-bold text-slate-300 block">
+   954→                      Google Email <span className="text-rose-400">*</span>
+   955→                    </label>
+   956→                    <span className="text-[10px] font-mono text-cyan-400 font-semibold whitespace-nowrap">
+   957→                      Must end in @gmail.com
+   958→                    </span>
+   959→                  </div>
+   960→                  <input
+   961→                    type="email"
+   962→                    required
+   963→                    value={googleEmailInput}
+   964→                    onChange={(e) => {
+   965→                      const val = e.target.value;
+   966→                      setGoogleEmailInput(val);
+   967→                      if (val && !isGmailAddress(val) && val.includes('@') && val.split('@')[1].length > 2) {
+   968→                        setGoogleModalError(`Google authentication is strictly restricted to @gmail.com accounts. For ${val.split('@')[1]}, please close this modal and use the standard form on the main page.`);
+   969→                      } else {
+   970→                        if (googleModalError) setGoogleModalError(null);
+   971→                      }
+   972→                    }}
+   973→                    placeholder="yourname@gmail.com"
+   974→                    className={`w-full bg-slate-950/90 border rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-600 outline-none transition-all font-mono min-h-[44px] ${
+   975→                      googleEmailInput && !isGmailAddress(googleEmailInput) && googleEmailInput.includes('@')
+   976→                        ? 'border-rose-500/80 focus:ring-2 focus:ring-rose-500/20'
+   977→                        : 'border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+   978→                    }`}
+   979→                  />
+   980→                </div>
+   981→
+   982→                <div className="space-y-1.5">
+   983→                  <div className="flex justify-between items-center gap-2">
+   984→                    <label className="text-xs font-bold text-slate-300 block">
+   985→                      Password <span className="text-rose-400">*</span>
+   986→                    </label>
+   987→                    <button
+   988→                      type="button"
+   989→                      onClick={() => setGoogleShowPassword(!googleShowPassword)}
+   990→                      className="text-[10px] text-cyan-400 hover:underline cursor-pointer font-semibold min-h-[28px]"
+   991→                    >
+   992→                      {googleShowPassword ? 'Hide password' : 'Show password'}
+   993→                    </button>
+   994→                  </div>
+   995→                  <div className="relative flex items-center">
+   996→                    <input
+   997→                      type={googleShowPassword ? 'text' : 'password'}
+   998→                      required
+   999→                      value={googlePasswordInput}
+  1000→                      onChange={(e) => setGooglePasswordInput(e.target.value)}
+  1001→                      placeholder="••••••••"
+  1002→                      className="w-full bg-slate-950/90 border border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-600 outline-none transition-all font-mono pr-10 min-h-[44px]"
+  1003→                    />
+  1004→                    <Lock className="w-4 h-4 text-slate-500 absolute right-3.5 pointer-events-none" />
+  1005→                  </div>
+  1006→                </div>
+  1007→
+  1008→                <div className="pt-2 flex items-center justify-between gap-3">
+  1009→                  <button
+  1010→                    type="button"
+  1011→                    onClick={() => setIsGoogleModalOpen(false)}
+  1012→                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer min-h-[44px]"
+  1013→                  >
+  1014→                    Cancel
+  1015→                  </button>
+  1016→
+  1017→                  <button
+  1018→                    type="submit"
+  1019→                    disabled={googleModalLoading}
+  1020→                    className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#1a73e8] hover:bg-[#1557b0] shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-2 min-h-[44px]"
+  1021→                  >
+  1022→                    {googleModalLoading ? (
+  1023→                      <>
+  1024→                        <Loader2 className="w-4 h-4 animate-spin" />
+  1025→                        <span>Verifying...</span>
+  1026→                      </>
+  1027→                    ) : (
+  1028→                      <span>Next &amp; Sign In</span>
+  1029→                    )}
+  1030→                  </button>
+  1031→                </div>
+  1032→              </form>
+  1033→
+  1034→              {/* Security Footer Note */}
+  1035→              <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500 gap-2 flex-wrap">
+  1036→                <span className="flex items-center gap-1">
+  1037→                  <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+  1038→                  Google OAuth 2.0 Security
+  1039→                </span>
+  1040→                <span className="font-mono whitespace-nowrap">TLS 1.3 Encryption</span>
+  1041→              </div>
+  1042→            </motion.div>
+  1043→          </div>
+  1044→        )}
+  1045→      </AnimatePresence>
+  1046→    </div>
+  1047→  );
+  1048→};
+  1049→

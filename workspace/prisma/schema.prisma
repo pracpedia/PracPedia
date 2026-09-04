@@ -26,8 +26,6 @@ model User {
   isAdminStudent Boolean @default(false)
   isPremium     Boolean  @default(false)
   aiCredits     Int      @default(0)
-  scareTriggered Boolean @default(false)
-  catTriggered  Boolean  @default(false)
 
   // Granular permissions for admins — JSON array of permission keys.
   // Super admins have all permissions implicitly. Regular admins only have

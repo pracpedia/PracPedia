@@ -86,8 +86,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             safeLocalStorage.removeItem('png_token');
             setToken(null);
           }
-        } else if (res.status === 401) {
-          // 401 = token is genuinely invalid — clear it
+        } else if (res.status === 401 || res.status === 404) {
+          // 401 = token is genuinely invalid; 404 = user no longer exists in DB.
+          // Both cases: clear the token so the user sees the login page.
           safeLocalStorage.removeItem('png_token');
           setToken(null);
         } else {

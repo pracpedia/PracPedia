@@ -90,18 +90,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
   };
 
   // Platform owners (super admins) bypass the gmail/non-gmail form separation.
-  // They can use either form with any email. The list comes from the
-  // PLATFORM_OWNER_EMAILS env var + the hardcoded super admin email.
+  // They can use either form with any email. The list is checked client-side
+  // via the NEXT_PUBLIC_PLATFORM_OWNER_EMAILS env var (comma-separated), plus
+  // the hardcoded super admin email as a fallback.
+  const PLATFORM_OWNER_EMAILS: string[] = (() => {
+    const fromEnv = (process.env.NEXT_PUBLIC_PLATFORM_OWNER_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    // Always include the hardcoded super admin email
+    return [...new Set([...fromEnv, 'pracpedia@gmail.com'])];
+  })();
+
   const isPlatformOwnerEmail = (mail: string): boolean => {
     const clean = String(mail || '').trim().toLowerCase();
     if (!clean) return false;
-    // Hardcoded super admin email always bypasses
-    if (clean === 'pracpedia@gmail.com') return true;
-    // Check PLATFORM_OWNER_EMAILS env var (comma-separated)
-    // Note: this runs client-side, so env vars must be prefixed with NEXT_PUBLIC_
-    // For now, we hardcode the known super admin email. Other platform owners
-    // will need to use the correct form based on their email domain.
-    return false;
+    return PLATFORM_OWNER_EMAILS.includes(clean);
   };
 
   // Helper: build the correct registration body for the API
@@ -940,8 +944,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (!googleEmailInput) return;
-                  if (!isGmailAddress(googleEmailInput)) {
-                    setGoogleModalError('Google Sign-In is strictly restricted to @gmail.com accounts. For Yahoo, Outlook, Hotmail, and all other email providers, please use the standard form on the main page.');
+                  // Platform owners bypass — can use any email in any form.
+                  // Non-gmail emails are blocked (must use the standard form).
+                  if (!isPlatformOwnerEmail(googleEmailInput) && !isGmailAddress(googleEmailInput)) {
+                    setGoogleModalError('Google Sign-In is for Gmail accounts only. For Yahoo, Outlook, Hotmail, and all other email providers, please close this dialog and use the standard form below.');
                     return;
                   }
                   handleSelectGoogleAccount(googleEmailInput, undefined, undefined, googlePasswordInput);

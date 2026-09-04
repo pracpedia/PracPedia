@@ -19,8 +19,6 @@ export async function GET(request: NextRequest) {
         profilePic: true,
         isAdminStudent: true,
         isPremium: true,
-        scareTriggered: true,
-        catTriggered: true,
       },
     });
     return NextResponse.json(students.map((u) => ({ ...u, id: u.id })));

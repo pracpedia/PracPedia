@@ -124,7 +124,7 @@ function PortalConsole() {
   const [currentView, setCurrentView] = useState<ViewState>(() => {
     if (typeof window === 'undefined') return 'dashboard';
     const saved = localStorage.getItem('app_current_view');
-    if (saved && ['landing', 'auth', 'dashboard', 'subject', 'folder', 'admins', 'chat', 'academy', 'profile', 'artists', 'artist_dashboard', 'creds'].includes(saved)) {
+    if (saved && ['landing', 'auth', 'dashboard', 'subject', 'folder', 'admins', 'chat', 'academy', 'profile', 'artists', 'artist_dashboard', 'creds', 'bookings'].includes(saved)) {
       return saved as ViewState;
     }
     return 'dashboard';

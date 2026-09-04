@@ -173,6 +173,15 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
   const updateHireStatus = async (hireId: string, newStatus: string) => {
     setUpdatingId(hireId);
     try {
+      const res = await apiFetch(`/api/hire/${hireId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
       setHireRequests((prev) =>
         prev.map((h) => (h.id === hireId ? { ...h, status: newStatus } : h)),
       );

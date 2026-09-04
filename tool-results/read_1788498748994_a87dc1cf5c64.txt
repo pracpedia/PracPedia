@@ -1,0 +1,700 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useEffect, useCallback } from 'react';
+     4→import { useAuth } from '@/contexts/AuthContext';
+     5→import {
+     6→  Calendar,
+     7→  User,
+     8→  Palette,
+     9→  Clock,
+    10→  CheckCircle2,
+    11→  XCircle,
+    12→  AlertCircle,
+    13→  Loader2,
+    14→  RefreshCw,
+    15→  Search,
+    16→  Mail,
+    17→  Phone,
+    18→  Image as ImageIcon,
+    19→  Star,
+    20→  Package,
+    21→  ClipboardList,
+    22→  Truck,
+    23→} from 'lucide-react';
+    24→
+    25→interface Booking {
+    26→  id: string;
+    27→  clientId: string;
+    28→  artistId: string;
+    29→  serviceType: string;
+    30→  notebookProvider: string;
+    31→  subject: string;
+    32→  description: string;
+    33→  referenceImages: string[];
+    34→  price: number;
+    35→  commissionPercent: number;
+    36→  commissionAmount: number;
+    37→  artistEarnings: number;
+    38→  status: string;
+    39→  paymentStatus: string;
+    40→  clientNotes: string | null;
+    41→  artistNotes: string | null;
+    42→  createdAt: string;
+    43→  updatedAt: string;
+    44→  client: { id: string; name: string; email: string; profilePic?: string | null };
+    45→  artist: { id: string; name: string; email: string; profilePic?: string | null; rating: number; completedOrders: number };
+    46→}
+    47→
+    48→interface HireRequest {
+    49→  id: string;
+    50→  fullName: string;
+    51→  email: string;
+    52→  phone: string;
+    53→  subject: string;
+    54→  message: string;
+    55→  status: string;
+    56→  createdAt: string;
+    57→}
+    58→
+    59→// 3-step progress bar: pending → in_progress → completed
+    60→// cancelled is a side-state (order cancelled, not part of the progress bar)
+    61→type Tab = 'hire_requests' | 'active_orders' | 'completed_cancelled';
+    62→type StatusFilter = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled';
+    63→
+    64→// Progress steps for the 1-2-3 progress bar
+    65→const PROGRESS_STEPS = [
+    66→  { key: 'pending', label: 'Order Placed', icon: ClipboardList },
+    67→  { key: 'in_progress', label: 'In Progress', icon: Package },
+    68→  { key: 'completed', label: 'Delivered', icon: Truck },
+    69→] as const;
+    70→
+    71→// Map booking status → progress step index (0, 1, 2). Cancelled = -1 (off-track).
+    72→function statusToProgressStep(status: string): number {
+    73→  if (status === 'pending') return 0;
+    74→  if (status === 'in_progress') return 1;
+    75→  if (status === 'completed') return 2;
+    76→  return -1; // cancelled or unknown
+    77→}
+    78→
+    79→const STATUS_STYLES: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+    80→  pending: { label: 'Pending', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: <Clock className="w-3 h-3" /> },
+    81→  in_progress: { label: 'In Progress', color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', icon: <Loader2 className="w-3 h-3" /> },
+    82→  completed: { label: 'Completed', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', icon: <CheckCircle2 className="w-3 h-3" /> },
+    83→  cancelled: { label: 'Cancelled', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20', icon: <XCircle className="w-3 h-3" /> },
+    84→};
+    85→
+    86→const PAYMENT_STYLES: Record<string, string> = {
+    87→  unpaid: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
+    88→  paid: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+    89→  refunded: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+    90→};
+    91→
+    92→export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
+    93→  const { user, apiFetch } = useAuth();
+    94→  const [tab, setTab] = useState<Tab>('active_orders');
+    95→  const [bookings, setBookings] = useState<Booking[]>([]);
+    96→  const [hireRequests, setHireRequests] = useState<HireRequest[]>([]);
+    97→  const [loading, setLoading] = useState(true);
+    98→  const [error, setError] = useState<string | null>(null);
+    99→  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+   100→  const [search, setSearch] = useState('');
+   101→  const [updatingId, setUpdatingId] = useState<string | null>(null);
+   102→
+   103→  const isSuperAdmin = user?.role === 'super_admin';
+   104→  const isAdmin = user?.role === 'admin' || isSuperAdmin;
+   105→
+   106→  const fetchBookings = useCallback(async () => {
+   107→    setLoading(true);
+   108→    setError(null);
+   109→    try {
+   110→      const res = await apiFetch('/api/bookings');
+   111→      if (!res.ok) {
+   112→        const err = await res.json().catch(() => ({}));
+   113→        throw new Error(err.error || `HTTP ${res.status}`);
+   114→      }
+   115→      const data = await res.json();
+   116→      setBookings(Array.isArray(data) ? data : (data.bookings || []));
+   117→    } catch (e: any) {
+   118→      setError(e?.message || 'Failed to load bookings');
+   119→    } finally {
+   120→      setLoading(false);
+   121→    }
+   122→  }, [apiFetch]);
+   123→
+   124→  const fetchHireRequests = useCallback(async () => {
+   125→    setLoading(true);
+   126→    setError(null);
+   127→    try {
+   128→      const res = await apiFetch('/api/hire');
+   129→      if (!res.ok) {
+   130→        const err = await res.json().catch(() => ({}));
+   131→        throw new Error(err.error || `HTTP ${res.status}`);
+   132→      }
+   133→      const data = await res.json();
+   134→      setHireRequests(Array.isArray(data) ? data : (data.hireRequests || []));
+   135→    } catch (e: any) {
+   136→      setError(e?.message || 'Failed to load hire requests');
+   137→    } finally {
+   138→      setLoading(false);
+   139→    }
+   140→  }, [apiFetch]);
+   141→
+   142→  useEffect(() => {
+   143→    if (tab === 'hire_requests') {
+   144→      if (isAdmin) fetchHireRequests();
+   145→      else { setLoading(false); }
+   146→    } else {
+   147→      fetchBookings();
+   148→    }
+   149→  }, [tab, isAdmin, fetchBookings, fetchHireRequests]);
+   150→
+   151→  const updateBookingStatus = async (bookingId: string, newStatus: string) => {
+   152→    setUpdatingId(bookingId);
+   153→    try {
+   154→      const res = await apiFetch(`/api/bookings/${bookingId}`, {
+   155→        method: 'PUT',
+   156→        headers: { 'Content-Type': 'application/json' },
+   157→        body: JSON.stringify({ status: newStatus }),
+   158→      });
+   159→      if (!res.ok) {
+   160→        const err = await res.json().catch(() => ({}));
+   161→        throw new Error(err.error || `HTTP ${res.status}`);
+   162→      }
+   163→      setBookings((prev) =>
+   164→        prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b)),
+   165→      );
+   166→    } catch (e: any) {
+   167→      setError(e?.message || 'Failed to update booking');
+   168→    } finally {
+   169→      setUpdatingId(null);
+   170→    }
+   171→  };
+   172→
+   173→  const updateHireStatus = async (hireId: string, newStatus: string) => {
+   174→    setUpdatingId(hireId);
+   175→    try {
+   176→      setHireRequests((prev) =>
+   177→        prev.map((h) => (h.id === hireId ? { ...h, status: newStatus } : h)),
+   178→      );
+   179→    } catch (e: any) {
+   180→      setError(e?.message || 'Failed to update hire request');
+   181→    } finally {
+   182→      setUpdatingId(null);
+   183→    }
+   184→  };
+   185→
+   186→  // Categorize bookings by tab
+   187→  const activeBookings = bookings.filter((b) => b.status === 'pending' || b.status === 'in_progress');
+   188→  const completedCancelledBookings = bookings.filter((b) => b.status === 'completed' || b.status === 'cancelled');
+   189→
+   190→  // Apply search to the current tab's bookings
+   191→  const filterBySearch = (list: Booking[]) => {
+   192→    if (!search) return list;
+   193→    const q = search.toLowerCase();
+   194→    return list.filter((b) =>
+   195→      b.subject.toLowerCase().includes(q) ||
+   196→      b.description.toLowerCase().includes(q) ||
+   197→      b.client?.name?.toLowerCase().includes(q) ||
+   198→      b.artist?.name?.toLowerCase().includes(q) ||
+   199→      b.client?.email?.toLowerCase().includes(q) ||
+   200→      b.artist?.email?.toLowerCase().includes(q)
+   201→    );
+   202→  };
+   203→
+   204→  const filteredActive = filterBySearch(activeBookings);
+   205→  const filteredCompleted = filterBySearch(completedCancelledBookings);
+   206→
+   207→  const filteredHireRequests = hireRequests.filter((h) => {
+   208→    if (statusFilter !== 'all' && h.status !== statusFilter) return false;
+   209→    if (search) {
+   210→      const q = search.toLowerCase();
+   211→      return (
+   212→        h.fullName.toLowerCase().includes(q) ||
+   213→        h.email.toLowerCase().includes(q) ||
+   214→        h.subject.toLowerCase().includes(q) ||
+   215→        h.message.toLowerCase().includes(q)
+   216→      );
+   217→    }
+   218→    return true;
+   219→  });
+   220→
+   221→  // ── Progress bar component ──
+   222→  const ProgressBar: React.FC<{ status: string }> = ({ status }) => {
+   223→    const currentStep = statusToProgressStep(status);
+   224→    const isCancelled = status === 'cancelled';
+   225→
+   226→    if (isCancelled) {
+   227→      return (
+   228→        <div className="flex items-center gap-2 p-2 rounded-lg bg-rose-500/5 border border-rose-500/15">
+   229→          <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+   230→          <span className="text-[11px] font-bold text-rose-300">Order Cancelled</span>
+   231→        </div>
+   232→      );
+   233→    }
+   234→
+   235→    return (
+   236→      <div className="flex items-center gap-1 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+   237→        {PROGRESS_STEPS.map((step, idx) => {
+   238→          const StepIcon = step.icon;
+   239→          const isDone = idx < currentStep;
+   240→          const isCurrent = idx === currentStep;
+   241→          const isFuture = idx > currentStep;
+   242→          return (
+   243→            <React.Fragment key={step.key}>
+   244→              {/* Step circle + label */}
+   245→              <div className="flex flex-col items-center gap-1 min-w-[60px] sm:min-w-[80px]">
+   246→                <div
+   247→                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 border-2 transition-all ${
+   248→                    isDone
+   249→                      ? 'bg-emerald-500 border-emerald-500 text-white'
+   250→                      : isCurrent
+   251→                        ? 'bg-cyan-500 border-cyan-400 text-white shadow-lg shadow-cyan-500/30 animate-pulse'
+   252→                        : 'bg-slate-900 border-slate-700 text-slate-600'
+   253→                  }`}
+   254→                >
+   255→                  {isDone ? (
+   256→                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+   257→                  ) : (
+   258→                    <StepIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+   259→                  )}
+   260→                </div>
+   261→                <span
+   262→                  className={`text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-center leading-tight ${
+   263→                    isDone
+   264→                      ? 'text-emerald-400'
+   265→                      : isCurrent
+   266→                        ? 'text-cyan-300'
+   267→                        : 'text-slate-600'
+   268→                  }`}
+   269→                >
+   270→                  {step.label}
+   271→                </span>
+   272→                <span className="text-[7px] font-mono text-slate-700">{idx + 1}</span>
+   273→              </div>
+   274→              {/* Connector line */}
+   275→              {idx < PROGRESS_STEPS.length - 1 && (
+   276→                <div
+   277→                  className={`h-0.5 flex-1 min-w-[20px] rounded-full transition-all ${
+   278→                    idx < currentStep ? 'bg-emerald-500' : 'bg-slate-800'
+   279→                  }`}
+   280→                />
+   281→              )}
+   282→            </React.Fragment>
+   283→          );
+   284→        })}
+   285→      </div>
+   286→    );
+   287→  };
+   288→
+   289→  // ── Booking card component ──
+   290→  const BookingCard: React.FC<{ b: Booking }> = ({ b }) => {
+   291→    const style = STATUS_STYLES[b.status] || STATUS_STYLES.pending;
+   292→    const payStyle = PAYMENT_STYLES[b.paymentStatus] || PAYMENT_STYLES.unpaid;
+   293→    const isClient = b.clientId === user?.id;
+   294→    const isArtist = b.artistId === user?.id;
+   295→    const canUpdate = isArtist || isAdmin;
+   296→    const currentStep = statusToProgressStep(b.status);
+   297→
+   298→    return (
+   299→      <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/10 hover:border-white/20 transition-all">
+   300→        {/* Header row */}
+   301→        <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+   302→          <div className="flex items-center gap-2 flex-wrap">
+   303→            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase border ${style.color}`}>
+   304→              {style.icon} {style.label}
+   305→            </span>
+   306→            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase border ${payStyle}`}>
+   307→              {b.paymentStatus}
+   308→            </span>
+   309→            <span className="text-[10px] text-slate-500 font-mono">
+   310→              {new Date(b.createdAt).toLocaleString()}
+   311→            </span>
+   312→          </div>
+   313→          <span className="text-lg font-black text-white font-mono">৳{b.price}</span>
+   314→        </div>
+   315→
+   316→        {/* Subject + description */}
+   317→        <div className="mb-3">
+   318→          <h3 className="text-sm font-bold text-white">{b.subject}</h3>
+   319→          <p className="text-xs text-slate-400 mt-1 line-clamp-2">{b.description}</p>
+   320→        </div>
+   321→
+   322→        {/* 1-2-3 Progress bar — shows the order tracking for the client */}
+   323→        <div className="mb-3">
+   324→          <ProgressBar status={b.status} />
+   325→        </div>
+   326→
+   327→        {/* Client + Artist */}
+   328→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+   329→          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+   330→            <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">
+   331→              <User className="w-4 h-4 text-cyan-400" />
+   332→            </div>
+   333→            <div className="min-w-0">
+   334→              <p className="text-[9px] uppercase tracking-wider text-slate-500 font-mono font-bold">Client {isClient && '(You)'}</p>
+   335→              <p className="text-xs text-slate-200 font-bold truncate">{b.client?.name || 'Unknown'}</p>
+   336→              <p className="text-[10px] text-slate-500 truncate">{b.client?.email}</p>
+   337→            </div>
+   338→          </div>
+   339→          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+   340→            <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+   341→              <Palette className="w-4 h-4 text-amber-400" />
+   342→            </div>
+   343→            <div className="min-w-0">
+   344→              <p className="text-[9px] uppercase tracking-wider text-slate-500 font-mono font-bold">Artist {isArtist && '(You)'}</p>
+   345→              <p className="text-xs text-slate-200 font-bold truncate">{b.artist?.name || 'Unknown'}</p>
+   346→              <div className="flex items-center gap-1 text-[10px] text-slate-500">
+   347→                <Star className="w-2.5 h-2.5 text-amber-400" />
+   348→                {b.artist?.rating?.toFixed(1) || '5.0'} · {b.artist?.completedOrders || 0} orders
+   349→              </div>
+   350→            </div>
+   351→          </div>
+   352→        </div>
+   353→
+   354→        {/* Service details */}
+   355→        <div className="flex flex-wrap gap-2 mb-3 text-[10px] font-mono">
+   356→          <span className="px-2 py-1 rounded bg-white/[0.03] text-slate-400 border border-white/[0.04]">
+   357→            {b.serviceType === 'drawing_only' ? 'Drawing Only' : 'Drawing + Writing'}
+   358→          </span>
+   359→          <span className="px-2 py-1 rounded bg-white/[0.03] text-slate-400 border border-white/[0.04]">
+   360→            Notebook: {b.notebookProvider === 'artist' ? 'Artist provides' : 'Client provides'}
+   361→          </span>
+   362→          {b.referenceImages?.length > 0 && (
+   363→            <span className="px-2 py-1 rounded bg-white/[0.03] text-slate-400 border border-white/[0.04] inline-flex items-center gap-1">
+   364→              <ImageIcon className="w-2.5 h-2.5" /> {b.referenceImages.length} ref images
+   365→            </span>
+   366→          )}
+   367→        </div>
+   368→
+   369→        {/* Notes */}
+   370→        {(b.clientNotes || b.artistNotes) && (
+   371→          <div className="space-y-1.5 mb-3">
+   372→            {b.clientNotes && (
+   373→              <p className="text-[11px] text-slate-400">
+   374→                <span className="text-slate-500 font-bold">Client notes:</span> {b.clientNotes}
+   375→              </p>
+   376→            )}
+   377→            {b.artistNotes && (
+   378→              <p className="text-[11px] text-slate-400">
+   379→                <span className="text-slate-500 font-bold">Artist notes:</span> {b.artistNotes}
+   380→              </p>
+   381→            )}
+   382→          </div>
+   383→        )}
+   384→
+   385→        {/* Artist actions — update progress system-wide */}
+   386→        {canUpdate && b.status !== 'cancelled' && b.status !== 'completed' && (
+   387→          <div className="flex gap-2 pt-2 border-t border-white/[0.04] flex-wrap">
+   388→            {/* Step 1 → 2: Accept (move to in_progress) */}
+   389→            {b.status === 'pending' && (
+   390→              <>
+   391→                <button
+   392→                  onClick={() => updateBookingStatus(b.id, 'in_progress')}
+   393→                  disabled={updatingId === b.id}
+   394→                  className="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+   395→                >
+   396→                  {updatingId === b.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Package className="w-3 h-3" />}
+   397→                  Accept & Start
+   398→                </button>
+   399→                <button
+   400→                  onClick={() => updateBookingStatus(b.id, 'cancelled')}
+   401→                  disabled={updatingId === b.id}
+   402→                  className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
+   403→                >
+   404→                  Decline
+   405→                </button>
+   406→              </>
+   407→            )}
+   408→            {/* Step 2 → 3: Mark Delivered (move to completed) */}
+   409→            {b.status === 'in_progress' && (
+   410→              <>
+   411→                <button
+   412→                  onClick={() => updateBookingStatus(b.id, 'completed')}
+   413→                  disabled={updatingId === b.id}
+   414→                  className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+   415→                >
+   416→                  {updatingId === b.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+   417→                  Mark Delivered
+   418→                </button>
+   419→                <button
+   420→                  onClick={() => updateBookingStatus(b.id, 'cancelled')}
+   421→                  disabled={updatingId === b.id}
+   422→                  className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
+   423→                >
+   424→                  Cancel Order
+   425→                </button>
+   426→              </>
+   427→            )}
+   428→          </div>
+   429→        )}
+   430→
+   431→        {/* Client actions — can cancel pending orders */}
+   432→        {isClient && !canUpdate && b.status === 'pending' && (
+   433→          <div className="flex gap-2 pt-2 border-t border-white/[0.04]">
+   434→            <button
+   435→              onClick={() => updateBookingStatus(b.id, 'cancelled')}
+   436→              disabled={updatingId === b.id}
+   437→              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
+   438→            >
+   439→              Cancel Order
+   440→            </button>
+   441→          </div>
+   442→        )}
+   443→
+   444→        {/* Completed/cancelled — show step label */}
+   445→        {(b.status === 'completed' || b.status === 'cancelled') && (
+   446→          <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-[10px] font-mono text-slate-500">
+   447→            <span>
+   448→              {b.status === 'completed'
+   449→                ? `Delivered on ${new Date(b.updatedAt).toLocaleDateString()}`
+   450→                : `Cancelled on ${new Date(b.updatedAt).toLocaleDateString()}`}
+   451→            </span>
+   452→            {isArtist && b.status === 'completed' && (
+   453→              <span className="text-emerald-400">+৳{b.artistEarnings} earned</span>
+   454→            )}
+   455→          </div>
+   456→        )}
+   457→      </div>
+   458→    );
+   459→  };
+   460→
+   461→  return (
+   462→    <div className="space-y-6 animate-in fade-in duration-300">
+   463→      {/* Header */}
+   464→      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   465→        <div>
+   466→          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+   467→            <Calendar className="w-6 h-6 text-cyan-400" />
+   468→            Bookings & Orders
+   469→          </h2>
+   470→          <p className="text-xs text-slate-400 mt-1">
+   471→            {isAdmin
+   472→              ? 'Track all marketplace orders, hire requests, and deliveries across the platform.'
+   473→              : 'Track your marketplace orders from placement to delivery.'}
+   474→          </p>
+   475→        </div>
+   476→        <button
+   477→          onClick={() => (tab === 'hire_requests' ? fetchHireRequests() : fetchBookings())}
+   478→          disabled={loading}
+   479→          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 min-h-[40px]"
+   480→        >
+   481→          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+   482→          Refresh
+   483→        </button>
+   484→      </div>
+   485→
+   486→      {/* Tabs — 3 options: Hire Requests | Active Orders | Completed/Cancelled */}
+   487→      <div className="flex gap-2 border-b border-white/[0.06] overflow-x-auto">
+   488→        {isAdmin && (
+   489→          <button
+   490→            onClick={() => { setTab('hire_requests'); setStatusFilter('all'); }}
+   491→            className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 -mb-px cursor-pointer whitespace-nowrap ${
+   492→              tab === 'hire_requests'
+   493→                ? 'text-purple-400 border-purple-400'
+   494→                : 'text-slate-400 border-transparent hover:text-slate-200'
+   495→            }`}
+   496→          >
+   497→            <Mail className="w-3.5 h-3.5 inline mr-1.5" />
+   498→            Hire Requests ({hireRequests.length})
+   499→          </button>
+   500→        )}
+   501→        <button
+   502→          onClick={() => { setTab('active_orders'); setStatusFilter('all'); }}
+   503→          className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 -mb-px cursor-pointer whitespace-nowrap ${
+   504→            tab === 'active_orders'
+   505→              ? 'text-cyan-400 border-cyan-400'
+   506→              : 'text-slate-400 border-transparent hover:text-slate-200'
+   507→          }`}
+   508→        >
+   509→          <Package className="w-3.5 h-3.5 inline mr-1.5" />
+   510→          Active Orders ({activeBookings.length})
+   511→        </button>
+   512→        <button
+   513→          onClick={() => { setTab('completed_cancelled'); setStatusFilter('all'); }}
+   514→          className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 -mb-px cursor-pointer whitespace-nowrap ${
+   515→            tab === 'completed_cancelled'
+   516→              ? 'text-emerald-400 border-emerald-400'
+   517→              : 'text-slate-400 border-transparent hover:text-slate-200'
+   518→          }`}
+   519→        >
+   520→          <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
+   521→          Completed / Cancelled ({completedCancelledBookings.length})
+   522→        </button>
+   523→      </div>
+   524→
+   525→      {/* Search */}
+   526→      <div className="flex flex-col sm:flex-row gap-3">
+   527→        <div className="relative flex-1">
+   528→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+   529→          <input
+   530→            type="text"
+   531→            placeholder={tab === 'hire_requests' ? 'Search by name, email, subject...' : 'Search by subject, client, artist...'}
+   532→            value={search}
+   533→            onChange={(e) => setSearch(e.target.value)}
+   534→            className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl outline-none focus:border-cyan-500/50 text-xs min-h-[40px]"
+   535→          />
+   536→        </div>
+   537→        {tab === 'hire_requests' && (
+   538→          <div className="flex gap-2 flex-wrap">
+   539→            {(['all', 'pending', 'completed', 'cancelled'] as StatusFilter[]).map((s) => (
+   540→              <button
+   541→                key={s}
+   542→                onClick={() => setStatusFilter(s)}
+   543→                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+   544→                  statusFilter === s
+   545→                    ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+   546→                    : 'bg-white/5 text-slate-400 border-white/10 hover:text-slate-200'
+   547→                }`}
+   548→              >
+   549→                {s === 'all' ? 'All' : s.replace('_', ' ')}
+   550→              </button>
+   551→            ))}
+   552→          </div>
+   553→        )}
+   554→      </div>
+   555→
+   556→      {/* Error */}
+   557→      {error && (
+   558→        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+   559→          <AlertCircle className="w-4 h-4 shrink-0" />
+   560→          {error}
+   561→          <button onClick={() => setError(null)} className="ml-auto text-rose-400 hover:text-rose-300">
+   562→            <XCircle className="w-4 h-4" />
+   563→          </button>
+   564→        </div>
+   565→      )}
+   566→
+   567→      {/* Loading */}
+   568→      {loading && (
+   569→        <div className="flex items-center justify-center py-12">
+   570→          <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
+   571→          <span className="ml-2 text-sm text-slate-400">Loading...</span>
+   572→        </div>
+   573→      )}
+   574→
+   575→      {/* Empty state */}
+   576→      {!loading && (
+   577→        (tab === 'hire_requests' && filteredHireRequests.length === 0) ||
+   578→        (tab === 'active_orders' && filteredActive.length === 0) ||
+   579→        (tab === 'completed_cancelled' && filteredCompleted.length === 0)
+   580→      ) && (
+   581→        <div className="text-center py-12 rounded-2xl bg-slate-950/50 border border-white/[0.06]">
+   582→          {tab === 'hire_requests' ? (
+   583→            <Mail className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+   584→          ) : tab === 'active_orders' ? (
+   585→            <Package className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+   586→          ) : (
+   587→            <CheckCircle2 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+   588→          )}
+   589→          <p className="text-sm text-slate-400 font-medium">
+   590→            {tab === 'hire_requests'
+   591→              ? 'No hire requests found'
+   592→              : tab === 'active_orders'
+   593→                ? 'No active orders'
+   594→                : 'No completed or cancelled orders'}
+   595→          </p>
+   596→          <p className="text-[11px] text-slate-600 mt-1">
+   597→            {search ? 'Try adjusting your search.' : 'New items will appear here.'}
+   598→          </p>
+   599→        </div>
+   600→      )}
+   601→
+   602→      {/* Active orders list */}
+   603→      {!loading && tab === 'active_orders' && filteredActive.length > 0 && (
+   604→        <div className="space-y-3">
+   605→          {filteredActive.map((b) => (
+   606→            <BookingCard key={b.id} b={b} />
+   607→          ))}
+   608→        </div>
+   609→      )}
+   610→
+   611→      {/* Completed/Cancelled orders list */}
+   612→      {!loading && tab === 'completed_cancelled' && filteredCompleted.length > 0 && (
+   613→        <div className="space-y-3">
+   614→          {filteredCompleted.map((b) => (
+   615→            <BookingCard key={b.id} b={b} />
+   616→          ))}
+   617→        </div>
+   618→      )}
+   619→
+   620→      {/* Hire requests list */}
+   621→      {!loading && tab === 'hire_requests' && filteredHireRequests.length > 0 && (
+   622→        <div className="space-y-3">
+   623→          {filteredHireRequests.map((h) => {
+   624→            const style = STATUS_STYLES[h.status] || STATUS_STYLES.pending;
+   625→            return (
+   626→              <div
+   627→                key={h.id}
+   628→                className="p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-white/10 hover:border-white/20 transition-all"
+   629→              >
+   630→                <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+   631→                  <div className="flex items-center gap-2 flex-wrap">
+   632→                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase border ${style.color}`}>
+   633→                      {style.icon} {style.label}
+   634→                    </span>
+   635→                    <span className="text-[10px] text-slate-500 font-mono">
+   636→                      {new Date(h.createdAt).toLocaleString()}
+   637→                    </span>
+   638→                  </div>
+   639→                </div>
+   640→
+   641→                <div className="mb-3">
+   642→                  <h3 className="text-sm font-bold text-white">{h.subject}</h3>
+   643→                  <p className="text-xs text-slate-400 mt-1">{h.message}</p>
+   644→                </div>
+   645→
+   646→                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+   647→                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+   648→                    <User className="w-4 h-4 text-cyan-400 shrink-0" />
+   649→                    <div className="min-w-0">
+   650→                      <p className="text-[9px] uppercase tracking-wider text-slate-500 font-mono font-bold">Name</p>
+   651→                      <p className="text-xs text-slate-200 font-bold truncate">{h.fullName}</p>
+   652→                    </div>
+   653→                  </div>
+   654→                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+   655→                    <Mail className="w-4 h-4 text-amber-400 shrink-0" />
+   656→                    <div className="min-w-0">
+   657→                      <p className="text-[9px] uppercase tracking-wider text-slate-500 font-mono font-bold">Email</p>
+   658→                      <p className="text-xs text-slate-200 truncate">{h.email}</p>
+   659→                    </div>
+   660→                  </div>
+   661→                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+   662→                    <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+   663→                    <div className="min-w-0">
+   664→                      <p className="text-[9px] uppercase tracking-wider text-slate-500 font-mono font-bold">Phone</p>
+   665→                      <p className="text-xs text-slate-200 truncate">{h.phone}</p>
+   666→                    </div>
+   667→                  </div>
+   668→                </div>
+   669→
+   670→                {isAdmin && (
+   671→                  <div className="flex gap-2 pt-2 border-t border-white/[0.04]">
+   672→                    {h.status === 'pending' && (
+   673→                      <>
+   674→                        <button
+   675→                          onClick={() => updateHireStatus(h.id, 'completed')}
+   676→                          disabled={updatingId === h.id}
+   677→                          className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
+   678→                        >
+   679→                          Mark Resolved
+   680→                        </button>
+   681→                        <button
+   682→                          onClick={() => updateHireStatus(h.id, 'cancelled')}
+   683→                          disabled={updatingId === h.id}
+   684→                          className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
+   685→                        >
+   686→                          Dismiss
+   687→                        </button>
+   688→                      </>
+   689→                    )}
+   690→                  </div>
+   691→                )}
+   692→              </div>
+   693→            );
+   694→          })}
+   695→        </div>
+   696→      )}
+   697→    </div>
+   698→  );
+   699→};
+   700→
