@@ -21,7 +21,15 @@ function Switch({
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(
-          "bg-background dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground pointer-events-none block size-4 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0"
+          // Knob sized relative to track height — adapts to any track size.
+          // h-[calc(100%-4px)] = 2px padding top + bottom.
+          // aspect-square = perfect circle.
+          // When unchecked: ml-[2px] (left padding).
+          // When checked: ml-auto pushes knob to right edge, mr-[2px] = right padding.
+          "bg-background dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground pointer-events-none block rounded-full ring-0 transition-all",
+          "h-[calc(100%-4px)] aspect-square",
+          "data-[state=unchecked]:ml-[2px]",
+          "data-[state=checked]:ml-auto data-[state=checked]:mr-[2px]"
         )}
       />
     </SwitchPrimitive.Root>
