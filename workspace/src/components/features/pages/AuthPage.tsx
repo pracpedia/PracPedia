@@ -127,7 +127,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
       setIsAdminEmail(true);
       return;
     }
-    // Debounced API check
+    // Debounced API check — 200ms so the admin bypass feels instant
     if (checkEmailTimeoutRef.current) clearTimeout(checkEmailTimeoutRef.current);
     checkEmailTimeoutRef.current = setTimeout(async () => {
       try {
@@ -143,7 +143,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
       } catch {
         setIsAdminEmail(false);
       }
-    }, 500);
+    }, 200);
     return () => {
       if (checkEmailTimeoutRef.current) clearTimeout(checkEmailTimeoutRef.current);
     };
@@ -253,7 +253,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
     // Standard form (this form) = NON-GMAIL emails only.
     // Gmail form (Google Sign-In modal) = GMAIL emails only.
     // Admins/super_admins/platform owners bypass — can use any form.
-    if (!isPlatformOwnerEmail(email) && !isAdminEmail && isGmailAddress(email)) {
+    // Check synchronously: platform owner list + admin cache (populated by
+    // the debounced useEffect). This ensures the bypass works even if the
+    // user types their email and immediately clicks submit before the
+    // 500ms debounce fires.
+    const cleanEmail = email.trim().toLowerCase();
+    const isCachedAdmin = adminEmailCache[cleanEmail] === true;
+    if (!isPlatformOwnerEmail(email) && !isAdminEmail && !isCachedAdmin && isGmailAddress(email)) {
       setLoading(false);
       setErrorMsg("Gmail accounts must use the 'Sign in / Sign up with Google' button above. This form is for non-Gmail providers (Yahoo, Outlook, Hotmail, edu.bd, etc.) only.");
       return;
