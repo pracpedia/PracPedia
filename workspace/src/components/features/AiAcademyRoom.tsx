@@ -623,70 +623,71 @@ export const AiAcademyRoom: React.FC = () => {
     fetchSubjects();
   }, [apiFetch]);
 
-  // Selected parameters (Initializers with localStorage fallbacks)
-  const [selectedSubject, setSelectedSubject] = useState<string>(() => {
-    return safeLocalStorage.getItem('academy_selected_subject') || 'Physics';
-  });
-  const [selectedPaper, setSelectedPaper] = useState<'1st Paper' | '2nd Paper'>(() => {
-    return (safeLocalStorage.getItem('academy_selected_paper') as '1st Paper' | '2nd Paper') || '1st Paper';
-  });
-  const [curriculum, setCurriculum] = useState<'NCTB' | 'International'>(() => {
-    return (safeLocalStorage.getItem('academy_curriculum') as 'NCTB' | 'International') || 'NCTB';
-  });
-  const [difficulty, setDifficulty] = useState<'Basic' | 'Intermediate' | 'Advanced'>(() => {
-    return (safeLocalStorage.getItem('academy_difficulty') as 'Basic' | 'Intermediate' | 'Advanced') || 'Basic';
-  });
-  const [selectedTopic, setSelectedTopic] = useState<string>(() => {
-    return safeLocalStorage.getItem('academy_selected_topic') || '';
-  });
-  const [customTopic, setCustomTopic] = useState<string>(() => {
-    return safeLocalStorage.getItem('academy_custom_topic') || '';
-  });
+  // Selected parameters — initialize with defaults (hydration-safe).
+  // Saved values are loaded in a useEffect after mount to avoid mismatches.
+  const [selectedSubject, setSelectedSubject] = useState<string>('Physics');
+  const [selectedPaper, setSelectedPaper] = useState<'1st Paper' | '2nd Paper'>('1st Paper');
+  const [curriculum, setCurriculum] = useState<'NCTB' | 'International'>('NCTB');
+  const [difficulty, setDifficulty] = useState<'Basic' | 'Intermediate' | 'Advanced'>('Basic');
+  const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [customTopic, setCustomTopic] = useState<string>('');
 
   // Custom expandable accordions for chapters
-  const [activeChapterIndex, setActiveChapterIndex] = useState<number | null>(() => {
-    const saved = safeLocalStorage.getItem('academy_active_chapter_index');
-    return saved !== null ? Number(saved) : 0;
-  });
+  const [activeChapterIndex, setActiveChapterIndex] = useState<number | null>(0);
 
   // Mode and loading states
-  const [mode, setMode] = useState<'concept' | 'mcq' | 'creative_question' | 'ask_ai'>(() => {
-    return (safeLocalStorage.getItem('academy_mode') as 'concept' | 'mcq' | 'creative_question' | 'ask_ai') || 'concept';
-  });
+  const [mode, setMode] = useState<'concept' | 'mcq' | 'creative_question' | 'ask_ai'>('concept');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [responseHtml, setResponseHtml] = useState<string>(() => {
-    return safeLocalStorage.getItem('academy_response_html') || '';
-  });
+  const [responseHtml, setResponseHtml] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Chat-specific state
-  const [chatLogs, setChatLogs] = useState<ChatMessage[]>(() => {
-    const saved = safeLocalStorage.getItem('academy_chat_logs');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse saved chat logs", e);
-      }
-    }
-    return [];
-  });
+  const [chatLogs, setChatLogs] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState<string>('');
   const [isAnswering, setIsAnswering] = useState<boolean>(false);
-  const [aiLanguage, setAiLanguage] = useState<'en' | 'bn_book'>(() => {
-    return (safeLocalStorage.getItem('ai_language') as 'en' | 'bn_book') || 'en';
-  });
+  const [aiLanguage, setAiLanguage] = useState<'en' | 'bn_book'>('en');
 
   // Gamification & bookmarks
-  const [knowledgePoints, setKnowledgePoints] = useState<number>(() => {
-    return Number(safeLocalStorage.getItem('academy_kp')) || 120;
-  });
+  const [knowledgePoints, setKnowledgePoints] = useState<number>(120);
   const [studyStreak, setStudyStreak] = useState<number>(8);
-  const [completedLessons, setCompletedLessons] = useState<number>(() => {
-    return Number(safeLocalStorage.getItem('academy_lessons')) || 4;
-  });
+  const [completedLessons, setCompletedLessons] = useState<number>(4);
   const [savedLessons, setSavedLessons] = useState<string[]>([]);
   const [isBookmarkedActive, setIsBookmarkedActive] = useState<boolean>(false);
+
+  // Load saved state from localStorage after mount (hydration-safe)
+  useEffect(() => {
+    const sSub = safeLocalStorage.getItem('academy_selected_subject');
+    if (sSub) setSelectedSubject(sSub);
+    const sPaper = safeLocalStorage.getItem('academy_selected_paper');
+    if (sPaper === '1st Paper' || sPaper === '2nd Paper') setSelectedPaper(sPaper);
+    const sCurr = safeLocalStorage.getItem('academy_curriculum');
+    if (sCurr === 'NCTB' || sCurr === 'International') setCurriculum(sCurr);
+    const sDiff = safeLocalStorage.getItem('academy_difficulty');
+    if (sDiff === 'Basic' || sDiff === 'Intermediate' || sDiff === 'Advanced') setDifficulty(sDiff);
+    const sTopic = safeLocalStorage.getItem('academy_selected_topic');
+    if (sTopic) setSelectedTopic(sTopic);
+    const sCustom = safeLocalStorage.getItem('academy_custom_topic');
+    if (sCustom) setCustomTopic(sCustom);
+    const sChapter = safeLocalStorage.getItem('academy_active_chapter_index');
+    if (sChapter !== null) {
+      const n = Number(sChapter);
+      if (!isNaN(n)) setActiveChapterIndex(n);
+    }
+    const sMode = safeLocalStorage.getItem('academy_mode');
+    if (sMode === 'concept' || sMode === 'mcq' || sMode === 'creative_question' || sMode === 'ask_ai') setMode(sMode);
+    const sHtml = safeLocalStorage.getItem('academy_response_html');
+    if (sHtml) setResponseHtml(sHtml);
+    const sChat = safeLocalStorage.getItem('academy_chat_logs');
+    if (sChat) {
+      try { setChatLogs(JSON.parse(sChat)); } catch (e) { console.error("Failed to parse saved chat logs", e); }
+    }
+    const sLang = safeLocalStorage.getItem('ai_language');
+    if (sLang === 'en' || sLang === 'bn_book') setAiLanguage(sLang);
+    const sKp = safeLocalStorage.getItem('academy_kp');
+    if (sKp) { const n = Number(sKp); if (!isNaN(n)) setKnowledgePoints(n); }
+    const sLessons = safeLocalStorage.getItem('academy_lessons');
+    if (sLessons) { const n = Number(sLessons); if (!isNaN(n)) setCompletedLessons(n); }
+  }, []);
 
   // Playable interactive MCQ State (Offline-first / robust game fallback)
   const [quizScore, setQuizScore] = useState<number>(0);

@@ -1275,7 +1275,7 @@ function PortalConsole() {
                                   </span>
 
                                   <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                                    {user?.role === 'admin' || user?.role === 'super_admin' && (
+                                    {(user?.role === 'admin' || user?.role === 'super_admin') &&(
                                       <button
                                         onClick={async (e) => {
                                           e.stopPropagation();
@@ -1440,7 +1440,7 @@ function PortalConsole() {
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-                        {user?.role === 'admin' || user?.role === 'super_admin' && (
+                        {(user?.role === 'admin' || user?.role === 'super_admin') &&(
                           <button
                             onClick={() => {
                               setEditFolderData(null);
@@ -1545,7 +1545,7 @@ function PortalConsole() {
                               </span>
 
                               <div className="flex gap-1 sm:gap-1.5 items-center justify-end flex-wrap">
-                                {user?.role === 'admin' || user?.role === 'super_admin' && (
+                                {(user?.role === 'admin' || user?.role === 'super_admin') &&(
                                   <>
                                     <button
                                       onClick={(e) => {
@@ -1625,7 +1625,7 @@ function PortalConsole() {
                           </div>
                         </div>
 
-                        {user?.role === 'admin' || user?.role === 'super_admin' && (
+                        {(user?.role === 'admin' || user?.role === 'super_admin') &&(
                           <>
                             <button
                               onClick={() => {
@@ -1793,7 +1793,7 @@ function PortalConsole() {
                                   <Eye className="w-3.5 h-3.5" />
                                 </span>
 
-                                {user?.role === 'admin' || user?.role === 'super_admin' && (
+                                {(user?.role === 'admin' || user?.role === 'super_admin') &&(
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1864,7 +1864,7 @@ function PortalConsole() {
                                   <span>View & Inspect</span>
                                 </span>
 
-                                {user?.role === 'admin' || user?.role === 'super_admin' && (
+                                {(user?.role === 'admin' || user?.role === 'super_admin') &&(
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();

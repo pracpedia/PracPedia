@@ -478,7 +478,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             {/* Admin actions shortcut within the dashboard structure */}
-            {user.role === 'admin' || user.role === 'super_admin' && (
+            {(user.role === 'admin' || user.role === 'super_admin') &&(
               <button
                 onClick={onOpenFolderCreate}
                 className="w-full mt-2 flex items-center justify-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl text-xs font-bold tracking-wide shadow-md shadow-indigo-950/50 transition-all active:scale-[0.98] cursor-pointer"
