@@ -425,20 +425,20 @@ function PortalConsole() {
     try {
       // Fetch subjects
       const subRes = await apiFetch('/api/subjects');
-      const subData = await subRes.json();
-      setSubjects(subData.map((s: any) => ({ ...s, id: s.id || s._id })));
+      const subData = await subRes.json().catch(() => []);
+      setSubjects(Array.isArray(subData) ? subData.map((s: any) => ({ ...s, id: s.id || s._id })) : []);
 
       // Fetch folder registries
       const fRes = await apiFetch('/api/folders');
-      const fData = await fRes.json();
-      setFolders(fData.map((f: any) => ({ ...f, id: f.id || f._id })));
+      const fData = await fRes.json().catch(() => []);
+      setFolders(Array.isArray(fData) ? fData.map((f: any) => ({ ...f, id: f.id || f._id })) : []);
 
       // Fetch announcements
       try {
         const annRes = await apiFetch('/api/announcements');
         if (annRes.ok) {
-          const annData = await annRes.json();
-          setAnnouncements(annData.map((a: any) => ({ ...a, id: a.id || a._id })));
+          const annData = await annRes.json().catch(() => []);
+          setAnnouncements(Array.isArray(annData) ? annData.map((a: any) => ({ ...a, id: a.id || a._id })) : []);
         }
       } catch (annErr) {
         console.error("Could not load announcements: ", annErr);
@@ -448,7 +448,7 @@ function PortalConsole() {
       try {
         const bannerRes = await fetch('/api/settings/banner');
         if (bannerRes.ok) {
-          setBannerConfig(await bannerRes.json());
+          setBannerConfig(await bannerRes.json().catch(() => ({})));
         }
       } catch {
         // defaults will be used
@@ -458,8 +458,8 @@ function PortalConsole() {
       try {
         const admRes = await apiFetch('/api/users/admins');
         if (admRes.ok) {
-          const admData = await admRes.json();
-          setAdminsList(admData.map((u: any) => ({ ...u, id: u.id || u._id })));
+          const admData = await admRes.json().catch(() => []);
+          setAdminsList(Array.isArray(admData) ? admData.map((u: any) => ({ ...u, id: u.id || u._id })) : []);
         }
       } catch (admErr) {
         console.error("Could not load admin directory: ", admErr);
@@ -467,8 +467,8 @@ function PortalConsole() {
 
       // Fetch statistics telemetry
       const statRes = await apiFetch('/api/stats');
-      const statData = await statRes.json();
-      setStats(statData);
+      const statData = await statRes.json().catch(() => ({}));
+      setStats(statData && typeof statData === 'object' ? statData : {});
 
       // Fetch students list if user is an Administrator
       if (user?.role === 'admin' || user?.role === 'super_admin') {
