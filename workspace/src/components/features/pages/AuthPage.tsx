@@ -916,32 +916,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                 </div>
               )}
 
-              {/* Quick Select Preset Gmail */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block">
-                  Quick Select Verified Gmail Account
-                </label>
-                <div className="grid grid-cols-1 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGoogleModalError(null);
-                      setGoogleEmailInput('scholar.student@gmail.com');
-                      setGooglePasswordInput('student123');
-                    }}
-                    className="p-2.5 bg-slate-950/80 hover:bg-slate-900 border border-slate-700/80 rounded-xl text-left transition-all cursor-pointer flex items-center gap-2 group min-h-[56px]"
-                  >
-                    <div className="w-7 h-7 rounded-full bg-emerald-900/90 text-emerald-300 font-extrabold text-xs flex items-center justify-center shrink-0 border border-emerald-500/30">
-                      S
-                    </div>
-                    <div className="truncate min-w-0">
-                      <div className="text-[11px] font-bold text-slate-200 truncate group-hover:text-emerald-300">scholar...</div>
-                      <div className="text-[9px] text-slate-400 font-mono truncate">@gmail.com (Student)</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
               {/* Google Modal Form */}
               <form
                 onSubmit={(e) => {
