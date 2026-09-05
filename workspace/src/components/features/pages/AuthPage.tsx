@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Logo } from '@/components/features/Logo';
 import {
@@ -89,16 +89,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
     return clean.endsWith('@gmail.com') || clean.endsWith('@googlemail.com');
   };
 
-  // Platform owners (super admins) bypass the gmail/non-gmail form separation.
-  // They can use either form with any email. The list is checked client-side
-  // via the NEXT_PUBLIC_PLATFORM_OWNER_EMAILS env var (comma-separated), plus
-  // the hardcoded super admin email as a fallback.
+  // Platform owners (super admins) + admins bypass the gmail/non-gmail form
+  // separation. They can use either form with any email.
+  //
+  // Since we don't know the user's role until they log in, we check:
+  // 1. The NEXT_PUBLIC_PLATFORM_OWNER_EMAILS env var (platform owners)
+  // 2. A runtime check against /api/auth/check-email (returns role for known emails)
   const PLATFORM_OWNER_EMAILS: string[] = (() => {
     const fromEnv = (process.env.NEXT_PUBLIC_PLATFORM_OWNER_EMAILS || '')
       .split(',')
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean);
-    // Always include the hardcoded super admin email
     return [...new Set([...fromEnv, 'pracpedia@gmail.com'])];
   })();
 
@@ -107,6 +108,46 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
     if (!clean) return false;
     return PLATFORM_OWNER_EMAILS.includes(clean);
   };
+
+  // Check if an email belongs to an admin/super_admin (runtime lookup).
+  // Caches results so we don't hit the API on every keystroke.
+  const [adminEmailCache, setAdminEmailCache] = useState<Record<string, boolean>>({});
+  const checkEmailTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced admin email check — fires when the user stops typing for 500ms
+  const [isAdminEmail, setIsAdminEmail] = useState(false);
+  useEffect(() => {
+    const clean = email.trim().toLowerCase();
+    if (!clean || !clean.includes('@')) {
+      setIsAdminEmail(false);
+      return;
+    }
+    // Platform owners bypass immediately
+    if (isPlatformOwnerEmail(clean)) {
+      setIsAdminEmail(true);
+      return;
+    }
+    // Debounced API check
+    if (checkEmailTimeoutRef.current) clearTimeout(checkEmailTimeoutRef.current);
+    checkEmailTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/auth/check-email?email=${encodeURIComponent(clean)}`);
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const isAdmin = data.role === 'admin' || data.role === 'super_admin';
+          setAdminEmailCache((prev) => ({ ...prev, [clean]: isAdmin }));
+          setIsAdminEmail(isAdmin);
+        } else {
+          setIsAdminEmail(false);
+        }
+      } catch {
+        setIsAdminEmail(false);
+      }
+    }, 500);
+    return () => {
+      if (checkEmailTimeoutRef.current) clearTimeout(checkEmailTimeoutRef.current);
+    };
+  }, [email, apiFetch]);
 
   // Helper: build the correct registration body for the API
   const buildRegisterBody = (isArtist: boolean) => {
@@ -211,8 +252,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
     // ── Form separation rules ──
     // Standard form (this form) = NON-GMAIL emails only.
     // Gmail form (Google Sign-In modal) = GMAIL emails only.
-    // Platform owners (super admins) bypass — can use any form.
-    if (!isPlatformOwnerEmail(email) && isGmailAddress(email)) {
+    // Admins/super_admins/platform owners bypass — can use any form.
+    if (!isPlatformOwnerEmail(email) && !isAdminEmail && isGmailAddress(email)) {
       setLoading(false);
       setErrorMsg("Gmail accounts must use the 'Sign in / Sign up with Google' button above. This form is for non-Gmail providers (Yahoo, Outlook, Hotmail, edu.bd, etc.) only.");
       return;
@@ -906,9 +947,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (!googleEmailInput) return;
-                  // Platform owners bypass — can use any email in any form.
+                  // Admins/super_admins/platform owners bypass — can use any email in any form.
                   // Non-gmail emails are blocked (must use the standard form).
-                  if (!isPlatformOwnerEmail(googleEmailInput) && !isGmailAddress(googleEmailInput)) {
+                  // Also check the admin cache for the current googleEmailInput.
+                  const isGoogleAdminEmail = isPlatformOwnerEmail(googleEmailInput) ||
+                    (adminEmailCache[googleEmailInput.trim().toLowerCase()] === true);
+                  if (!isGoogleAdminEmail && !isGmailAddress(googleEmailInput)) {
                     setGoogleModalError('Google Sign-In is for Gmail accounts only. For Yahoo, Outlook, Hotmail, and all other email providers, please close this dialog and use the standard form below.');
                     return;
                   }
