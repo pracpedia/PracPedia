@@ -1353,7 +1353,7 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
     setBookingsLoading(true);
     try {
       const res = await apiFetch('/api/bookings?scope=artist');
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data?.error || 'Could not load incoming orders.');
       }
@@ -1382,7 +1382,7 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
     setPortfolioLoading(true);
     try {
       const res = await apiFetch('/api/portfolio');
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data?.error || 'Could not load portfolio.');
       }
