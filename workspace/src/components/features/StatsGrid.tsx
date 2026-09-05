@@ -14,11 +14,23 @@ import {
 
 interface StatsGridProps {
   stats: {
-    usersCount: number;
-    subjectsCount: number;
-    foldersCount: number;
-    imagesCount: number;
-    databaseType: string;
+    // Fields from /api/stats response (no "Count" suffix)
+    users?: number;
+    subjects?: number;
+    folders?: number;
+    images?: number;
+    artists?: number;
+    announcements?: number;
+    bookings?: number;
+    portfolioItems?: number;
+    chatMessages?: number;
+    hireRequests?: number;
+    // Legacy fields (kept for backward compat — no longer used)
+    usersCount?: number;
+    subjectsCount?: number;
+    foldersCount?: number;
+    imagesCount?: number;
+    databaseType?: string;
     uptime?: number;
   } | null;
 }
@@ -34,10 +46,17 @@ export const StatsGrid: React.FC<StatsGridProps> = ({ stats }) => {
     );
   }
 
+  // Support both new API shape (users/subjects/folders/images) and legacy shape (usersCount/etc.)
+  const users = stats.users ?? stats.usersCount ?? 0;
+  const subjects = stats.subjects ?? stats.subjectsCount ?? 0;
+  const folders = stats.folders ?? stats.foldersCount ?? 0;
+  const images = stats.images ?? stats.imagesCount ?? 0;
+  const databaseType = stats.databaseType || (typeof process !== 'undefined' && process.env.DATABASE_URL?.startsWith('postgres') ? 'PostgreSQL' : 'SQLite');
+
   const items = [
     {
       title: "Active Scholars",
-      value: stats.usersCount,
+      value: users,
       desc: "Verified students & researchers",
       badge: "LIVE ENROLLMENT",
       icon: Users,
@@ -49,7 +68,7 @@ export const StatsGrid: React.FC<StatsGridProps> = ({ stats }) => {
     },
     {
       title: "Course Subjects",
-      value: stats.subjectsCount,
+      value: subjects,
       desc: "Distinct academic faculties",
       badge: "CORE CURRICULUM",
       icon: BookOpen,
@@ -61,7 +80,7 @@ export const StatsGrid: React.FC<StatsGridProps> = ({ stats }) => {
     },
     {
       title: "Practical Folders",
-      value: stats.foldersCount,
+      value: folders,
       desc: "Indexed lab experiment notebooks",
       badge: "VERIFIED LABS",
       icon: FolderClosed,
@@ -73,7 +92,7 @@ export const StatsGrid: React.FC<StatsGridProps> = ({ stats }) => {
     },
     {
       title: "Experiment Images",
-      value: stats.imagesCount,
+      value: images,
       desc: "High-resolution diagram scans",
       badge: "100% BOARD STD",
       icon: ImageIcon,
@@ -138,7 +157,7 @@ export const StatsGrid: React.FC<StatsGridProps> = ({ stats }) => {
           <Database className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
           <span className="truncate">Storage & Query Engine:</span>
           <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 font-bold border border-cyan-500/20 text-[10px] shrink-0">
-            {stats.databaseType}
+            {databaseType}
           </span>
         </div>
 

@@ -112,18 +112,18 @@ function PortalConsole() {
   // Active App Theme State
   const [activeTheme, setActiveTheme] = useState<string>(() => {
     if (typeof window === 'undefined') return 'default';
-    return localStorage.getItem('app_theme') || 'default';
+    return safeLocalStorage.getItem('app_theme') || 'default';
   });
 
   // Sync theme changes to localStorage
   useEffect(() => {
-    localStorage.setItem('app_theme', activeTheme);
+    safeLocalStorage.setItem('app_theme', activeTheme);
   }, [activeTheme]);
 
   // Navigation View states
   const [currentView, setCurrentView] = useState<ViewState>(() => {
     if (typeof window === 'undefined') return 'dashboard';
-    const saved = localStorage.getItem('app_current_view');
+    const saved = safeLocalStorage.getItem('app_current_view');
     if (saved && ['landing', 'auth', 'dashboard', 'subject', 'folder', 'admins', 'chat', 'academy', 'profile', 'artists', 'artist_dashboard', 'creds', 'bookings'].includes(saved)) {
       return saved as ViewState;
     }
@@ -131,39 +131,39 @@ function PortalConsole() {
   });
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
-    const savedView = localStorage.getItem('app_current_view');
+    const savedView = safeLocalStorage.getItem('app_current_view');
     if (savedView === 'subject' || savedView === 'folder') {
-      return localStorage.getItem('app_selected_subject_id');
+      return safeLocalStorage.getItem('app_selected_subject_id');
     }
     return null;
   });
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
-    const savedView = localStorage.getItem('app_current_view');
+    const savedView = safeLocalStorage.getItem('app_current_view');
     if (savedView === 'folder') {
-      return localStorage.getItem('app_selected_folder_id');
+      return safeLocalStorage.getItem('app_selected_folder_id');
     }
     return null;
   });
 
   // Sync state parameters to localStorage for reload integrity
   useEffect(() => {
-    localStorage.setItem('app_current_view', currentView);
+    safeLocalStorage.setItem('app_current_view', currentView);
   }, [currentView]);
 
   useEffect(() => {
     if (selectedSubjectId) {
-      localStorage.setItem('app_selected_subject_id', selectedSubjectId);
+      safeLocalStorage.setItem('app_selected_subject_id', selectedSubjectId);
     } else {
-      localStorage.removeItem('app_selected_subject_id');
+      safeLocalStorage.removeItem('app_selected_subject_id');
     }
   }, [selectedSubjectId]);
 
   useEffect(() => {
     if (selectedFolderId) {
-      localStorage.setItem('app_selected_folder_id', selectedFolderId);
+      safeLocalStorage.setItem('app_selected_folder_id', selectedFolderId);
     } else {
-      localStorage.removeItem('app_selected_folder_id');
+      safeLocalStorage.removeItem('app_selected_folder_id');
     }
   }, [selectedFolderId]);
 
@@ -1487,7 +1487,7 @@ function PortalConsole() {
                         {filteredFolders.length === 0
                           ? "No practical folders have been indexed under this discipline yet."
                           : `No practicals match current query "${searchQuery}"`}
-                        {user?.role === "admin" && filteredFolders.length === 0 && (
+                        {(user?.role === 'admin' || user?.role === 'super_admin') && filteredFolders.length === 0 && (
                           <button
                             onClick={() => {
                               setEditFolderData(null);
@@ -2181,7 +2181,7 @@ export default function Home() {
   // Public marketplace browse mode — renders a no-auth marketplace view
   // when an unauthenticated visitor taps "Browse Marketplace" on the landing
   // page. Authenticated users never reach this branch (they go to
-  // PortalConsole above, which reads localStorage.app_current_view='artists'
+  // PortalConsole above, which reads safeLocalStorage.app_current_view='artists'
   // and opens to the marketplace directly).
   if (viewPublicMarketplace && !isAuthenticated) {
     return (
@@ -2229,7 +2229,7 @@ export default function Home() {
         // which renders the no-auth <PublicMarketplace /> view above.
         if (typeof window !== 'undefined') {
           try {
-            window.localStorage.setItem('app_current_view', 'artists');
+            safeLocalStorage.setItem('app_current_view', 'artists');
           } catch { /* ignore */ }
         }
         if (isAuthenticated) return;

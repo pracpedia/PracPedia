@@ -91,8 +91,11 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
     messagesRef.current = messages;
   }, [messages]);
 
-  // Real-time active users
-  const [activeUsers, setActiveUsers] = useState<any[]>((window as any).__activeUsers || []);
+  // Real-time active users — guard against SSR (window is undefined on server)
+  const [activeUsers, setActiveUsers] = useState<any[]>(() => {
+    if (typeof window === 'undefined') return [];
+    return (window as any).__activeUsers || [];
+  });
 
   // Quick Action triggers removed per user request — chat input is now clean.
 
