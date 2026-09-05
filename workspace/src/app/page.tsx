@@ -1092,7 +1092,6 @@ function PortalConsole() {
 
             <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-slate-950/60 border border-white/[0.04] rounded-xl text-slate-400 text-[10px] font-mono uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-[#22d3ee] animate-pulse" />
-              <span>LIVE WORKSPACE DOCK</span>
             </div>
           </div>
         </header>
@@ -1998,9 +1997,6 @@ function PortalConsole() {
                   BD Time: <span className="text-cyan-400">{bdTime}</span>
                 </span>
               )}
-              <span className="text-slate-600 hidden md:inline">
-                · Encrypted Workspace Stream
-              </span>
             </div>
           </div>
         </footer>
