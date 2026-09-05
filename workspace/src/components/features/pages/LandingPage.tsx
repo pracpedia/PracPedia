@@ -11,7 +11,6 @@ import {
   Activity,
   Calendar,
   CheckCircle2,
-  Sparkles,
   MessageCircle,
   Palette,
   BookOpen,
@@ -24,6 +23,7 @@ import {
   Menu,
   X,
   Clock,
+  GraduationCap,
 } from 'lucide-react';
 import { Logo } from '@/components/features/Logo';
 
@@ -72,7 +72,7 @@ const FALLBACK_SUBJECTS = [
 
 const FEATURES = [
   {
-    Icon: Sparkles,
+    Icon: GraduationCap,
     title: 'Gemini AI Academy',
     desc: 'Ask questions 24/7 in English or Bangla. Get step-by-step lesson explanations, practice MCQs, and structured lessons.',
     tint: 'from-indigo-500 to-purple-500',
@@ -1868,7 +1868,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   {isAuthenticated ? (
                     <Layout className="w-4 h-4" />
                   ) : (
-                    <Sparkles className="w-4 h-4 text-cyan-600" />
+                    <GraduationCap className="w-4 h-4 text-cyan-600" />
                   )}
                   <span>{heroCtaLabel}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
