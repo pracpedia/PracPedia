@@ -35,6 +35,86 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
   // Carousel states
   const [index, setIndex] = useState(initialIndex);
   const [zoom, setZoom] = useState(false);
+  // Multi-level zoom: 1x, 1.5x, 2x, 3x, 4x — click image to cycle,
+  // or use zoom in/out buttons for precise control
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  // Reset zoom/pan when switching images
+  useEffect(() => {
+    setZoomLevel(1);
+    setPanX(0);
+    setPanY(0);
+    setZoom(false);
+  }, [index]);
+
+  const zoomIn = () => {
+    setZoomLevel((prev) => Math.min(prev + 0.5, 5));
+  };
+  const zoomOut = () => {
+    setZoomLevel((prev) => {
+      const next = Math.max(prev - 0.5, 1);
+      if (next === 1) {
+        setPanX(0);
+        setPanY(0);
+      }
+      return next;
+    });
+  };
+  const resetZoom = () => {
+    setZoomLevel(1);
+    setPanX(0);
+    setPanY(0);
+    setZoom(false);
+  };
+
+  // Click to cycle zoom: 1 → 2 → 3 → 1
+  const handleImageClick = () => {
+    setZoomLevel((prev) => {
+      if (prev === 1) return 2;
+      if (prev === 2) return 3;
+      return 1;
+    });
+  };
+
+  // Pan support — drag to move zoomed image
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoomLevel <= 1) return;
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY, panX, panY };
+  };
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || zoomLevel <= 1) return;
+    e.preventDefault();
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    setPanX(dragStartRef.current.panX + dx);
+    setPanY(dragStartRef.current.panY + dy);
+  };
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Touch pan support for mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (zoomLevel <= 1) return;
+    const touch = e.touches[0];
+    setIsDragging(true);
+    dragStartRef.current = { x: touch.clientX, y: touch.clientY, panX, panY };
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || zoomLevel <= 1) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const dx = touch.clientX - dragStartRef.current.x;
+    const dy = touch.clientY - dragStartRef.current.y;
+    setPanX(dragStartRef.current.panX + dx);
+    setPanY(dragStartRef.current.panY + dy);
+  };
 
   // HSC Science AI Helper States
   const [showAiAssistant, setShowAiAssistant] = useState(false);
@@ -364,23 +444,73 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
 
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-full h-full flex items-center justify-center p-2 relative min-h-0"
+              className="w-full h-full flex items-center justify-center p-2 relative min-h-0 overflow-hidden"
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleMouseUp}
             >
               <motion.img
                 key={index}
-                initial={{ scale: 0.97, opacity: 0 }}
+                initial={{ opacity: 0 }}
                 animate={{
-                  scale: zoom ? 1.2 : 1,
+                  scale: zoomLevel,
+                  x: panX,
+                  y: panY,
                   opacity: 1,
-                  cursor: zoom ? 'zoom-out' : 'zoom-in'
+                  cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
                 }}
-                exit={{ scale: 0.97, opacity: 0 }}
+                exit={{ opacity: 0 }}
                 transition={{ type: "spring", damping: 30, stiffness: 220 }}
-                src={currentImage?.url}
-                alt={currentImage?.title}
-                onClick={() => setZoom(!zoom)}
-                className="max-w-[95vw] max-h-[34vh] sm:max-h-[38vh] lg:max-h-[72vh] object-contain rounded-2xl border border-white/10"
+                src={currentImage?.url || '/favicon.ico'}
+                alt={currentImage?.title || 'Image'}
+                onError={(e) => { e.currentTarget.src = '/favicon.ico'; }}
+                onClick={(e) => {
+                  if (zoomLevel > 1 && !isDragging) {
+                    e.stopPropagation();
+                    resetZoom();
+                  } else if (!isDragging) {
+                    handleImageClick();
+                  }
+                }}
+                onMouseDown={handleMouseDown}
+                onTouchStart={handleTouchStart}
+                draggable={false}
+                className="max-w-[95vw] max-h-[34vh] sm:max-h-[38vh] lg:max-h-[72vh] object-contain rounded-2xl border border-white/10 select-none pointer-events-auto"
               />
+
+              {/* Zoom control buttons */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-slate-950/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 shadow-xl z-20">
+                <button
+                  onClick={(e) => { e.stopPropagation(); zoomOut(); }}
+                  disabled={zoomLevel <= 1}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/15 text-white transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Zoom out"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="text-[10px] font-mono font-bold text-cyan-400 min-w-[36px] text-center select-none">
+                  {Math.round(zoomLevel * 100)}%
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); zoomIn(); }}
+                  disabled={zoomLevel >= 5}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/15 text-white transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Zoom in"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                {zoomLevel > 1 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); resetZoom(); }}
+                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer"
+                    title="Reset zoom"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {images.length > 1 && (
