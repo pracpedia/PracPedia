@@ -62,6 +62,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [scannedResultBase64, setScannedResultBase64] = useState<string | null>(null);
   const [scannedWidth, setScannedWidth] = useState(0);
   const [scannedHeight, setScannedHeight] = useState(0);
+  const [isRotating, setIsRotating] = useState(false);
 
   // Elements refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -372,7 +373,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   // downstream features (upload original, perspective align) use the
   // rotated version. This lets the user turn a landscape image into
   // portrait and vice versa.
-  const [isRotating, setIsRotating] = useState(false);
   const rotateImage = (direction: 1 | -1) => {
     if (!hiddenImgRef.current || !rawImageBase64 || isRotating) return;
     setIsRotating(true);
