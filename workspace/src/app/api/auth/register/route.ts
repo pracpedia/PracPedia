@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { signToken, getUserFromRequest } from '@/lib/auth';
 import { serializeUser } from '@/lib/user-serializer';

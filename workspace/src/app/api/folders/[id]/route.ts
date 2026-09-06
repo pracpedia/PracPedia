@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       subjectId: updated.subjectId,
       title: updated.title,
       description: updated.description,
-      images: JSON.parse(updated.imagesJson || '[]'),
+      images: safeJsonParseArray(updated.imagesJson),
       createdAt: updated.createdAt,
     });
   } catch (err: any) {

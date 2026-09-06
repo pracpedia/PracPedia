@@ -259,7 +259,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
     // 500ms debounce fires.
     const cleanEmail = email.trim().toLowerCase();
     const isCachedAdmin = adminEmailCache[cleanEmail] === true;
-    if (!isPlatformOwnerEmail(email) && !isAdminEmail && !isCachedAdmin && isGmailAddress(email)) {
+    if (!isPlatformOwnerEmail(cleanEmail) && !isAdminEmail && !isCachedAdmin && isGmailAddress(email)) {
       setLoading(false);
       setErrorMsg("Gmail accounts must use the 'Sign in / Sign up with Google' button above. This form is for non-Gmail providers (Yahoo, Outlook, Hotmail, edu.bd, etc.) only.");
       return;

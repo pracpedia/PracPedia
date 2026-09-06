@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { serializeUser } from '@/lib/user-serializer';
 
@@ -19,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       portfolio: portfolio.map((p) => ({
         ...p,
         id: p.id,
-        tags: JSON.parse(p.tagsJson || '[]'),
+        tags: safeJsonParseArray(p.tagsJson),
       })),
     });
   } catch (err: any) {

@@ -1,0 +1,702 @@
+  1100→        <main className="flex-1 p-3 sm:p-6 md:p-8 space-y-6 w-full min-w-0">
+  1101→
+  1102→          {isLoading && (
+  1103→            <DataLoader />
+  1104→          )}
+  1105→
+  1106→          {!isLoading && (
+  1107→            <>
+  1108→              {/* ==============================================
+  1109→                  📊 VIEW: MAIN DASHBOARD GALLERY VIEW
+  1110→                  ============================================== */}
+  1111→              {currentView === 'dashboard' && (
+  1112→                <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
+  1113→
+  1114→                  {/* Dynamic Announcement Alerts */}
+  1115→                  {announcements.length > 0 && (
+  1116→                    <div className="space-y-3 animate-in slide-in-from-top-3 duration-300">
+  1117→                      <div className="flex items-center justify-between gap-2 flex-wrap">
+  1118→                        <h3 className="text-xs font-mono uppercase tracking-widest text-[#fbbf24] font-bold flex items-center gap-1.5">
+  1119→                          <span className="relative flex h-2 w-2">
+  1120→                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+  1121→                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+  1122→                          </span>
+  1123→                          Active Deadlines & Announcements
+  1124→                        </h3>
+  1125→                      </div>
+  1126→
+  1127→                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  1128→                        {announcements.slice(0, 2).map((ann) => (
+  1129→                          <div
+  1130→                            key={ann.id}
+  1131→                            className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900/60 to-slate-950/20 border border-amber-500/15 relative overflow-hidden group hover:border-amber-400/30 transition-all flex flex-col justify-between shadow-lg"
+  1132→                          >
+  1133→                            <div className="absolute top-0 right-0 p-3 text-[10px] font-mono text-slate-600 bg-white/[0.01] border-l border-b border-white/[0.03] rounded-bl-xl">
+  1134→                              {new Date(ann.createdAt).toLocaleDateString()}
+  1135→                            </div>
+  1136→
+  1137→                            <div className="space-y-1.5 max-w-[85%]">
+  1138→                              <h4 className="text-sm font-extrabold text-white tracking-tight group-hover:text-[#fbbf24] transition-colors break-words">
+  1139→                                {ann.title}
+  1140→                              </h4>
+  1141→                              <p className="text-xs text-slate-300 leading-relaxed line-clamp-2 break-words">
+  1142→                                {ann.content}
+  1143→                              </p>
+  1144→                            </div>
+  1145→
+  1146→                            {/* Downloadable attachment — visible to all users */}
+  1147→                            {ann.fileUrl && (
+  1148→                              <button
+  1149→                                onClick={() => {
+  1150→                                  const url = ann.fileUrl!;
+  1151→                                  const name = ann.fileName || 'download';
+  1152→                                  if (url.startsWith('data:')) {
+  1153→                                    try {
+  1154→                                      const [meta, base64] = url.split(',');
+  1155→                                      const mime = meta.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
+  1156→                                      const binary = atob(base64);
+  1157→                                      const bytes = new Uint8Array(binary.length);
+  1158→                                      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  1159→                                      const blob = new Blob([bytes], { type: mime });
+  1160→                                      const blobUrl = URL.createObjectURL(blob);
+  1161→                                      const a = document.createElement('a');
+  1162→                                      a.href = blobUrl;
+  1163→                                      a.download = name;
+  1164→                                      document.body.appendChild(a);
+  1165→                                      a.click();
+  1166→                                      document.body.removeChild(a);
+  1167→                                      URL.revokeObjectURL(blobUrl);
+  1168→                                    } catch (err) {
+  1169→                                      console.error('Download failed:', err);
+  1170→                                      window.open(url, '_blank');
+  1171→                                    }
+  1172→                                  } else {
+  1173→                                    const a = document.createElement('a');
+  1174→                                    a.href = url;
+  1175→                                    a.download = name;
+  1176→                                    a.target = '_blank';
+  1177→                                    a.rel = 'noopener noreferrer';
+  1178→                                    document.body.appendChild(a);
+  1179→                                    a.click();
+  1180→                                    document.body.removeChild(a);
+  1181→                                  }
+  1182→                                }}
+  1183→                                className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-bold transition-all cursor-pointer"
+  1184→                              >
+  1185→                                <FileText className="w-3.5 h-3.5" />
+  1186→                                Download {ann.fileName || 'file'}
+  1187→                              </button>
+  1188→                            )}
+  1189→
+  1190→                            <div className="flex items-center justify-between pt-4 mt-3 border-t border-white/[0.03] text-[10.5px] font-mono gap-2 flex-wrap">
+  1191→                              <span className="text-slate-400 font-sans truncate min-w-0">Posted by: {ann.createdByName}</span>
+  1192→                              {ann.deadline && (
+  1193→                                <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-extrabold border border-amber-500/20 shrink-0">
+  1194→                                  Deadline: {ann.deadline}
+  1195→                                </span>
+  1196→                              )}
+  1197→                            </div>
+  1198→                          </div>
+  1199→                        ))}
+  1200→                      </div>
+  1201→                    </div>
+  1202→                  )}
+  1203→
+  1204→                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+  1205→                    <div className="min-w-0">
+  1206→                      <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight break-words">University Archive Panel</h2>
+  1207→                      <p className="text-xs text-slate-400 mt-1">Select from five premium subject areas to access specific experiment galleries.</p>
+  1208→                    </div>
+  1209→
+  1210→                    {/* Quick Search */}
+  1211→                    <div className="relative w-full sm:w-72">
+  1212→                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">
+  1213→                        <Search className="w-4 h-4" />
+  1214→                      </span>
+  1215→                      <input
+  1216→                        type="text"
+  1217→                        placeholder="Search all practical modules..."
+  1218→                        value={searchQuery}
+  1219→                        onChange={(e) => setSearchQuery(e.target.value)}
+  1220→                        className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl outline-none focus:border-indigo-500/50 text-xs transition-transform focus:scale-[1.01] min-h-[44px]"
+  1221→                      />
+  1222→                    </div>
+  1223→                  </div>
+  1224→
+  1225→                  {/* Standard Counter Statistics Blocks */}
+  1226→                  <StatsGrid stats={stats} />
+  1227→
+  1228→                  {/* Subject folders list */}
+  1229→                  {!searchQuery ? (
+  1230→                    <div className="space-y-5">
+  1231→                      <div className="flex items-center justify-between gap-2 flex-wrap">
+  1232→                        <div className="flex items-center gap-2.5 min-w-0">
+  1233→                          <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+  1234→                            <Compass className="w-4 h-4" />
+  1235→                          </div>
+  1236→                          <div className="min-w-0">
+  1237→                            <h3 className="text-sm font-black uppercase tracking-wider font-mono text-white truncate">
+  1238→                              Primary Course Subjects
+  1239→                            </h3>
+  1240→                            <p className="text-[11px] text-slate-400 font-sans truncate">Core academic disciplines & certified practical laboratories</p>
+  1241→                          </div>
+  1242→                        </div>
+  1243→                        <span className="text-[11px] font-mono text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-white/5 shrink-0">
+  1244→                          {subjects.length} Faculties
+  1245→                        </span>
+  1246→                      </div>
+  1247→
+  1248→                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+  1249→                        {subjects.map((sub) => {
+  1250→                          const meta = getSubjectMeta(sub.title);
+  1251→                          const subjectFolders = folders.filter(f => f.subjectId === sub.id);
+  1252→                          const totalPhotos = subjectFolders.reduce((sum, f) => sum + (f.images ? f.images.length : 0), 0);
+  1253→
+  1254→                          return (
+  1255→                            <div
+  1256→                              key={sub.id}
+  1257→                              onClick={() => setView('subject', sub.id)}
+  1258→                              className={`
+  1259→                                cursor-pointer rounded-2xl p-4 sm:p-6 border transition-all duration-300 relative group overflow-hidden shadow-xl backdrop-blur-md flex flex-col justify-between
+  1260→                                bg-gradient-to-b from-slate-900/80 via-slate-900/60 to-slate-950/90 border-white/10 hover:border-white/20 hover:-translate-y-1 hover:shadow-2xl
+  1261→                              `}
+  1262→                            >
+  1263→                              {/* Top laser line with subject specific glow */}
+  1264→                              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+  1265→
+  1266→                              {/* Ambient radial blur */}
+  1267→                              <div className="absolute top-0 right-0 w-36 h-36 bg-indigo-500/5 group-hover:bg-indigo-500/10 blur-2xl pointer-events-none rounded-full transition-all duration-300" />
+  1268→
+  1269→                              <div className="space-y-3 sm:space-y-4 relative z-10">
+  1270→                                {/* Subject header ribbon */}
+  1271→                                <div className="flex justify-between items-center gap-2">
+  1272→                                  <span className={`text-[8px] sm:text-[9px] uppercase font-mono font-bold tracking-wider px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border ${meta.text} ${meta.bg} border-current/20 flex items-center gap-1 sm:gap-1.5 truncate min-w-0`}>
+  1273→                                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />
+  1274→                                    <span className="truncate">Faculty</span>
+  1275→                                  </span>
+  1276→
+  1277→                                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+  1278→                                    {(user?.role === 'admin' || user?.role === 'super_admin') &&(
+  1279→                                      <button
+  1280→                                        onClick={async (e) => {
+  1281→                                          e.stopPropagation();
+  1282→                                          addLiveNotification(`Deleting subject "${sub.title}"...`, "warning");
+  1283→                                          try {
+  1284→                                              const res = await apiFetch(`/api/subjects/${sub.id}`, { method: 'DELETE' });
+  1285→                                              if (res.ok) {
+  1286→                                                await refreshWorkspaceData();
+  1287→                                              } else {
+  1288→                                                const err = await res.json();
+  1289→                                                addLiveNotification(err.error || "Failed to delete subject.", "warning");
+  1290→                                              }
+  1291→                                            } catch (err) {
+  1292→                                              addLiveNotification("Network error deleting subject.", "warning");
+  1293→                                            }
+  1294→                                        }}
+  1295→                                        className="p-1 sm:p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
+  1296→                                        title="Delete Subject"
+  1297→                                      >
+  1298→                                        <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+  1299→                                      </button>
+  1300→                                    )}
+  1301→                                    <div className="p-1.5 sm:p-2 rounded-xl bg-slate-800/80 border border-white/5 text-slate-400 group-hover:text-indigo-400 group-hover:scale-110 transition-all">
+  1302→                                      <FolderClosed className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+  1303→                                    </div>
+  1304→                                  </div>
+  1305→                                </div>
+  1306→
+  1307→                                <div className="min-w-0">
+  1308→                                  <h4 className="text-sm sm:text-lg font-black text-white group-hover:text-indigo-300 transition-colors tracking-tight line-clamp-1 break-words">
+  1309→                                    {sub.title}
+  1310→                                  </h4>
+  1311→                                  <p className="text-[11px] sm:text-xs text-slate-400 min-h-[28px] sm:min-h-[36px] line-clamp-2 leading-relaxed mt-1 sm:mt-1.5 font-sans break-words">
+  1312→                                    {sub.description || meta.desc}
+  1313→                                  </p>
+  1314→                                </div>
+  1315→                              </div>
+  1316→
+  1317→                              <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-white/5 mt-3 sm:mt-5 text-[9px] sm:text-[11px] font-mono text-slate-400 relative z-10 gap-2 flex-wrap">
+  1318→                                <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
+  1319→                                  <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-slate-800/80 border border-white/5">
+  1320→                                    <strong className="text-slate-200">{subjectFolders.length}</strong> Folders
+  1321→                                  </span>
+  1322→                                  <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-bold">
+  1323→                                    {totalPhotos} Scans
+  1324→                                  </span>
+  1325→                                </div>
+  1326→                                <span className="group-hover:translate-x-1 transition-transform inline-flex items-center gap-0.5 sm:gap-1 text-indigo-400 font-bold font-sans text-[11px] sm:text-xs shrink-0 ml-1">
+  1327→                                  <span>Explore</span>
+  1328→                                  <span>→</span>
+  1329→                                </span>
+  1330→                              </div>
+  1331→                            </div>
+  1332→                          );
+  1333→                        })}
+  1334→                      </div>
+  1335→                    </div>
+  1336→                  ) : (
+  1337→                    // Search layout Results
+  1338→                    <div className="space-y-5 font-sans">
+  1339→                      <div className="flex items-center justify-between gap-2 flex-wrap">
+  1340→                        <div className="flex items-center gap-2.5 min-w-0">
+  1341→                          <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
+  1342→                            <Compass className="w-4 h-4" />
+  1343→                          </div>
+  1344→                          <h3 className="text-sm font-black uppercase tracking-wider font-mono text-white truncate">
+  1345→                            Search Results ({searchedDashboardFolders.length})
+  1346→                          </h3>
+  1347→                        </div>
+  1348→                        <span className="text-xs text-slate-400 font-mono truncate max-w-full">Query: "{searchQuery}"</span>
+  1349→                      </div>
+  1350→
+  1351→                      {searchedDashboardFolders.length === 0 ? (
+  1352→                        <div className="p-8 sm:p-12 text-center text-slate-400 bg-slate-950/60 rounded-3xl border border-white/5 space-y-2">
+  1353→                          <FolderClosed className="w-8 h-8 text-slate-600 mx-auto" />
+  1354→                          <p className="text-xs font-semibold break-words">No practical folders match "{searchQuery}"</p>
+  1355→                        </div>
+  1356→                      ) : (
+  1357→                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+  1358→                          {searchedDashboardFolders.map((fold) => {
+  1359→                            const sub = subjects.find(s => s.id === fold.subjectId);
+  1360→                            const meta = getSubjectMeta(sub?.title || '');
+  1361→                            return (
+  1362→                              <div
+  1363→                                key={fold.id}
+  1364→                                onClick={() => setView('folder', undefined, fold.id)}
+  1365→                                className="stagger-card cursor-pointer p-3.5 sm:p-5 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-white/20 hover:-translate-y-1 transition-all duration-300 relative group flex flex-col justify-between shadow-xl backdrop-blur-md overflow-hidden"
+  1366→                              >
+  1367→                                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/60 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+  1368→
+  1369→                                <div className="min-w-0">
+  1370→                                  <div className="flex justify-between items-start mb-2 gap-1.5">
+  1371→                                    <div className="flex flex-col gap-1 items-start min-w-0">
+  1372→                                      <span className={`text-[8px] sm:text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 sm:px-2 py-0.5 rounded-full border ${meta.text} ${meta.bg} border-current/20 truncate max-w-full`}>
+  1373→                                        {sub?.title || 'General'}
+  1374→                                      </span>
+  1375→                                      {getRecentlyViewedMsg(fold.id) && (
+  1376→                                        <span className="text-[8px] sm:text-[8.5px] px-1.5 sm:px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-mono font-bold flex items-center gap-1 border border-cyan-500/20 truncate max-w-full">
+  1377→                                          <span className="w-1 h-1 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+  1378→                                          <span className="truncate">Recent</span>
+  1379→                                        </span>
+  1380→                                      )}
+  1381→                                    </div>
+  1382→                                    <span className="text-[9px] sm:text-[10px] text-cyan-400 font-mono px-1.5 sm:px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 shrink-0 font-bold">
+  1383→                                      {fold.images ? fold.images.length : 0} sheets
+  1384→                                    </span>
+  1385→                                  </div>
+  1386→                                  <h4 className="text-xs sm:text-sm font-black text-white mt-1.5 sm:mt-2 line-clamp-1 group-hover:text-cyan-300 transition-colors break-words">
+  1387→                                    {fold.title}
+  1388→                                  </h4>
+  1389→                                  <p className="text-[11px] sm:text-xs text-slate-400 line-clamp-2 mt-1 sm:mt-1.5 leading-relaxed break-words">
+  1390→                                    {fold.description}
+  1391→                                  </p>
+  1392→                                </div>
+  1393→                                <div className="pt-2.5 sm:pt-3.5 border-t border-white/5 mt-3 sm:mt-4 text-[9px] sm:text-[10px] text-slate-400 flex justify-between items-center font-mono gap-2">
+  1394→                                  <span className="truncate min-w-0">{new Date(fold.createdAt).toLocaleDateString()}</span>
+  1395→                                  <span className="text-cyan-400 font-sans font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-0.5 sm:gap-1 shrink-0 ml-1">
+  1396→                                    <span>Vault</span>
+  1397→                                    <span>→</span>
+  1398→                                  </span>
+  1399→                                </div>
+  1400→                              </div>
+  1401→                            );
+  1402→                          })}
+  1403→                        </div>
+  1404→                      )}
+  1405→                    </div>
+  1406→                  )}
+  1407→                </div>
+  1408→              )}
+  1409→
+  1410→
+  1411→              {/* ==============================================
+  1412→                  📚 VIEW: SUBJECT CORE PAGE VIEW
+  1413→                  ============================================== */}
+  1414→              {currentView === 'subject' && activeSubject && (
+  1415→                <div className="space-y-6 animate-in fade-in duration-300">
+  1416→
+  1417→                  {/* Top Subject title block */}
+  1418→                  <div className="p-4 sm:p-6 md:p-8 rounded-3xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-950 to-slate-950 border border-slate-900">
+  1419→                    <div className="absolute right-6 top-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-indigo-500/5 blur-3xl" />
+  1420→
+  1421→                    <button
+  1422→                      onClick={() => setView('dashboard')}
+  1423→                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg text-xs font-semibold mb-6 flex items-center gap-1.5 border border-slate-800 transition-colors min-h-[40px] w-fit"
+  1424→                    >
+  1425→                      <ArrowLeft className="w-3.5 h-3.5" />
+  1426→                      Back to Subjects
+  1427→                    </button>
+  1428→
+  1429→                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+  1430→                      <div className="reveal-header space-y-2 min-w-0">
+  1431→                        <span className="text-[10px] text-indigo-400 font-mono uppercase tracking-widest font-bold">
+  1432→                          ACADEMIC DISCIPLINE
+  1433→                        </span>
+  1434→                        <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight break-words">
+  1435→                          {activeSubject.title} Lab Book
+  1436→                        </h2>
+  1437→                        <p className="text-xs text-slate-400 max-w-2xl break-words">
+  1438→                          {activeSubject.description || getSubjectMeta(activeSubject.title).desc}
+  1439→                        </p>
+  1440→                      </div>
+  1441→
+  1442→                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+  1443→                        {(user?.role === 'admin' || user?.role === 'super_admin') &&(
+  1444→                          <button
+  1445→                            onClick={() => {
+  1446→                              setEditFolderData(null);
+  1447→                              setIsFolderModalOpen(true);
+  1448→                            }}
+  1449→                            className="px-4 sm:px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs tracking-wide flex items-center gap-1.5 transition-all shadow-md shadow-indigo-950 animate-pulse active:scale-95 min-h-[44px] w-full sm:w-auto justify-center"
+  1450→                          >
+  1451→                            <Plus className="w-4 h-4" />
+  1452→                            Add Practical Folder
+  1453→                          </button>
+  1454→                        )}
+  1455→
+  1456→                        <div className="relative w-full sm:w-60">
+  1457→                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">
+  1458→                            <Search className="w-4 h-4" />
+  1459→                          </span>
+  1460→                          <input
+  1461→                            type="text"
+  1462→                            placeholder="Filter practicals..."
+  1463→                            value={searchQuery}
+  1464→                            onChange={(e) => setSearchQuery(e.target.value)}
+  1465→                            className="w-full pl-9 pr-4 py-2.5 bg-slate-900 border border-slate-800 text-slate-100 placeholder-slate-600 rounded-xl outline-none focus:border-indigo-500 text-xs transition-all min-h-[44px]"
+  1466→                          />
+  1467→                        </div>
+  1468→                      </div>
+  1469→                    </div>
+  1470→                  </div>
+  1471→
+  1472→
+  1473→
+  1474→                  {/* Practical Folders list in this subject */}
+  1475→                  <div className="space-y-4">
+  1476→                    <div className="flex justify-between items-center gap-2 flex-wrap">
+  1477→                      <h3 className="text-xs uppercase font-mono tracking-widest text-slate-500 font-bold truncate">
+  1478→                        Indexed Practical Folders
+  1479→                      </h3>
+  1480→                      <span className="text-[11px] text-slate-500 font-mono shrink-0">
+  1481→                        TOTAL INDEXES: {filteredFolders.length}
+  1482→                      </span>
+  1483→                    </div>
+  1484→
+  1485→                    {searchedSubjectFolders.length === 0 ? (
+  1486→                      <div className="p-8 sm:p-16 text-center text-slate-500 rounded-3xl bg-slate-900/30 border border-slate-900 break-words">
+  1487→                        {filteredFolders.length === 0
+  1488→                          ? "No practical folders have been indexed under this discipline yet."
+  1489→                          : `No practicals match current query "${searchQuery}"`}
+  1490→                        {(user?.role === 'admin' || user?.role === 'super_admin') && filteredFolders.length === 0 && (
+  1491→                          <button
+  1492→                            onClick={() => {
+  1493→                              setEditFolderData(null);
+  1494→                              setIsFolderModalOpen(true);
+  1495→                            }}
+  1496→                            className="mt-4 px-4 py-2 mx-auto bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold block hover:bg-indigo-600 hover:text-white transition-all min-h-[44px]"
+  1497→                          >
+  1498→                            Create First Notebook Location
+  1499→                          </button>
+  1500→                        )}
+  1501→                      </div>
+  1502→                    ) : (
+  1503→                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+  1504→                        {searchedSubjectFolders.map((fold) => (
+  1505→                          <div
+  1506→                            key={fold.id}
+  1507→                            onClick={() => setView('folder', undefined, fold.id)}
+  1508→                            className="stagger-card p-3.5 sm:p-5 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-white/20 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between relative group shadow-xl backdrop-blur-md overflow-hidden cursor-pointer"
+  1509→                          >
+  1510→                            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+  1511→
+  1512→                            <div className="space-y-2.5 sm:space-y-3 min-w-0">
+  1513→                              <div className="flex justify-between items-start gap-1.5">
+  1514→                                <div className="flex items-center gap-1.5 min-w-0">
+  1515→                                  <div className="p-1.5 sm:p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400 shrink-0">
+  1516→                                    <FolderClosed className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+  1517→                                  </div>
+  1518→                                  {getRecentlyViewedMsg(fold.id) && (
+  1519→                                    <span className="text-[8px] sm:text-[8.5px] px-1.5 sm:px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-mono font-bold flex items-center gap-1 border border-cyan-500/20 truncate max-w-full">
+  1520→                                      <span className="w-1 h-1 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+  1521→                                      <span className="truncate">Recent</span>
+  1522→                                    </span>
+  1523→                                  )}
+  1524→                                </div>
+  1525→
+  1526→                                <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[9px] sm:text-[10px] font-mono font-bold shrink-0">
+  1527→                                  {fold.images ? fold.images.length : 0} Sheets
+  1528→                                </span>
+  1529→                              </div>
+  1530→
+  1531→                              <div className="min-w-0">
+  1532→                                <h4 className="text-xs sm:text-sm font-black text-white group-hover:text-indigo-300 transition-colors line-clamp-1 break-words">
+  1533→                                  {fold.title}
+  1534→                                </h4>
+  1535→                                <p className="text-[11px] sm:text-xs text-slate-400 leading-relaxed line-clamp-2 mt-1 font-sans break-words">
+  1536→                                  {fold.description || "Experimental worksheets, reading records, chemical assay methods."}
+  1537→                                </p>
+  1538→                              </div>
+  1539→                            </div>
+  1540→
+  1541→                            <div className="pt-2.5 sm:pt-3.5 border-t border-white/5 mt-3 sm:mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[9px] sm:text-[10px] font-mono text-slate-400">
+  1542→                              <span className="flex items-center gap-1 truncate min-w-0">
+  1543→                                <Calendar className="w-3 h-3 text-slate-500 shrink-0" />
+  1544→                                <span className="truncate">{new Date(fold.createdAt).toLocaleDateString()}</span>
+  1545→                              </span>
+  1546→
+  1547→                              <div className="flex gap-1 sm:gap-1.5 items-center justify-end flex-wrap">
+  1548→                                {(user?.role === 'admin' || user?.role === 'super_admin') &&(
+  1549→                                  <>
+  1550→                                    <button
+  1551→                                      onClick={(e) => {
+  1552→                                        e.stopPropagation();
+  1553→                                        setEditFolderData(fold);
+  1554→                                        setIsFolderModalOpen(true);
+  1555→                                      }}
+  1556→                                      className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/5 rounded-lg font-bold font-sans text-[9px] sm:text-[10px] cursor-pointer transition-colors min-h-[32px] flex items-center"
+  1557→                                      title="Edit settings"
+  1558→                                    >
+  1559→                                      Edit
+  1560→                                    </button>
+  1561→
+  1562→                                    <button
+  1563→                                      onClick={(e) => {
+  1564→                                        e.stopPropagation();
+  1565→                                        addLiveNotification(`Deleting folder "${fold.title}"...`, "warning");
+  1566→                                        handleDeleteFolder(fold.id);
+  1567→                                      }}
+  1568→                                      className="p-0.5 sm:p-1 px-1.5 sm:px-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg font-bold font-sans text-[9px] sm:text-[10px] flex items-center gap-1 cursor-pointer transition-colors min-h-[32px]"
+  1569→                                      title="Delete practical folder"
+  1570→                                    >
+  1571→                                      <Trash2 className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+  1572→                                      <span className="hidden sm:inline">Del</span>
+  1573→                                    </button>
+  1574→                                  </>
+  1575→                                )}
+  1576→
+  1577→                                <button
+  1578→                                  onClick={(e) => {
+  1579→                                    e.stopPropagation();
+  1580→                                    setView('folder', undefined, fold.id);
+  1581→                                  }}
+  1582→                                  className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-all text-[9px] sm:text-[10px] font-bold font-sans cursor-pointer shadow-sm min-h-[32px] flex items-center"
+  1583→                                >
+  1584→                                  Open →
+  1585→                                </button>
+  1586→                              </div>
+  1587→                            </div>
+  1588→                          </div>
+  1589→                        ))}
+  1590→                      </div>
+  1591→                    )}
+  1592→                  </div>
+  1593→                </div>
+  1594→              )}
+  1595→
+  1596→
+  1597→              {/* ==============================================
+  1598→                  📁 VIEW: PRACTICAL FOLDER CONTENTS GALLERY
+  1599→                  ============================================== */}
+  1600→              {currentView === 'folder' && activeFolder && (
+  1601→                <div className="space-y-6 animate-in fade-in duration-300">
+  1602→
+  1603→                  {/* Modern Header Section */}
+  1604→                  <div className="p-4 sm:p-6 md:p-8 rounded-3xl bg-slate-900/40 border border-slate-900 space-y-6 relative overflow-hidden">
+  1605→                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+  1606→                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+  1607→
+  1608→                    {/* Top Row: Navigation and Action buttons */}
+  1609→                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+  1610→                      <button
+  1611→                        onClick={() => setView('subject', activeFolder.subjectId)}
+  1612→                        className="px-3.5 py-2 bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-bold flex items-center gap-2 border border-slate-800 transition-all duration-200 self-start cursor-pointer shadow-sm min-h-[44px]"
+  1613→                      >
+  1614→                        <ArrowLeft className="w-4 h-4 text-slate-400" />
+  1615→                        Back to subject folders
+  1616→                      </button>
+  1617→
+  1618→                      <div className="flex flex-wrap items-center gap-3">
+  1619→                        {/* Workspace register count indicator */}
+  1620→                        <div className="px-4 py-2 bg-slate-950 border border-slate-850 rounded-xl text-left flex items-center gap-2.5 shadow-inner">
+  1621→                          <FileImage className="w-4 h-4 text-indigo-400 shrink-0 opacity-80" />
+  1622→                          <div>
+  1623→                            <p className="text-[8px] text-slate-500 font-mono tracking-wider leading-none uppercase">PAGES REGISTERED</p>
+  1624→                            <p className="text-xs text-slate-300 font-bold mt-0.5">{activeFolder.images ? activeFolder.images.length : 0} sheets</p>
+  1625→                          </div>
+  1626→                        </div>
+  1627→
+  1628→                        {(user?.role === 'admin' || user?.role === 'super_admin') &&(
+  1629→                          <>
+  1630→                            <button
+  1631→                              onClick={() => {
+  1632→                                setEditFolderData(activeFolder);
+  1633→                                setIsFolderModalOpen(true);
+  1634→                              }}
+  1635→                              className="px-4 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-850 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:border-indigo-500/30 active:scale-95 min-h-[44px]"
+  1636→                            >
+  1637→                              <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+  1638→                              Edit settings
+  1639→                            </button>
+  1640→
+  1641→                            <button
+  1642→                              onClick={() => {
+  1643→                                addLiveNotification(`Deleting folder "${activeFolder.title}"...`, "warning");
+  1644→                                handleDeleteFolder(activeFolder.id);
+  1645→                              }}
+  1646→                              className="px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 min-h-[44px]"
+  1647→                              title="Delete practical folder"
+  1648→                            >
+  1649→                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+  1650→                              Delete Folder
+  1651→                            </button>
+  1652→                          </>
+  1653→                        )}
+  1654→
+  1655→                        {user && (
+  1656→                          <button
+  1657→                            onClick={() => setIsUploadModalOpen(true)}
+  1658→                            className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold rounded-xl text-xs tracking-wide flex items-center gap-1.5 shadow-lg shadow-cyan-950/50 border border-cyan-500/30 transition-all duration-200 active:scale-95 animate-pulse cursor-pointer min-h-[44px]"
+  1659→                          >
+  1660→                            <Plus className="w-4 h-4" />
+  1661→                            Scan & Attach Sheet
+  1662→                          </button>
+  1663→                        )}
+  1664→                      </div>
+  1665→                    </div>
+  1666→
+  1667→                    {/* Content Section: Wide Title and Elegant Full-width Description Card */}
+  1668→                    <div className="space-y-4 relative z-10 text-left min-w-0">
+  1669→                      <div className="min-w-0">
+  1670→                        <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-black bg-cyan-500/10 border border-cyan-500/15 px-2.5 py-1 rounded-full inline-block">
+  1671→                          {activeSubject?.title} course
+  1672→                        </span>
+  1673→                        <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-3 break-words">
+  1674→                          {activeFolder.title}
+  1675→                        </h2>
+  1676→                      </div>
+  1677→
+  1678→                      {/* Wide modern description block */}
+  1679→                      <div className="p-4 sm:p-5 bg-slate-950/60 rounded-2xl border border-slate-850 flex flex-col sm:flex-row items-start gap-4 shadow-inner hover:border-slate-800 transition-colors">
+  1680→                        <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-cyan-400 shrink-0 mt-0.5 hidden sm:block">
+  1681→                          <BookOpen className="w-4 h-4" />
+  1682→                        </div>
+  1683→                        <div className="space-y-3 flex-1 min-w-0">
+  1684→                          <div className="text-left">
+  1685→                            <h4 className="text-[10px] text-zinc-500 font-mono tracking-widest uppercase font-extrabold">Syllabus Overview & Guidelines</h4>
+  1686→                            <p className="text-xs md:text-sm text-slate-300 leading-relaxed font-medium mt-1 break-words">
+  1687→                              {activeFolder.description || "Review laboratory research, notebook files, student notes, equations and observations related to this syllabus unit."}
+  1688→                            </p>
+  1689→                          </div>
+  1690→
+  1691→                          {activeFolder.images && activeFolder.images.length > 0 && (
+  1692→                            <div className="pt-3 border-t border-white/5 flex items-center gap-2.5 text-left flex-wrap">
+  1693→                              <span className="flex h-2 w-2 relative shrink-0">
+  1694→                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+  1695→                                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+  1696→                              </span>
+  1697→                              <span className="text-[11px] font-mono text-cyan-400 font-bold uppercase tracking-wider block break-words">
+  1698→                                ✨ HSC AI Copilot Active: Click any sheet below and toggle "HSC AI Assistant" to let Gemini explain the whole topic, formulas & run interactive Q&As!
+  1699→                              </span>
+  1700→                            </div>
+  1701→                          )}
+  1702→                        </div>
+  1703→                      </div>
+  1704→                    </div>
+  1705→
+  1706→                  </div>
+  1707→
+  1708→                  {/* Sheets Gallery masonry style display */}
+  1709→                  <div className="space-y-4">
+  1710→                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/10 p-2 rounded-2xl border border-white/5">
+  1711→                      <h3 className="text-xs uppercase font-mono tracking-widest text-slate-400 font-bold flex items-center gap-1.5 px-2 truncate">
+  1712→                        <Plus className="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
+  1713→                        {galleryViewMode === 'grid' ? "Dynamic Sheet Grid" : "Dynamic Sheet List"}
+  1714→                      </h3>
+  1715→
+  1716→                      {activeFolder.images && activeFolder.images.length > 0 && (
+  1717→                        <div className="flex items-center bg-slate-950/80 border border-white/5 rounded-xl p-0.5" id="gallery-view-switcher">
+  1718→                          <button
+  1719→                            type="button"
+  1720→                            onClick={() => setGalleryViewMode('grid')}
+  1721→                            className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans flex items-center gap-1.5 cursor-pointer transition-all min-h-[36px] ${
+  1722→                              galleryViewMode === 'grid'
+  1723→                                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 shadow-sm font-extrabold'
+  1724→                                : 'text-slate-400 hover:text-white border border-transparent'
+  1725→                            }`}
+  1726→                            title="Grid layout view"
+  1727→                          >
+  1728→                            <LayoutGrid className="w-3.5 h-3.5" />
+  1729→                            Grid View
+  1730→                          </button>
+  1731→                          <button
+  1732→                            type="button"
+  1733→                            onClick={() => setGalleryViewMode('list')}
+  1734→                            className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans flex items-center gap-1.5 cursor-pointer transition-all min-h-[36px] ${
+  1735→                              galleryViewMode === 'list'
+  1736→                                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 shadow-sm font-extrabold'
+  1737→                                : 'text-slate-400 hover:text-white border border-transparent'
+  1738→                            }`}
+  1739→                            title="List layout view"
+  1740→                          >
+  1741→                            <List className="w-3.5 h-3.5" />
+  1742→                            List View
+  1743→                          </button>
+  1744→                        </div>
+  1745→                      )}
+  1746→                    </div>
+  1747→
+  1748→                    {!activeFolder.images || activeFolder.images.length === 0 ? (
+  1749→                      <div className="p-8 sm:p-16 border-2 border-dashed border-slate-950 rounded-3xl text-center space-y-4 bg-slate-900/10">
+  1750→                        <FileImage className="w-10 h-10 mx-auto text-slate-600 opacity-60" />
+  1751→                        <div>
+  1752→                          <p className="text-sm font-semibold text-slate-300">No Pages Registered Yet</p>
+  1753→                          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">This practical folder is currently empty. Notebook pages can be added by uploading image scans or web attachments.</p>
+  1754→                        </div>
+  1755→                        {user && (
+  1756→                          <button
+  1757→                            onClick={() => setIsUploadModalOpen(true)}
+  1758→                            className="px-4 py-2 mx-auto bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs tracking-wide flex items-center gap-1.5 transition-all cursor-pointer min-h-[44px]"
+  1759→                          >
+  1760→                            <Plus className="w-4 h-4" />
+  1761→                            Scan & Attach First Sheet
+  1762→                          </button>
+  1763→                        )}
+  1764→                      </div>
+  1765→                    ) : galleryViewMode === 'grid' ? (
+  1766→                      // Grid list (existing masonry block)
+  1767→                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+  1768→                        {activeFolder.images.map((img, index) => (
+  1769→                          <div
+  1770→                            key={img.url || `img-${index}`}
+  1771→                            onClick={() => setActiveLightboxIndex(index)}
+  1772→                            className="group cursor-pointer aspect-[3/4] bg-slate-950 border border-slate-900 rounded-2xl overflow-hidden relative shadow-lg hover:shadow-indigo-950/10 transition-all flex flex-col hover:-translate-y-1.5 duration-300 hover:border-slate-800"
+  1773→                          >
+  1774→                            {/* Overlay image display */}
+  1775→                            <img
+  1776→                              src={img.url}
+  1777→                              alt={img.title}
+  1778→                              className="w-full flex-1 min-h-0 object-cover opacity-80 group-hover:opacity-95 transition-all"
+  1779→                              loading="lazy"
+  1780→                            />
+  1781→
+  1782→                            {/* Caption segment details */}
+  1783→                            <div className="p-3 bg-slate-950/90 border-t border-slate-900/60 flex justify-between items-start gap-2">
+  1784→                              <div className="min-w-0 pr-2">
+  1785→                                <span className="text-[8px] font-mono text-cyan-400 tracking-wider">SHEET PAGE {index + 1}</span>
+  1786→                                <h4 className="text-[11.5px] font-bold text-slate-200 truncate pr-2 mt-0.5" title={img.title}>
+  1787→                                  {img.title || "Experiment Page Index"}
+  1788→                                </h4>
+  1789→                              </div>
+  1790→
+  1791→                              <div className="flex gap-1.5 shrink-0">
+  1792→                                <span className="p-1 rounded bg-slate-900 text-slate-400 group-hover:text-white transition-colors" title="Zoom">
+  1793→                                  <Eye className="w-3.5 h-3.5" />
+  1794→                                </span>
+  1795→
+  1796→                                {(user?.role === 'admin' || user?.role === 'super_admin') &&(
+  1797→                                  <button
+  1798→                                    onClick={(e) => {
+  1799→                                      e.stopPropagation();
+
+[showing lines 1100-1799 of 2254; use offset=1800 with limit to continue reading]

@@ -1,0 +1,801 @@
+    setSearchQuery('');
+    // Admin CMS — allow both admin and super_admin
+    if (view === 'admins' && user?.role !== 'admin' && user?.role !== 'super_admin') {
+      return;
+    }
+    if (view === 'subject' && subjectId) {
+      setSelectedSubjectId(subjectId);
+      setSelectedFolderId(null);
+    } else if (view === 'folder' && folderId) {
+      setSelectedFolderId(folderId);
+      const targetFolder = folders.find(f => f.id === folderId);
+      if (targetFolder) {
+        setSelectedSubjectId(targetFolder.subjectId);
+      } else if (subjectId) {
+        setSelectedSubjectId(subjectId);
+      }
+      // Save timestamp of opened folder in safeLocalStorage & update state
+      const key = user ? `png_recent_views_${user.id}` : 'png_recent_views_guest';
+      const now = Date.now();
+      setRecentlyViewed((prev) => {
+        const updated = { ...prev, [folderId]: now };
+        safeLocalStorage.setItem(key, JSON.stringify(updated));
+        return updated;
+      });
+    } else {
+      setSelectedSubjectId(null);
+      setSelectedFolderId(null);
+    }
+    setCurrentView(view as ViewState);
+  };
+
+  // API Mutators
+  const handleSaveFolder = async (title: string, description: string, subjectId: string) => {
+    try {
+      if (editFolderData) {
+        // Edit Folder details
+        const res = await apiFetch(`/api/folders/${editFolderData.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description })
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Could not apply edits to folder settings.");
+        }
+      } else {
+        // Create new Folder metadata
+        const res = await apiFetch('/api/folders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description, subjectId })
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Could not initialize folder document.");
+        }
+      }
+      setEditFolderData(null);
+      await refreshWorkspaceData();
+    } catch (err: any) {
+      addLiveNotification(err.message || "Operation failed.", "warning");
+      throw err;
+    }
+  };
+
+  const handleDeleteFolder = async (id: string) => {
+    try {
+      const res = await apiFetch(`/api/folders/${id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Folder document unlinking failed.");
+      }
+
+      setSelectedFolderId(null);
+      setView('dashboard');
+      await refreshWorkspaceData();
+    } catch (err: any) {
+      addLiveNotification(err.message || "Delete failed.", "warning");
+      throw err;
+    }
+  };
+
+  // Admin & Announcements Mutators
+  const handlePromoteEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminPageSuccess(null);
+    setAdminPageError(null);
+    if (!promoteEmail.trim()) return;
+
+    try {
+      const res = await apiFetch('/api/users/promote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: promoteEmail })
+      });
+
+      let data: any = {};
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const textResponse = await res.text();
+        const errorMessage = textResponse.includes('Access forbidden')
+          ? "Access forbidden. Only the main authorized administrator can promote users."
+          : `Elevating rights failed with status ${res.status}.`;
+        throw new Error(errorMessage);
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Elevation could not be completed.");
+      }
+      setAdminPageSuccess(data.message || `Successfully elevated ${promoteEmail} to administrator.`);
+      setPromoteEmail('');
+      await refreshWorkspaceData();
+    } catch (err: any) {
+      setAdminPageError(err.message || "An unexpected error occurred during user elevation.");
+    }
+  };
+
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminPageSuccess(null);
+    setAdminPageError(null);
+    if (!announceTitle.trim() || !announceContent.trim()) {
+      setAdminPageError("Title and description content are required to issue an alert.");
+      return;
+    }
+
+    try {
+      const res = await apiFetch('/api/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: announceTitle,
+          content: announceContent,
+          deadline: announceDeadline
+        })
+      });
+
+      let data: any = {};
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || "Could not publish internal notification alert.");
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Announcement registration could not be completed.");
+      }
+      setAdminPageSuccess("Successfully published practical submission deadline alert.");
+      setAnnounceTitle('');
+      setAnnounceContent('');
+      setAnnounceDeadline('');
+      await refreshWorkspaceData();
+    } catch (err: any) {
+      setAdminPageError(err.message || "Could not publish internal notification alert.");
+    }
+  };
+
+  const handleDeleteAnnouncement = (id: string) => {
+    setConfirmDeleteAnnouncementId(id);
+  };
+
+  const handleConfirmDeleteAnnouncement = async (id: string) => {
+    setAdminPageSuccess(null);
+    setAdminPageError(null);
+    try {
+      const res = await apiFetch(`/api/announcements/${id}`, {
+        method: 'DELETE'
+      });
+
+      let data: any = {};
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || "Retraction could not be completed.");
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Retraction could not be completed.");
+      }
+      setAdminPageSuccess("Announcement successfully retracted and removed.");
+      await refreshWorkspaceData();
+    } catch (err: any) {
+      setAdminPageError(err.message || "Retraction failed.");
+    }
+  };
+
+  const handleAppendImage = async (url: string, titleStr: string) => {
+    if (!selectedFolderId) return;
+    try {
+      const res = await apiFetch('/api/images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          folderId: selectedFolderId,
+          imageUrl: url,
+          title: titleStr
+        })
+      });
+      if (!res.ok) throw new Error("Uploading script page rejected.");
+      await refreshWorkspaceData();
+    } catch (err: any) {
+      addLiveNotification(err.message || "Failed to add image.", "warning");
+    }
+  };
+
+  const handleDeleteImage = (imgIndex: number) => {
+    setConfirmDeleteImageIndex(imgIndex);
+  };
+
+  const handleConfirmDeleteImage = async (imgIndex: number) => {
+    if (!selectedFolderId) return;
+    try {
+      const res = await apiFetch(`/api/images/${selectedFolderId}/${imgIndex}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Deletion rejected by api.");
+      }
+      await refreshWorkspaceData();
+    } catch (err: any) {
+      addLiveNotification(err.message || "Failed to delete image.", "warning");
+    }
+  };
+
+  // Find active subject & active folder for display
+  const activeSubject = subjects.find(s => s.id === selectedSubjectId);
+  const activeFolder = folders.find(f => f.id === selectedFolderId);
+
+  // Filtered lists for the active viewing context
+  const filteredFolders = folders.filter(f => f.subjectId === selectedSubjectId);
+
+  // Search query filters for folders
+  const searchedDashboardFolders = folders.filter(f =>
+    f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    f.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const searchedSubjectFolders = filteredFolders.filter(f =>
+    f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    f.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Preserve access to internal state mutators referenced by Sidebar / Admin CMS
+  void setUser;
+  void studentsList;
+  void confirmDemoteId;
+  void setConfirmDemoteId;
+  void promoteEmail;
+  void setPromoteEmail;
+  void announceTitle;
+  void setAnnounceTitle;
+  void announceContent;
+  void setAnnounceContent;
+  void announceDeadline;
+  void setAnnounceDeadline;
+  void adminPageSuccess;
+  void setAdminPageSuccess;
+  void adminPageError;
+  void setAdminPageError;
+  void handlePromoteEmail;
+  void handleCreateAnnouncement;
+  void bdTime;
+
+  return (
+    <div className={`min-h-screen lg:min-h-0 flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden text-slate-100 relative transition-all duration-300 ${
+      activeTheme === 'peaceful-purple' ? 'theme-peaceful-purple' :
+      activeTheme === 'deep-blue' ? 'theme-deep-blue' :
+      activeTheme === 'cosmic-black' ? 'theme-cosmic-black' :
+      activeTheme === 'mesh-aurora' ? 'theme-mesh-aurora' :
+      activeTheme === 'emerald-green' ? 'theme-emerald-green' :
+      activeTheme === 'botanic-green' ? 'theme-botanic-green' :
+      activeTheme === 'saffron-gold' ? 'theme-saffron-gold' :
+      activeTheme === 'royal-purple' ? 'theme-royal-purple' :
+      activeTheme === 'crimson-red' ? 'theme-crimson-red' :
+      activeTheme === 'ocean-teal' ? 'theme-ocean-teal' :
+      activeTheme === 'sunset-orange' ? 'theme-sunset-orange' :
+      activeTheme === 'midnight-blue' ? 'theme-midnight-blue' :
+      activeTheme === 'rose-pink' ? 'theme-rose-pink' :
+      activeTheme === 'abyss-violet' ? 'theme-abyss-violet' :
+      activeTheme === 'obsidian-gold' ? 'theme-obsidian-gold' :
+      activeTheme === 'plasma-storm' ? 'theme-plasma-storm' :
+      'glass-main-bg'
+    }`}>
+
+      {/* 🔔 LIVE REAL-TIME RADIAL TOAST SYSTEM */}
+      <div className="fixed top-6 right-6 z-[1000] flex flex-col gap-3 w-80 max-w-[90vw] pointer-events-none">
+        <AnimatePresence>
+          {liveNotifications.map((notif) => (
+            <motion.div
+              key={notif.id}
+              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 20, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className={`pointer-events-auto p-4 rounded-xl border border-slate-700/60 shadow-2xl flex items-start gap-3 backdrop-blur-md relative overflow-hidden group ${
+                notif.type === 'success' ? 'bg-emerald-950/90 text-emerald-100 border-l-4 border-l-emerald-500' :
+                notif.type === 'warning' ? 'bg-amber-950/90 text-amber-100 border-l-4 border-l-amber-500' :
+                'bg-slate-900/95 text-slate-100 border-l-4 border-l-sky-500'
+              }`}
+            >
+              <Bell className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                notif.type === 'success' ? 'text-emerald-400' :
+                notif.type === 'warning' ? 'text-amber-400' :
+                'text-sky-400 animate-pulse'
+              }`} />
+
+              <div className="flex-1 text-sm font-medium tracking-wide break-words">
+                {notif.message}
+              </div>
+
+              <button
+                onClick={() => setLiveNotifications((prev) => prev.filter(n => n.id !== notif.id))}
+                className="text-slate-400 hover:text-white transition-colors duration-150 p-0.5 rounded-md hover:bg-white/10 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                aria-label="Dismiss notification"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Mobile-first sticky header — hamburger triggers the Sidebar drawer (Sheet pattern handled inside Sidebar.tsx). Visible on mobile. */}
+      <header className="lg:hidden sticky top-0 z-30 glass-header px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2 min-h-[4rem]">
+        <button
+          onClick={() => setIsMobileSidebarOpen(prev => !prev)}
+          className="p-2 bg-white/5 border border-white/10 text-slate-300 hover:text-white rounded-lg shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+          aria-label="Toggle navigation menu"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+          <Logo size="sm" />
+          {currentView !== 'dashboard' && currentView !== 'subject' && currentView !== 'folder' && (
+            <span className="text-slate-400 text-[10px] sm:text-xs capitalize truncate">
+              · {currentView === 'artists' ? 'Marketplace' :
+                 currentView === 'artist_dashboard' ? 'Artist Dashboard' :
+                 currentView === 'creds' ? 'System Credentials' :
+                 currentView === 'bookings' ? 'Bookings' :
+                 currentView === 'academy' ? 'AI Academy' :
+                 currentView === 'profile' ? 'Profile' :
+                 currentView === 'chat' ? 'Discussion Chat' :
+                 currentView === 'admins' ? (user?.role === 'super_admin' ? 'Super Admin CMS' : 'Admin Portal') : currentView}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 bg-slate-950/80 border border-white/[0.04] rounded-xl p-1 shrink-0 max-w-[140px]">
+            <select
+              value={activeTheme}
+              onChange={(e) => setActiveTheme(e.target.value)}
+              className="bg-slate-900 border-none text-[10px] font-mono font-bold text-slate-300 rounded-lg py-1 px-1.5 focus:ring-1 focus:ring-indigo-500/50 cursor-pointer uppercase select-none outline-none max-w-[130px]"
+            >
+              <option value="default">🌌 Navy</option>
+              <option value="peaceful-purple">🔮 Purple</option>
+              <option value="deep-blue">🌊 Deep Blue</option>
+              <option value="cosmic-black">🖤 Black</option>
+              <option value="mesh-aurora">✨ Aurora</option>
+              <option value="emerald-green">🌲 Emerald</option>
+              <option value="botanic-green">🌿 Botanic Green</option>
+              <option value="saffron-gold">🌟 Saffron Gold</option>
+              <option value="royal-purple">👑 Royal Purple</option>
+              <option value="crimson-red">🔴 Crimson Red</option>
+              <option value="ocean-teal">🌊 Ocean Teal</option>
+              <option value="sunset-orange">🌅 Sunset Orange</option>
+              <option value="midnight-blue">🌙 Midnight Blue</option>
+              <option value="rose-pink">🌸 Rose Pink</option>
+              <option value="abyss-violet">🌌 Abyss Violet</option>
+              <option value="obsidian-gold">⚫ Obsidian Gold</option>
+              <option value="plasma-storm">⚡ Plasma Storm</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      {/* Interactive sidebar element — Sidebar handles its own mobile drawer (Sheet pattern). */}
+      <Sidebar
+        currentView={currentView}
+        setView={setView}
+        stats={stats}
+        onOpenFolderCreate={() => {
+          setEditFolderData(null);
+          setIsFolderModalOpen(true);
+        }}
+        isMobileOpen={isMobileSidebarOpen}
+        setMobileOpen={setIsMobileSidebarOpen}
+        sessionSeconds={sessionSeconds}
+        subjects={subjects}
+        selectedSubjectId={selectedSubjectId}
+        selectedFolderId={selectedFolderId}
+        folders={folders}
+        studyLogs={studyLogs}
+      />
+
+      {/* Main dashboard view container — independently scrollable on desktop */}
+      <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden lg:h-full lg:overflow-y-auto min-h-0">
+
+        {/* Desktop Navigation Admin Header */}
+        <header className="hidden lg:flex shrink-0 sticky top-0 glass-header py-3 px-3 sm:px-6 md:px-8 justify-between items-center z-30 min-h-[4rem] gap-2">
+          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
+            {/* Breadcrumb Navigation Trail */}
+            <div className="flex items-center gap-1 sm:gap-2 text-xs text-slate-400 font-sans tracking-wide min-w-0 flex-1 truncate">
+              <button
+                onClick={() => setView('dashboard')}
+                className="hover:text-white font-semibold transition-colors truncate max-w-[120px] sm:max-w-none hover:scale-102 duration-150 inline-flex items-center gap-1.5 shrink-0"
+              >
+                <Logo size="sm" />
+              </button>
+
+              {currentView === 'dashboard' && (
+                <>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+                  <span className="text-slate-200 font-bold truncate">Dashboard</span>
+                </>
+              )}
+
+              {(currentView === 'subject' || currentView === 'folder') && selectedSubjectId && activeSubject && (
+                <>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+                  <button
+                    onClick={() => setView('subject', selectedSubjectId)}
+                    className="hover:text-white font-semibold transition-colors text-indigo-400 truncate max-w-[100px] sm:max-w-none hover:scale-102 duration-150 inline-flex items-center"
+                  >
+                    {activeSubject.title}
+                  </button>
+                </>
+              )}
+
+              {currentView === 'folder' && selectedFolderId && activeFolder && (
+                <>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+                  <span className="text-slate-200 font-bold truncate max-w-[120px] sm:max-w-xs inline-flex items-center">
+                    {activeFolder.title}
+                  </span>
+                </>
+              )}
+
+              {currentView !== 'dashboard' && currentView !== 'subject' && currentView !== 'folder' && (
+                <>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+                  <span className="text-slate-200 font-bold capitalize truncate">
+                    {currentView === 'artists' ? 'Marketplace' :
+                     currentView === 'artist_dashboard' ? 'Artist Dashboard' :
+                     currentView === 'creds' ? 'System Credentials' :
+                     currentView === 'academy' ? 'AI Academy' :
+                     currentView === 'profile' ? 'Profile' :
+                     currentView === 'chat' ? 'Discussion Chat' :
+                     currentView === 'admins' ? (user?.role === 'super_admin' ? 'Super Admin CMS' : 'Admin Portal') : currentView}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Right Balanced Console Stats & Status */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Theme Selection Panel */}
+            <div className="flex items-center gap-1 bg-slate-950/80 border border-white/[0.04] rounded-xl p-1 shrink-0 max-w-[130px] sm:max-w-none">
+              <span className="text-[9px] font-mono font-bold text-slate-500 uppercase px-1 hidden sm:inline">Theme:</span>
+              <select
+                value={activeTheme}
+                onChange={(e) => setActiveTheme(e.target.value)}
+                className="bg-slate-900 border-none text-[10px] font-mono font-bold text-slate-300 rounded-lg py-1 px-1.5 focus:ring-1 focus:ring-indigo-500/50 cursor-pointer uppercase select-none outline-none max-w-[110px] sm:max-w-none text-ellipsis overflow-hidden"
+              >
+                <option value="default">🌌 Navy</option>
+                <option value="peaceful-purple">🔮 Purple</option>
+                <option value="deep-blue">🌊 Blue</option>
+                <option value="cosmic-black">🖤 Black</option>
+                <option value="mesh-aurora">🌈 Aurora</option>
+                <option value="emerald-green">🌲 Emerald</option>
+                <option value="botanic-green">🌿 Botanic Green</option>
+                <option value="saffron-gold">🌟 Saffron Gold</option>
+                <option value="royal-purple">👑 Royal Purple</option>
+                <option value="crimson-red">🔴 Crimson Red</option>
+                <option value="ocean-teal">🌊 Ocean Teal</option>
+                <option value="sunset-orange">🌅 Sunset Orange</option>
+                <option value="midnight-blue">🌙 Midnight Blue</option>
+                <option value="rose-pink">🌸 Rose Pink</option>
+                <option value="abyss-violet">🌌 Abyss Violet</option>
+                <option value="obsidian-gold">⚫ Obsidian Gold</option>
+                <option value="plasma-storm">⚡ Plasma Storm</option>
+              </select>
+            </div>
+
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-slate-950/60 border border-white/[0.04] rounded-xl text-slate-400 text-[10px] font-mono uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22d3ee] animate-pulse" />
+            </div>
+          </div>
+        </header>
+
+        {/* Dashboard Pages wrapper */}
+        <main className="flex-1 p-3 sm:p-6 md:p-8 space-y-6 w-full min-w-0">
+
+          {isLoading && (
+            <DataLoader />
+          )}
+
+          {!isLoading && (
+            <>
+              {/* ==============================================
+                  📊 VIEW: MAIN DASHBOARD GALLERY VIEW
+                  ============================================== */}
+              {currentView === 'dashboard' && (
+                <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
+
+                  {/* Dynamic Announcement Alerts */}
+                  {announcements.length > 0 && (
+                    <div className="space-y-3 animate-in slide-in-from-top-3 duration-300">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <h3 className="text-xs font-mono uppercase tracking-widest text-[#fbbf24] font-bold flex items-center gap-1.5">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          </span>
+                          Active Deadlines & Announcements
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {announcements.slice(0, 2).map((ann) => (
+                          <div
+                            key={ann.id}
+                            className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900/60 to-slate-950/20 border border-amber-500/15 relative overflow-hidden group hover:border-amber-400/30 transition-all flex flex-col justify-between shadow-lg"
+                          >
+                            <div className="absolute top-0 right-0 p-3 text-[10px] font-mono text-slate-600 bg-white/[0.01] border-l border-b border-white/[0.03] rounded-bl-xl">
+                              {new Date(ann.createdAt).toLocaleDateString()}
+                            </div>
+
+                            <div className="space-y-1.5 max-w-[85%]">
+                              <h4 className="text-sm font-extrabold text-white tracking-tight group-hover:text-[#fbbf24] transition-colors break-words">
+                                {ann.title}
+                              </h4>
+                              <p className="text-xs text-slate-300 leading-relaxed line-clamp-2 break-words">
+                                {ann.content}
+                              </p>
+                            </div>
+
+                            {/* Downloadable attachment — visible to all users */}
+                            {ann.fileUrl && (
+                              <button
+                                onClick={() => {
+                                  const url = ann.fileUrl!;
+                                  const name = ann.fileName || 'download';
+                                  if (url.startsWith('data:')) {
+                                    try {
+                                      const eta, base64] = url.split(',');
+                                      const mime = meta.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
+                                      const binary = atob(base64);
+                                      const bytes = new Uint8Array(binary.length);
+                                      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                                      const blob = new Blob([bytes], { type: mime });
+                                      const blobUrl = URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.href = blobUrl;
+                                      a.download = name;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      document.body.removeChild(a);
+                                      URL.revokeObjectURL(blobUrl);
+                                    } catch (err) {
+                                      console.error('Download failed:', err);
+                                      window.open(url, '_blank');
+                                    }
+                                  } else {
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = name;
+                                    a.target = '_blank';
+                                    a.rel = 'noopener noreferrer';
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-bold transition-all cursor-pointer"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                Download {ann.fileName || 'file'}
+                              </button>
+                            )}
+
+                            <div className="flex items-center justify-between pt-4 mt-3 border-t border-white/[0.03] text-[10.5px] font-mono gap-2 flex-wrap">
+                              <span className="text-slate-400 font-sans truncate min-w-0">Posted by: {ann.createdByName}</span>
+                              {ann.deadline && (
+                                <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-extrabold border border-amber-500/20 shrink-0">
+                                  Deadline: {ann.deadline}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                    <div className="min-w-0">
+                      <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight break-words">University Archive Panel</h2>
+                      <p className="text-xs text-slate-400 mt-1">Select from five premium subject areas to access specific experiment galleries.</p>
+                    </div>
+
+                    {/* Quick Search */}
+                    <div className="relative w-full sm:w-72">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 pointer-events-none">
+                        <Search className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Search all practical modules..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 text-slate-100 placeholder-slate-500 rounded-xl outline-none focus:border-indigo-500/50 text-xs transition-transform focus:scale-[1.01] min-h-[44px]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Standard Counter Statistics Blocks */}
+                  <StatsGrid stats={stats} />
+
+                  {/* Subject folders list */}
+                  {!searchQuery ? (
+                    <div className="space-y-5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+                            <Compass className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="text-sm font-black uppercase tracking-wider font-mono text-white truncate">
+                              Primary Course Subjects
+                            </h3>
+                            <p className="text-[11px] text-slate-400 font-sans truncate">Core academic disciplines & certified practical laboratories</p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-mono text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-white/5 shrink-0">
+                          {subjects.length} Faculties
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+                        {subjects.map((sub) => {
+                          const meta = getSubjectMeta(sub.title);
+                          const subjectFolders = folders.filter(f => f.subjectId === sub.id);
+                          const totalPhotos = subjectFolders.reduce((sum, f) => sum + (f.images ? f.images.length : 0), 0);
+
+                          return (
+                            <div
+                              key={sub.id}
+                              onClick={() => setView('subject', sub.id)}
+                              className={`
+                                cursor-pointer rounded-2xl p-4 sm:p-6 border transition-all duration-300 relative group overflow-hidden shadow-xl backdrop-blur-md flex flex-col justify-between
+                                bg-gradient-to-b from-slate-900/80 via-slate-900/60 to-slate-950/90 border-white/10 hover:border-white/20 hover:-translate-y-1 hover:shadow-2xl
+                              `}
+                            >
+                              {/* Top laser line with subject specific glow */}
+                              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+
+                              {/* Ambient radial blur */}
+                              <div className="absolute top-0 right-0 w-36 h-36 bg-indigo-500/5 group-hover:bg-indigo-500/10 blur-2xl pointer-events-none rounded-full transition-all duration-300" />
+
+                              <div className="space-y-3 sm:space-y-4 relative z-10">
+                                {/* Subject header ribbon */}
+                                <div className="flex justify-between items-center gap-2">
+                                  <span className={`text-[8px] sm:text-[9px] uppercase font-mono font-bold tracking-wider px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border ${meta.text} ${meta.bg} border-current/20 flex items-center gap-1 sm:gap-1.5 truncate min-w-0`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" />
+                                    <span className="truncate">Faculty</span>
+                                  </span>
+
+                                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                                    {(user?.role === 'admin' || user?.role === 'super_admin') &&(
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          addLiveNotification(`Deleting subject "${sub.title}"...`, "warning");
+                                          try {
+                                              const res = await apiFetch(`/api/subjects/${sub.id}`, { method: 'DELETE' });
+                                              if (res.ok) {
+                                                await refreshWorkspaceData();
+                                              } else {
+                                                const err = await res.json();
+                                                addLiveNotification(err.error || "Failed to delete subject.", "warning");
+                                              }
+                                            } catch (err) {
+                                              addLiveNotification("Network error deleting subject.", "warning");
+                                            }
+                                        }}
+                                        className="p-1 sm:p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
+                                        title="Delete Subject"
+                                      >
+                                        <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                      </button>
+                                    )}
+                                    <div className="p-1.5 sm:p-2 rounded-xl bg-slate-800/80 border border-white/5 text-slate-400 group-hover:text-indigo-400 group-hover:scale-110 transition-all">
+                                      <FolderClosed className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="min-w-0">
+                                  <h4 className="text-sm sm:text-lg font-black text-white group-hover:text-indigo-300 transition-colors tracking-tight line-clamp-1 break-words">
+                                    {sub.title}
+                                  </h4>
+                                  <p className="text-[11px] sm:text-xs text-slate-400 min-h-[28px] sm:min-h-[36px] line-clamp-2 leading-relaxed mt-1 sm:mt-1.5 font-sans break-words">
+                                    {sub.description || meta.desc}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-white/5 mt-3 sm:mt-5 text-[9px] sm:text-[11px] font-mono text-slate-400 relative z-10 gap-2 flex-wrap">
+                                <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
+                                  <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-slate-800/80 border border-white/5">
+                                    <strong className="text-slate-200">{subjectFolders.length}</strong> Folders
+                                  </span>
+                                  <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-bold">
+                                    {totalPhotos} Scans
+                                  </span>
+                                </div>
+                                <span className="group-hover:translate-x-1 transition-transform inline-flex items-center gap-0.5 sm:gap-1 text-indigo-400 font-bold font-sans text-[11px] sm:text-xs shrink-0 ml-1">
+                                  <span>Explore</span>
+                                  <span>→</span>
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    // Search layout Results
+                    <div className="space-y-5 font-sans">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
+                            <Compass className="w-4 h-4" />
+                          </div>
+                          <h3 className="text-sm font-black uppercase tracking-wider font-mono text-white truncate">
+                            Search Results ({searchedDashboardFolders.length})
+                          </h3>
+                        </div>
+                        <span className="text-xs text-slate-400 font-mono truncate max-w-full">Query: "{searchQuery}"</span>
+                      </div>
+
+                      {searchedDashboardFolders.length === 0 ? (
+                        <div className="p-8 sm:p-12 text-center text-slate-400 bg-slate-950/60 rounded-3xl border border-white/5 space-y-2">
+                          <FolderClosed className="w-8 h-8 text-slate-600 mx-auto" />
+                          <p className="text-xs font-semibold break-words">No practical folders match "{searchQuery}"</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+                          {searchedDashboardFolders.map((fold) => {
+                            const sub = subjects.find(s => s.id === fold.subjectId);
+                            const meta = getSubjectMeta(sub?.title || '');
+                            return (
+                              <div
+                                key={fold.id}
+                                onClick={() => setView('folder', undefined, fold.id)}
+                                className="stagger-card cursor-pointer p-3.5 sm:p-5 rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/90 border border-white/10 hover:border-white/20 hover:-translate-y-1 transition-all duration-300 relative group flex flex-col justify-between shadow-xl backdrop-blur-md overflow-hidden"
+                              >
+                                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/60 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+
+                                <div className="min-w-0">
+                                  <div className="flex justify-between items-start mb-2 gap-1.5">
+                                    <div className="flex flex-col gap-1 items-start min-w-0">
+                                      <span className={`text-[8px] sm:text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 sm:px-2 py-0.5 rounded-full border ${meta.text} ${meta.bg} border-current/20 truncate max-w-full`}>
+                                        {sub?.title || 'General'}
+                                      </span>
+                                      {getRecentlyViewedMsg(fold.id) && (
+                                        <span className="text-[8px] sm:text-[8.5px] px-1.5 sm:px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-mono font-bold flex items-center gap-1 border border-cyan-500/20 truncate max-w-full">
+                                          <span className="w-1 h-1 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+                                          <span className="truncate">Recent</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[9px] sm:text-[10px] text-cyan-400 font-mono px-1.5 sm:px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 shrink-0 font-bold">
+                                      {fold.images ? fold.images.length : 0} sheets
+                                    </span>
+                                  </div>
+                                  <h4 className="text-xs sm:text-sm font-black text-white mt-1.5 sm:mt-2 line-clamp-1 group-hover:text-cyan-300 transition-colors break-words">
+                                    {fold.title}
+                                  </h4>
+                                  <p className="text-[11px] sm:text-xs text-slate-400 line-clamp-2 mt-1 sm:mt-1.5 leading-relaxed break-words">
+                                    {fold.description}
+                                  </p>
+                                </div>
+                                <div className="pt-2.5 sm:pt-3.5 border-t border-white/5 mt-3 sm:mt-4 text-[9px] sm:text-[10px] text-slate-400 flex justify-between items-center font-mono gap-2">
+                                  <span className="truncate min-w-0">{new Date(fold.createdAt).toLocaleDateString()}</span>
+                                  <span className="text-cyan-400 font-sans font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-0.5 sm:gap-1 shrink-0 ml-1">
+                                    <span>Vault</span>
+                                    <span>→</span>
+                                  </span>
+                                </div>
+                              </div>

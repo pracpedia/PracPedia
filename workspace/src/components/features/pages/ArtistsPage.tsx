@@ -1721,7 +1721,7 @@ export const ArtistsPage: React.FC<ArtistsPageProps> = ({ activeTheme }) => {
     async (artist: Artist) => {
       setDetailArtist(artist);
       // If portfolio already cached, skip the fetch.
-      if (portfolioMap[artist.id] && portfolioMap[artist.id].length >= 0) {
+      if (portfolioMap[artist.id] !== undefined) {
         return;
       }
       setDetailLoading(true);

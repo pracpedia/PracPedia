@@ -1,0 +1,842 @@
+     1→'use client';
+     2→
+     3→import React, { useState, useEffect, useRef } from 'react';
+     4→import { useAuth } from '@/contexts/AuthContext';
+     5→import { useLanguage } from '@/contexts/LanguageContext';
+     6→import {
+     7→  Send,
+     8→  Trash2,
+     9→  MessageSquare,
+    10→  User,
+    11→  ShieldCheck,
+    12→  Hash,
+    13→  Sparkles,
+    14→  Clock,
+    15→  AlertCircle,
+    16→  Loader2,
+    17→  BookOpen,
+    18→  ChevronLeft,
+    19→  Users,
+    20→  GraduationCap,
+    21→  Beaker,
+    22→  Compass,
+    23→  Code,
+    24→  Sparkle,
+    25→  BookmarkCheck,
+    26→  Phone,
+    27→  Video,
+    28→  Info,
+    29→  Paperclip,
+    30→  X,
+    31→  Image as ImageIcon,
+    32→} from 'lucide-react';
+    33→import { motion, AnimatePresence } from 'framer-motion';
+    34→
+    35→interface SubjectType {
+    36→  id: string;
+    37→  title: string;
+    38→  description: string;
+    39→}
+    40→
+    41→interface MessageType {
+    42→  id?: string;
+    43→  _id?: string;
+    44→  userId: string;
+    45→  userName: string;
+    46→  userRole: 'user' | 'admin';
+    47→  content: string;
+    48→  subjectId: string;
+    49→  createdAt: string;
+    50→  userProfilePic?: string;
+    51→  imageUrl?: string;
+    52→}
+    53→
+    54→interface ClassroomDiscussionProps {
+    55→  subjects: SubjectType[];
+    56→}
+    57→
+    58→export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjects }) => {
+    59→  const { user, apiFetch } = useAuth();
+    60→  const { language, t } = useLanguage();
+    61→  const [messages, setMessages] = useState<MessageType[]>([]);
+    62→  const messagesRef = useRef<MessageType[]>([]);
+    63→  const [activeChannelId, setActiveChannelId] = useState<string>('general');
+    64→  const [typedMessage, setTypedMessage] = useState<string>('');
+    65→  const [pendingImage, setPendingImage] = useState<string | null>(null);
+    66→  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+    67→  const [revealedTimeId, setRevealedTimeId] = useState<string | null>(null);
+    68→  const imageInputRef = useRef<HTMLInputElement>(null);
+    69→  const [loading, setLoading] = useState<boolean>(false);
+    70→  const [submitting, setSubmitting] = useState<boolean>(false);
+    71→  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    72→
+    73→  // Close zoom popup on Escape
+    74→  useEffect(() => {
+    75→    if (!zoomedImage) return;
+    76→    const handler = (e: KeyboardEvent) => {
+    77→      if (e.key === 'Escape') setZoomedImage(null);
+    78→    };
+    79→    window.addEventListener('keydown', handler);
+    80→    return () => window.removeEventListener('keydown', handler);
+    81→  }, [zoomedImage]);
+    82→
+    83→  // Custom mobile screen flow: 'channels' list vs the 'chat' window itself
+    84→  const [mobileView, setMobileView] = useState<'channels' | 'chat'>('chat');
+    85→
+    86→  const scrollContainerRef = useRef<HTMLDivElement>(null);
+    87→
+    88→  // Keep messagesRef in sync with messages state so the long-poll loop can
+    89→  // read the latest message timestamp without being a dependency of the effect.
+    90→  useEffect(() => {
+    91→    messagesRef.current = messages;
+    92→  }, [messages]);
+    93→
+    94→  // Real-time active users — guard against SSR (window is undefined on server)
+    95→  const [activeUsers, setActiveUsers] = useState<any[]>(() => {
+    96→    if (typeof window === 'undefined') return [];
+    97→    return (window as any).__activeUsers || [];
+    98→  });
+    99→
+   100→  // Quick Action triggers removed per user request — chat input is now clean.
+   101→
+   102→  // Fetch messages of specified subject channel.
+   103→  // If `since` is provided, uses long-polling (server holds up to 20s waiting
+   104→  // for new messages). Otherwise, fetches the latest 200 messages immediately.
+   105→  const fetchChannelMessages = async (subjId: string, silent: boolean = false, since?: string) => {
+   106→    if (!silent) {
+   107→      setLoading(true);
+   108→      setErrorMessage(null);
+   109→    }
+   110→    try {
+   111→      // Always use /api/chat/[subjectId] — 'general' maps to global (null subjectId)
+   112→      const endpoint = `/api/chat/${subjId}` + (since ? `?since=${encodeURIComponent(since)}` : '');
+   113→      const res = await apiFetch(endpoint);
+   114→      if (res.ok) {
+   115→        const raw = await res.json();
+   116→        // Response shape: { messages: [...], polledAt: '...' }
+   117→        // Handle both old (array) and new ({messages}) shapes for resilience
+   118→        const rawMessages = Array.isArray(raw) ? raw : (raw.messages || []);
+   119→        // Normalize API fields (text -> content, userAvatar -> userProfilePic) to match local MessageType shape
+   120→        const data: MessageType[] = rawMessages.map((m: any) => ({
+   121→          id: m.id,
+   122→          _id: m._id,
+   123→          userId: m.userId,
+   124→          userName: m.userName,
+   125→          userRole: m.userRole === 'admin' ? 'admin' : 'user',
+   126→          content: m.text ?? m.content ?? '',
+   127→          subjectId: m.subjectId ?? subjId,
+   128→          createdAt: m.createdAt,
+   129→          userProfilePic: m.userProfilePic ?? m.userAvatar,
+   130→          imageUrl: m.imageUrl,
+   131→        }));
+   132→        setMessages((prev) => {
+   133→          if (since) {
+   134→            // Long-poll mode — merge new messages into existing
+   135→            if (data.length === 0) return prev;
+   136→            const existingIds = new Set(prev.map(m => m.id || m._id));
+   137→            const newOnes = data.filter(m => !existingIds.has(m.id || m._id));
+   138→            return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
+   139→          }
+   140→          // Initial fetch — replace all
+   141→          return data;
+   142→        });
+   143→      } else if (!silent) {
+   144→        const errData = await res.json();
+   145→        setErrorMessage(errData.error || t('networkLoss'));
+   146→      }
+   147→    } catch (e: any) {
+   148→      if (!silent) {
+   149→        setErrorMessage(t('networkLoss'));
+   150→      }
+   151→    } finally {
+   152→      if (!silent) {
+   153→        setLoading(false);
+   154→      }
+   155→    }
+   156→  };
+   157→
+   158→  // Image picker — converts to base64 data URL for inline upload
+   159→  const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+   160→    const file = e.target.files?.[0];
+   161→    if (imageInputRef.current) imageInputRef.current.value = '';
+   162→    if (!file) return;
+   163→    if (!file.type.startsWith('image/')) {
+   164→      setErrorMessage('Please choose an image file.');
+   165→      return;
+   166→    }
+   167→    if (file.size > 2 * 1024 * 1024) {
+   168→      setErrorMessage('Max 2 MB for chat images.');
+   169→      return;
+   170→    }
+   171→    const reader = new FileReader();
+   172→    reader.onload = () => setPendingImage(String(reader.result || ''));
+   173→    reader.onerror = () => setErrorMessage('Could not read image file.');
+   174→    reader.readAsDataURL(file);
+   175→  };
+   176→
+   177→  // Perform post of typed message content + optional image
+   178→  const handleSendMessage = async (incomingContent?: string) => {
+   179→    const targetContent = incomingContent || typedMessage;
+   180→    // Need either text or an image to send
+   181→    if ((!targetContent.trim() && !pendingImage) || submitting) return;
+   182→
+   183→    setSubmitting(true);
+   184→    setErrorMessage(null);
+   185→
+   186→    const messageContent = targetContent;
+   187→    const imageToSend = pendingImage;
+   188→    if (!incomingContent) {
+   189→      setTypedMessage('');
+   190→    }
+   191→    setPendingImage(null);
+   192→
+   193→    try {
+   194→      // Next.js /api/chat expects { text, subjectId, imageUrl } — pass null for general lounge
+   195→      const subjectPayload = activeChannelId === 'general' ? null : activeChannelId;
+   196→      const res = await apiFetch('/api/chat', {
+   197→        method: 'POST',
+   198→        headers: {
+   199→          'Content-Type': 'application/json',
+   200→        },
+   201→        body: JSON.stringify({
+   202→          text: messageContent || '(image)',
+   203→          subjectId: subjectPayload,
+   204→          imageUrl: imageToSend || undefined,
+   205→        })
+   206→      });
+   207→
+   208→      if (res.ok) {
+   209→        const newMsg = await res.json();
+   210→        // Normalize the new message to match local MessageType shape
+   211→        const normalized: MessageType = {
+   212→          id: newMsg.id,
+   213→          _id: newMsg._id,
+   214→          userId: newMsg.userId,
+   215→          userName: newMsg.userName,
+   216→          userRole: newMsg.userRole === 'admin' ? 'admin' : 'user',
+   217→          content: newMsg.text ?? newMsg.content ?? messageContent,
+   218→          subjectId: newMsg.subjectId ?? activeChannelId,
+   219→          createdAt: newMsg.createdAt,
+   220→          userProfilePic: newMsg.userProfilePic ?? newMsg.userAvatar,
+   221→          imageUrl: newMsg.imageUrl,
+   222→        };
+   223→        setMessages((prev) => [...prev, normalized]);
+   224→        // Force scroll-to-bottom on newly typed posts from our side
+   225→        setTimeout(() => {
+   226→          if (scrollContainerRef.current) {
+   227→            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+   228→          }
+   229→        }, 80);
+   230→      } else {
+   231→        const errData = await res.json();
+   232→        setErrorMessage(errData.error || "Failed to broadcast message.");
+   233→        if (!incomingContent) setTypedMessage(messageContent); // Restore text on failure
+   234→      }
+   235→    } catch (err) {
+   236→      setErrorMessage("Broadcast failed due to structural network discrepancy.");
+   237→      if (!incomingContent) setTypedMessage(messageContent); // Restore text on failure
+   238→    } finally {
+   239→      setSubmitting(false);
+   240→    }
+   241→  };
+   242→
+   243→  const handleFormSubmit = async (e: React.FormEvent) => {
+   244→    e.preventDefault();
+   245→    await handleSendMessage();
+   246→  };
+   247→
+   248→  // Perform message eradication (admin or owner only)
+   249→  const handleDeleteMessage = async (msgId: string) => {
+   250→    if (!msgId) return;
+   251→
+   252→    try {
+   253→      // Next.js /api/chat delete via ?id= query param
+   254→      const res = await apiFetch(`/api/chat?id=${msgId}`, {
+   255→        method: 'DELETE',
+   256→      });
+   257→
+   258→      if (res.ok) {
+   259→        // Remove locally from UI state
+   260→        setMessages((prev) => prev.filter(m => (m.id || m._id) !== msgId));
+   261→      } else {
+   262→        const errData = await res.json();
+   263→        setErrorMessage(errData.error || "Could not delete message."); setTimeout(() => setErrorMessage(null), 4000);
+   264→      }
+   265→    } catch (err) {
+   266→      setErrorMessage("Network error deleting message."); setTimeout(() => setErrorMessage(null), 4000);
+   267→    }
+   268→  };
+   269→
+   270→  // ── Client-side polling (Vercel serverless-safe) ──────────────────────
+   271→  // Instead of long-polling (server holds request open 20s — burns Vercel
+   272→  // quota + times out on Hobby plan), the client polls every 3 seconds.
+   273→  // The server returns immediately with any new messages since the last
+   274→  // poll. This is cheaper, simpler, and works on all serverless platforms.
+   275→  useEffect(() => {
+   276→    let cancelled = false;
+   277→
+   278→    const startPollLoop = async (subjId: string) => {
+   279→      // Initial fetch (no `since` param — get latest 200 messages)
+   280→      await fetchChannelMessages(subjId, false);
+   281→
+   282→      if (cancelled) return;
+   283→
+   284→      // Poll loop — fetch new messages every 3 seconds
+   285→      while (!cancelled) {
+   286→        await new Promise((r) => setTimeout(r, 3000));
+   287→        if (cancelled) break;
+   288→
+   289→        // Get the latest message timestamp to use as the `since` cursor
+   290→        const latestMsg = messagesRef.current[messagesRef.current.length - 1];
+   291→        const since = latestMsg?.createdAt || new Date(0).toISOString();
+   292→
+   293→        // Fetch only new messages since the last poll
+   294→        await fetchChannelMessages(subjId, true, since);
+   295→      }
+   296→    };
+   297→
+   298→    startPollLoop(activeChannelId);
+   299→
+   300→    return () => {
+   301→      cancelled = true;
+   302→    };
+   303→  }, [activeChannelId]);
+   304→
+   305→  // Listen to WebSocket-triggered immediate reload event for instantaneous responsiveness
+   306→  useEffect(() => {
+   307→    const handleRemoteChatUpdate = (e: Event) => {
+   308→      const customEvent = e as CustomEvent;
+   309→      if (customEvent.detail && customEvent.detail.subjectId === activeChannelId) {
+   310→        fetchChannelMessages(activeChannelId, true);
+   311→      }
+   312→    };
+   313→
+   314→    window.addEventListener('chat-updated', handleRemoteChatUpdate);
+   315→    return () => {
+   316→      window.removeEventListener('chat-updated', handleRemoteChatUpdate);
+   317→    };
+   318→  }, [activeChannelId]);
+   319→
+   320→  // Sync initial components presence data and update when event triggers
+   321→  useEffect(() => {
+   322→    if ((window as any).__activeUsers) {
+   323→      setActiveUsers((window as any).__activeUsers);
+   324→    }
+   325→    const handlePresenceUpdated = (e: Event) => {
+   326→      const customEvent = e as CustomEvent;
+   327→      if (customEvent.detail && customEvent.detail.activeUsers) {
+   328→        setActiveUsers(customEvent.detail.activeUsers);
+   329→      }
+   330→    };
+   331→    window.addEventListener('presence-updated', handlePresenceUpdated);
+   332→    return () => {
+   333→      window.removeEventListener('presence-updated', handlePresenceUpdated);
+   334→    };
+   335→  }, []);
+   336→
+   337→  // Handle user-friendly quiet auto-scrolling on load or when sending message
+   338→  const lastMessageCountRef = useRef<number>(0);
+   339→  useEffect(() => {
+   340→    const scrollContainer = scrollContainerRef.current;
+   341→    if (!scrollContainer) return;
+   342→
+   343→    if (messages.length > lastMessageCountRef.current) {
+   344→      const lastMsg = messages[messages.length - 1];
+   345→      const isMyMessage = lastMsg && lastMsg.userId === user?.id;
+   346→      const isInitialScroll = !loading && lastMessageCountRef.current === 0;
+   347→
+   348→      // Scroll to bottom immediately if it's the initial load or if the user sent a new message
+   349→      if (isInitialScroll || isMyMessage) {
+   350→        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+   351→      } else {
+   352→        // If someone else posted, scroll down only if the user is already near the bottom
+   353→        // (to prevent interrupting their reading of history)
+   354→        const threshold = 180; // pixels from bottom threshold zone
+   355→        const isNearBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < threshold;
+   356→        if (isNearBottom) {
+   357→          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+   358→        }
+   359→      }
+   360→    }
+   361→    lastMessageCountRef.current = messages.length;
+   362→  }, [messages, loading, user?.id]);
+   363→
+   364→  const activeChannelObj = subjects.find(s => s.id === activeChannelId);
+   365→  const activeChannelTitle = activeChannelId === 'general' ? 'General Academic Lounge' : `${activeChannelObj?.title} Support Channel`;
+   366→  const activeChannelDesc = activeChannelId === 'general'
+   367→    ? 'Universal classroom bulletin board and loose peer conversation space.'
+   368→    : activeChannelObj?.description;
+   369→
+   370→  const formatDateLabel = (isoStr: string) => {
+   371→    try {
+   372→      const date = new Date(isoStr);
+   373→      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+   374→    } catch (e) {
+   375→      return '';
+   376→    }
+   377→  };
+   378→
+   379→  // Assign specific visual descriptors, emojis, and icons of subjects for professional feel
+   380→  const getSubjectIcon = (title: string, sizeClass = "w-4 h-4") => {
+   381→    const l = title.toLowerCase();
+   382→    if (l.includes('physic')) return <Compass className={`${sizeClass} text-indigo-400`} />;
+   383→    if (l.includes('chemist')) return <Beaker className={`${sizeClass} text-emerald-400`} />;
+   384→    if (l.includes('biolog')) return <Sparkle className={`${sizeClass} text-amber-400`} />;
+   385→    if (l.includes('math')) return <GraduationCap className={`${sizeClass} text-pink-400`} />;
+   386→    if (l.includes('ict')) return <Code className={`${sizeClass} text-cyan-400`} />;
+   387→    return <Hash className={`${sizeClass} text-slate-450`} />;
+   388→  };
+   389→
+   390→  const getSubjectGradient = (title: string) => {
+   391→    const l = title.toLowerCase();
+   392→    if (l.includes('physic')) return 'from-indigo-505/20 to-indigo-950/25 border-indigo-500/20 text-indigo-350';
+   393→    if (l.includes('chemist')) return 'from-emerald-505/20 to-emerald-950/25 border-emerald-500/20 text-emerald-350';
+   394→    if (l.includes('biolog')) return 'from-amber-505/20 to-amber-950/25 border-amber-500/20 text-amber-350';
+   395→    if (l.includes('math')) return 'from-pink-505/20 to-pink-950/25 border-pink-500/20 text-pink-350';
+   396→    if (l.includes('ict')) return 'from-cyan-505/20 to-cyan-950/25 border-cyan-500/20 text-cyan-350';
+   397→    return 'from-slate-800/10 to-slate-950/20 border-white/5 text-slate-350';
+   398→  };
+   399→
+   400→  return (
+   401→    <div
+   402→      id="classroom-chat-root"
+   403→      className="
+   404→        w-full min-h-[600px] lg:h-[calc(100vh-180px)]
+   405→        flex flex-col lg:flex-row
+   406→        rounded-3xl border border-white/[0.06]
+   407→        bg-slate-950/40 overflow-hidden
+   408→        backdrop-blur-2xl relative shadow-2xl
+   409→      "
+   410→    >
+   411→      {/* ───────────────────────────────────────────────────────────────────
+   412→          CHANNELS SIDEBAR (left on desktop, full-screen on mobile when mobileView='channels')
+   413→          ─────────────────────────────────────────────────────────────────── */}
+   414→      <aside
+   415→        className={`
+   416→          w-full lg:w-80 xl:w-96 shrink-0
+   417→          flex flex-col gap-3
+   418→          bg-slate-950/70 border-r border-white/[0.04]
+   419→          overflow-hidden
+   420→          ${mobileView === 'channels' ? 'flex' : 'hidden lg:flex'}
+   421→        `}
+   422→      >
+   423→        {/* Sidebar header */}
+   424→        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04] shrink-0">
+   425→          <div className="flex items-center gap-2 min-w-0">
+   426→            <div className="p-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20 shrink-0">
+   427→              <Users className="w-3.5 h-3.5 text-pink-400" />
+   428→            </div>
+   429→            <span className="font-mono text-[10px] uppercase font-black tracking-widest text-slate-300 truncate">
+   430→              {t('lobby')}
+   431→            </span>
+   432→          </div>
+   433→          <span className="flex items-center gap-1 text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono font-bold">
+   434→            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+   435→            {t('synced')}
+   436→          </span>
+   437→        </div>
+   438→
+   439→        {/* Active users strip */}
+   440→        <div className="px-3 shrink-0">
+   441→          <div className="bg-slate-900/40 border border-white/[0.03] p-2.5 rounded-2xl">
+   442→            <div className="flex items-center justify-between mb-2">
+   443→              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{t('activeScholars')}</span>
+   444→              <span className="text-[9px] font-mono text-cyan-400">{activeUsers.length} {t('onlineSuffix')}</span>
+   445→            </div>
+   446→            <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+   447→              {activeUsers.length === 0 ? (
+   448→                <span className="text-[10px] text-slate-500 italic px-1">Connecting…</span>
+   449→              ) : (
+   450→                activeUsers.slice(0, 8).map((item, idx) => (
+   451→                  <div key={item.id || idx} className="relative group shrink-0 flex flex-col items-center gap-1" title={`${item.name} (${item.role})`}>
+   452→                    <div className="relative">
+   453→                      {item.profilePic ? (
+   454→                        <img
+   455→                          src={item.profilePic}
+   456→                          alt={item.name}
+   457→                          referrerPolicy="no-referrer"
+   458→                          className="w-8 h-8 rounded-full object-cover border border-emerald-500/60 bg-slate-950"
+   459→                        />
+   460→                      ) : (
+   461→                        <div className="w-8 h-8 rounded-full border border-emerald-500/60 bg-slate-900 flex items-center justify-center text-slate-200 text-[10px] font-bold">
+   462→                          {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+   463→                        </div>
+   464→                      )}
+   465→                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-950" />
+   466→                    </div>
+   467→                    <span className="text-[8px] text-slate-400 font-bold max-w-[44px] truncate leading-none text-center">
+   468→                      {item.name ? item.name.split(' ')[0] : 'Scholar'}
+   469→                    </span>
+   470→                  </div>
+   471→                ))
+   472→              )}
+   473→            </div>
+   474→          </div>
+   475→        </div>
+   476→
+   477→        {/* Channel list */}
+   478→        <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1.5 scrollbar-thin">
+   479→          <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-widest px-2 pb-1 font-mono">
+   480→            {t('chatRooms')}
+   481→          </span>
+   482→
+   483→          {/* General channel */}
+   484→          <button
+   485→            onClick={() => {
+   486→              setActiveChannelId('general');
+   487→              setMobileView('chat');
+   488→            }}
+   489→            className={`w-full flex items-center gap-3 px-3 py-2.5 min-h-[48px] rounded-2xl text-xs font-semibold cursor-pointer transition-all border text-left ${
+   490→              activeChannelId === 'general'
+   491→                ? 'bg-gradient-to-r from-cyan-500/15 to-indigo-500/10 border-cyan-500/30 text-cyan-200'
+   492→                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03] border-transparent'
+   493→            }`}
+   494→          >
+   495→            <div className="p-2 rounded-xl bg-slate-800/60 border border-white/5 shrink-0">
+   496→              <Hash className="w-3.5 h-3.5" />
+   497→            </div>
+   498→            <div className="min-w-0 flex-1">
+   499→              <div className="font-bold truncate">General Lounge</div>
+   500→              <div className="text-[9px] text-slate-500 truncate">Open discussion for everyone</div>
+   501→            </div>
+   502→          </button>
+   503→
+   504→          {/* Subject channels */}
+   505→          {subjects.map((subj) => {
+   506→            const isActive = activeChannelId === subj.id;
+   507→            return (
+   508→              <button
+   509→                key={subj.id}
+   510→                onClick={() => {
+   511→                  setActiveChannelId(subj.id);
+   512→                  setMobileView('chat');
+   513→                }}
+   514→                className={`w-full flex items-center gap-3 px-3 py-2.5 min-h-[48px] rounded-2xl text-xs font-semibold cursor-pointer transition-all border text-left ${
+   515→                  isActive
+   516→                    ? 'bg-gradient-to-r from-cyan-500/15 to-indigo-500/10 border-cyan-500/30 text-cyan-200'
+   517→                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03] border-transparent'
+   518→                }`}
+   519→              >
+   520→                <div className="p-2 rounded-xl bg-slate-800/60 border border-white/5 shrink-0">
+   521→                  {getSubjectIcon(subj.title, "w-3.5 h-3.5")}
+   522→                </div>
+   523→                <div className="min-w-0 flex-1">
+   524→                  <div className="font-bold truncate">{subj.title}</div>
+   525→                  <div className="text-[9px] text-slate-500 truncate">{subj.description}</div>
+   526→                </div>
+   527→              </button>
+   528→            );
+   529→          })}
+   530→
+   531→          {subjects.length === 0 && (
+   532→            <div className="text-center text-[10px] text-slate-600 py-4">
+   533→              No subject channels yet.
+   534→            </div>
+   535→          )}
+   536→        </div>
+   537→      </aside>
+   538→
+   539→      {/* ───────────────────────────────────────────────────────────────────
+   540→          CHAT PANEL (right on desktop, full-screen on mobile when mobileView='chat')
+   541→          ─────────────────────────────────────────────────────────────────── */}
+   542→      <section
+   543→        className={`
+   544→          flex-1 flex flex-col min-w-0 overflow-hidden
+   545→          ${mobileView === 'chat' ? 'flex' : 'hidden lg:flex'}
+   546→        `}
+   547→      >
+   548→        {/* Chat header */}
+   549→        <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b border-white/[0.04] bg-slate-950/60 shrink-0">
+   550→          <div className="flex items-center gap-2 min-w-0 flex-1">
+   551→            {/* Mobile back button */}
+   552→            <button
+   553→              onClick={() => setMobileView('channels')}
+   554→              className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors shrink-0"
+   555→              title="Back to channels"
+   556→            >
+   557→              <ChevronLeft className="w-5 h-5" />
+   558→            </button>
+   559→
+   560→            <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 border border-white/5 shrink-0 hidden sm:block">
+   561→              {getSubjectIcon(activeChannelObj?.title || 'General', "w-5 h-5")}
+   562→            </div>
+   563→
+   564→            <div className="min-w-0 flex-1">
+   565→              <h2 className="text-sm font-bold text-white truncate">{activeChannelTitle}</h2>
+   566→              <p className="text-[10px] text-slate-400 truncate hidden sm:block">{activeChannelDesc}</p>
+   567→            </div>
+   568→          </div>
+   569→
+   570→          <div className="flex items-center gap-2 shrink-0">
+   571→            <div className="flex items-center gap-1.5 bg-slate-900/60 border border-white/5 px-2 py-1 rounded-lg">
+   572→              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+   573→              <span className="text-[9px] font-mono text-slate-300 font-bold uppercase tracking-wider hidden sm:inline">{t('activeStream')}</span>
+   574→            </div>
+   575→          </div>
+   576→        </div>
+   577→
+   578→        {/* Error banner */}
+   579→        {errorMessage && (
+   580→          <div className="m-3 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-2.5 text-xs text-rose-200 shrink-0">
+   581→            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+   582→            <div className="min-w-0 flex-1">
+   583→              <span className="font-bold block">{t('networkAlert')}</span>
+   584→              <span className="text-rose-300/80 text-[11px] mt-0.5 block break-words">{errorMessage}</span>
+   585→            </div>
+   586→            <button
+   587→              onClick={() => setErrorMessage(null)}
+   588→              className="p-1 hover:bg-rose-500/20 rounded text-rose-300 shrink-0"
+   589→            >
+   590→              <X className="w-3 h-3" />
+   591→            </button>
+   592→          </div>
+   593→        )}
+   594→
+   595→        {/* Messages feed */}
+   596→        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-3 scrollbar-thin">
+   597→
+   598→          {loading ? (
+   599→            <div className="h-full flex flex-col items-center justify-center gap-3">
+   600→              <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+   601→              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Synchronizing…</span>
+   602→            </div>
+   603→          ) : messages.length === 0 ? (
+   604→            <div className="h-full flex flex-col items-center justify-center p-4 text-center gap-3">
+   605→              <div className="p-4 bg-cyan-500/5 rounded-full border border-cyan-500/10 text-cyan-400">
+   606→                <MessageSquare className="w-6 h-6" />
+   607→              </div>
+   608→              <div>
+   609→                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-widest font-mono">{t('academicRoom')}</h4>
+   610→                <p className="text-[11px] text-slate-500 max-w-xs mt-1 leading-relaxed">{t('noPostsYet')}</p>
+   611→              </div>
+   612→            </div>
+   613→          ) : (
+   614→            <div className="space-y-3">
+   615→              {messages.map((msg, index) => {
+   616→                const isMine = msg.userId === user?.id;
+   617→                const dbId = msg.id || msg._id;
+   618→                const isTeacher = msg.userRole === 'admin';
+   619→                const hasImage = !!msg.imageUrl;
+   620→                const hasText = !!(msg.content && msg.content.trim() && msg.content !== '(image)');
+   621→
+   622→                return (
+   623→                  <motion.div
+   624→                    key={dbId || `msg-${index}`}
+   625→                    initial={{ opacity: 0, y: 8 }}
+   626→                    animate={{ opacity: 1, y: 0 }}
+   627→                    transition={{ duration: 0.2 }}
+   628→                    className={`flex gap-2 sm:gap-3 w-full ${isMine ? 'justify-end' : 'justify-start'}`}
+   629→                  >
+   630→                    {/* Avatar — for others: left side; for me: right side (rendered first, flex-row handles order) */}
+   631→                    {!isMine && (
+   632→                      msg.userProfilePic ? (
+   633→                        <img
+   634→                          src={msg.userProfilePic}
+   635→                          alt={msg.userName}
+   636→                          referrerPolicy="no-referrer"
+   637→                          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover shrink-0 border self-end ${
+   638→                            isTeacher ? 'border-amber-400/40' : 'border-white/10'
+   639→                          }`}
+   640→                        />
+   641→                      ) : (
+   642→                        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold self-end ${
+   643→                          isTeacher
+   644→                            ? 'bg-amber-500/15 border border-amber-500/30 text-amber-300'
+   645→                            : 'bg-slate-800 border border-white/5 text-slate-400'
+   646→                        }`}>
+   647→                          {msg.userName?.charAt(0).toUpperCase() || '?'}
+   648→                        </div>
+   649→                      )
+   650→                    )}
+   651→
+   652→                    {/* Bubble column — sizes to content, max 80% width */}
+   653→                    <div className="min-w-0 flex flex-col" style={{ maxWidth: '80%' }}>
+   654→                      {/* Name + meta — timestamp hidden by default, click to reveal (like Messenger) */}
+   655→                      <div className={`flex items-center gap-1.5 text-[10px] mb-1 flex-wrap ${isMine ? 'justify-end' : 'justify-start'}`}>
+   656→                        <span className={`font-bold ${isTeacher ? 'text-amber-300' : 'text-slate-300'}`}>
+   657→                          {isMine ? 'You' : msg.userName}
+   658→                        </span>
+   659→                        {isTeacher && (
+   660→                          <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20 font-mono font-bold uppercase">
+   661→                            {t('teacher')}
+   662→                          </span>
+   663→                        )}
+   664→                        <button
+   665→                          onClick={() => setRevealedTimeId(revealedTimeId === (msg.id || msg._id) ? null : (msg.id || msg._id || ''))}
+   666→                          className="text-slate-600 hover:text-slate-400 font-mono text-[9px] transition-colors cursor-pointer"
+   667→                        >
+   668→                          {revealedTimeId === (msg.id || msg._id)
+   669→                            ? new Date(msg.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+   670→                            : '◦◦◦'}
+   671→                        </button>
+   672→                      </div>
+   673→
+   674→                      {/* Image (if present) */}
+   675→                      {hasImage && (
+   676→                        <div className={`mb-1 ${isMine ? 'flex justify-end' : 'flex justify-start'}`}>
+   677→                          <img
+   678→                            src={msg.imageUrl}
+   679→                            alt="Shared"
+   680→                            referrerPolicy="no-referrer"
+   681→                            className="max-w-full max-h-64 rounded-2xl border border-white/10 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+   682→                            onClick={() => setZoomedImage(msg.imageUrl!)}
+   683→                          />
+   684→                        </div>
+   685→                      )}
+   686→
+   687→                      {/* Text (if present) */}
+   688→                      {hasText && (
+   689→                        <div className={isMine ? 'flex justify-end' : 'flex justify-start'}>
+   690→                          <div
+   691→                            className={`
+   692→                              inline-block px-3.5 py-2 text-xs sm:text-[13px] leading-relaxed break-words
+   693→                              ${isMine
+   694→                                ? 'bg-cyan-500 text-white rounded-2xl rounded-br-md'
+   695→                                : isTeacher
+   696→                                  ? 'bg-slate-900 border border-amber-500/20 text-amber-50 rounded-2xl rounded-bl-md'
+   697→                                  : 'bg-slate-900 border border-white/[0.06] text-slate-200 rounded-2xl rounded-bl-md'
+   698→                              }
+   699→                            `}
+   700→                          >
+   701→                            <p className="whitespace-pre-line">{msg.content}</p>
+   702→                          </div>
+   703→                        </div>
+   704→                      )}
+   705→                    </div>
+   706→
+   707→                    {/* Own avatar — right side for my messages */}
+   708→                    {isMine && (
+   709→                      msg.userProfilePic ? (
+   710→                        <img
+   711→                          src={msg.userProfilePic}
+   712→                          alt="You"
+   713→                          referrerPolicy="no-referrer"
+   714→                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover shrink-0 border border-cyan-500/30 self-end"
+   715→                        />
+   716→                      ) : (
+   717→                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center shrink-0 text-cyan-300 text-xs font-bold self-end">
+   718→                          {user?.name?.charAt(0).toUpperCase() || 'M'}
+   719→                        </div>
+   720→                      )
+   721→                    )}
+   722→                  </motion.div>
+   723→                );
+   724→              })}
+   725→            </div>
+   726→          )}
+   727→        </div>
+   728→
+   729→        {/* Pending image preview (above input) */}
+   730→        {pendingImage && (
+   731→          <div className="px-3 sm:px-4 pb-2 shrink-0">
+   732→            <div className="inline-flex items-end gap-2 p-2 rounded-xl bg-slate-900/80 border border-white/10">
+   733→              <div className="relative">
+   734→                <img
+   735→                  src={pendingImage}
+   736→                  alt="Pending upload"
+   737→                  className="w-16 h-16 object-cover rounded-lg border border-white/10"
+   738→                />
+   739→                <button
+   740→                  type="button"
+   741→                  onClick={() => setPendingImage(null)}
+   742→                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center hover:bg-rose-400 transition-colors"
+   743→                  title="Remove image"
+   744→                >
+   745→                  <X className="w-3 h-3" />
+   746→                </button>
+   747→              </div>
+   748→              <span className="text-[10px] text-slate-400 pb-1">Press send to share</span>
+   749→            </div>
+   750→          </div>
+   751→        )}
+   752→
+   753→        {/* Input bar */}
+   754→        <div className="border-t border-white/[0.04] bg-slate-950/60 p-3 sm:p-4 shrink-0">
+   755→          <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
+   756→            <input
+   757→              ref={imageInputRef}
+   758→              type="file"
+   759→              accept="image/*"
+   760→              onChange={handleImagePick}
+   761→              className="hidden"
+   762→            />
+   763→
+   764→            {/* Paperclip */}
+   765→            <button
+   766→              type="button"
+   767→              onClick={() => imageInputRef.current?.click()}
+   768→              disabled={submitting}
+   769→              className="shrink-0 w-10 h-10 rounded-full bg-slate-900 border border-white/5 hover:border-cyan-500/40 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 flex items-center justify-center transition-all disabled:opacity-40"
+   770→              title="Attach image"
+   771→            >
+   772→              <Paperclip className="w-4 h-4" />
+   773→            </button>
+   774→
+   775→            {/* Textarea */}
+   776→            <textarea
+   777→              value={typedMessage}
+   778→              onChange={(e) => setTypedMessage(e.target.value)}
+   779→              onKeyDown={(e) => {
+   780→                if (e.key === 'Enter' && !e.shiftKey) {
+   781→                  e.preventDefault();
+   782→                  handleSendMessage();
+   783→                }
+   784→              }}
+   785→              rows={1}
+   786→              maxLength={4000}
+   787→              placeholder={pendingImage ? 'Add a caption…' : 'Type a message…'}
+   788→              className="flex-1 min-w-0 min-h-[40px] max-h-32 resize-none bg-slate-900 border border-white/5 focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20 px-3 py-2 rounded-2xl text-xs sm:text-[13px] text-slate-100 placeholder:text-slate-500 focus:outline-none transition-all overflow-y-auto"
+   789→            />
+   790→
+   791→            {/* Send */}
+   792→            <button
+   793→              type="submit"
+   794→              disabled={(!typedMessage.trim() && !pendingImage) || submitting}
+   795→              className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 shadow-lg shadow-indigo-600/20"
+   796→              title="Send message"
+   797→            >
+   798→              {submitting ? (
+   799→                <Loader2 className="w-4 h-4 animate-spin" />
+   800→              ) : (
+   801→                <Send className="w-4 h-4" />
+   802→              )}
+   803→            </button>
+   804→          </form>
+   805→        </div>
+   806→      </section>
+   807→
+   808→      {/* Image zoom popup — fullscreen overlay when a chat image is clicked */}
+   809→      {zoomedImage && (
+   810→        <div
+   811→          className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 cursor-pointer"
+   812→          onClick={() => setZoomedImage(null)}
+   813→        >
+   814→          {/* Close button */}
+   815→          <button
+   816→            className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-white transition-colors z-10"
+   817→            onClick={(e) => { e.stopPropagation(); setZoomedImage(null); }}
+   818→            aria-label="Close image"
+   819→          >
+   820→            <X className="w-5 h-5" />
+   821→          </button>
+   822→
+   823→          {/* Zoomable image — click to toggle zoom, drag to pan when zoomed */}
+   824→          <img
+   825→            src={zoomedImage}
+   826→            alt="Zoomed image"
+   827→            referrerPolicy="no-referrer"
+   828→            className="max-w-[95vw] max-h-[90vh] object-contain rounded-xl shadow-2xl select-none"
+   829→            onClick={(e) => e.stopPropagation()}
+   830→            style={{ cursor: 'zoom-in' }}
+   831→          />
+   832→
+   833→          {/* Hint text */}
+   834→          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 font-mono uppercase tracking-wider pointer-events-none">
+   835→            Click anywhere outside to close
+   836→          </div>
+   837→        </div>
+   838→      )}
+   839→    </div>
+   840→  );
+   841→};
+   842→

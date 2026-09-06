@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { uploadDataUrl } from '@/lib/blob-storage';
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     // image is silently dropped.
     const updated = await db.$transaction(async (tx) => {
       const fresh = await tx.folder.findUniqueOrThrow({ where: { id: folder.id } });
-      const images = JSON.parse(fresh.imagesJson || '[]');
+      const images = safeJsonParseArray(fresh.imagesJson);
       images.push({ url: finalUrl, title: String(title || '') });
       return tx.folder.update({
         where: { id: fresh.id },
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    const images = JSON.parse(updated.imagesJson || '[]');
+    const images = safeJsonParseArray(updated.imagesJson);
     return NextResponse.json({
       id: updated.id,
       subjectId: updated.subjectId,

@@ -31,7 +31,7 @@ export const GeminiKeyModal: React.FC = () => {
 
   const handleCopy = () => {
     if (!inputKey) return;
-    navigator.clipboard.writeText(inputKey);
+    try { navigator.clipboard.writeText(inputKey); } catch {} ;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

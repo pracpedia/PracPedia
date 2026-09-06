@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { logActivity } from '@/lib/activity-log';
 import { getClientIp, errorLogLimiter, rateLimitHeaders } from '@/lib/rate-limit';
 import { appendErrorLog } from '@/lib/error-log';

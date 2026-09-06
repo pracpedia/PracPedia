@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { uploadDataUrl } from '@/lib/blob-storage';
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(items.map((p) => ({
       ...p,
       id: p.id,
-      tags: JSON.parse(p.tagsJson || '[]'),
+      tags: safeJsonParseArray(p.tagsJson),
     })));
   } catch (err: any) {
     console.error('GET /api/portfolio error:', err);

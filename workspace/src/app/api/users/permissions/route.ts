@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { ALL_PERMISSIONS, PERMISSION_KEYS, parsePermissions } from '@/lib/permissions';

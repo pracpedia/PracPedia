@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { safeLocalStorage } from '@/lib/storage';
 
 type Language = 'en' | 'bn';
@@ -155,17 +155,18 @@ const translations: Record<Language, Record<string, string>> = {
 };
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Lazy-initialize from localStorage to avoid setState-in-effect cascade
-  const [language, setLanguageState] = useState<Language>(() => {
-    if (typeof window === 'undefined') return 'en';
+  // Initialize with default — hydration-safe (server and client render the same).
+  const [language, setLanguageState] = useState<Language>('en');
+
+  // Load saved language after mount (avoids hydration mismatch)
+  useEffect(() => {
     try {
       const saved = safeLocalStorage.getItem('app_language');
-      if (saved === 'en' || saved === 'bn') return saved;
+      if (saved === 'en' || saved === 'bn') setLanguageState(saved);
     } catch {
       // ignore
     }
-    return 'en';
-  });
+  }, []);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);

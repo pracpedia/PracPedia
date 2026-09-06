@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
@@ -20,7 +21,7 @@ export async function DELETE(
     if (!folder) {
       return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
     }
-    const images = JSON.parse(folder.imagesJson || '[]') as { url: string; title: string }[];
+    const images = safeJsonParseArray(folder.imagesJson) as { url: string; title: string }[];
     if (idx < 0 || idx >= images.length) {
       return NextResponse.json({ error: 'Image index out of range' }, { status: 400 });
     }

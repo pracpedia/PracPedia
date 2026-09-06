@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { logActivity } from '@/lib/activity-log';
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(bookings.map((b) => ({
       ...b,
       id: b.id,
-      referenceImages: JSON.parse(b.referenceImagesJson || '[]'),
+      referenceImages: safeJsonParseArray(b.referenceImagesJson),
       client: { ...b.client, id: b.client.id },
       artist: { ...b.artist, id: b.artist.id },
     })));
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...booking,
       id: booking.id,
-      referenceImages: JSON.parse(booking.referenceImagesJson || '[]'),
+      referenceImages: safeJsonParseArray(booking.referenceImagesJson),
     });
   } catch (err: any) {
     console.error('POST /api/bookings error:', err);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { logActivity } from '@/lib/activity-log';
@@ -32,10 +33,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({
       ...booking,
       id: booking.id,
-      referenceImages: JSON.parse(booking.referenceImagesJson || '[]'),
+      referenceImages: safeJsonParseArray(booking.referenceImagesJson),
     });
-  } catch {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  } catch (err: any) {
+    console.error("GET error:", err); return NextResponse.json({ error: "Could not load booking." }, { status: 500 });
   }
 }
 
@@ -161,7 +162,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({
       ...updated,
       id: updated.id,
-      referenceImages: JSON.parse(updated.referenceImagesJson || '[]'),
+      referenceImages: safeJsonParseArray(updated.referenceImagesJson),
     });
   } catch (err: any) {
     console.error('PUT /api/bookings/[id] error:', err);
@@ -202,7 +203,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({
       ...updated,
       id: updated.id,
-      referenceImages: JSON.parse(updated.referenceImagesJson || '[]'),
+      referenceImages: safeJsonParseArray(updated.referenceImagesJson),
     });
   } catch (err: any) {
     console.error('DELETE /api/bookings/[id] error:', err);

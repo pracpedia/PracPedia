@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     let images = 0;
     for (const f of allFolders) {
       try {
-        const arr = JSON.parse(f.imagesJson || '[]');
+        const arr = safeJsonParseArray(f.imagesJson);
         if (Array.isArray(arr)) images += arr.length;
       } catch { /* skip malformed */ }
     }

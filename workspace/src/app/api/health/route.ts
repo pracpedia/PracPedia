@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 
 /**

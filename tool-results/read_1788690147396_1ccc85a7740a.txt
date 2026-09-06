@@ -1,0 +1,702 @@
+   400→          const data = await res.json();
+   401→          if (data && typeof data.studyTime === 'number') {
+   402→            updateUserStudyTime(data.studyTime);
+   403→          }
+   404→        }
+   405→      } catch (err) {
+   406→        // Silent — heartbeat failures are normal (network blips, dev HMR
+   407→        // restarts). The bug monitor already catches persistent 5xx via
+   408→        // apiFetch, so we don't need to log every transient failure here.
+   409→        void err;
+   410→      }
+   411→    }, 15050);
+   412→
+   413→    return () => {
+   414→      clearInterval(ticker);
+   415→      clearInterval(syncSeconds);
+   416→    };
+   417→  }, [user?.id]);
+   418→
+   419→  // Fetch full system context
+   420→  // NOTE: Does NOT set isLoading=true on refresh — only the initial load
+   421→  // sets isLoading. Setting it on every refresh causes the loading screen
+   422→  // to flash + triggers the forceLoaded/SSR auto-reload timeouts, which
+   423→  // reload the page and wipe all user state (AI answers, chat, etc.).
+   424→  const refreshWorkspaceData = async () => {
+   425→    try {
+   426→      // Fetch subjects
+   427→      const subRes = await apiFetch('/api/subjects');
+   428→      const subData = await subRes.json().catch(() => []);
+   429→      setSubjects(Array.isArray(subData) ? subData.map((s: any) => ({ ...s, id: s.id || s._id })) : []);
+   430→
+   431→      // Fetch folder registries
+   432→      const fRes = await apiFetch('/api/folders');
+   433→      const fData = await fRes.json().catch(() => []);
+   434→      setFolders(Array.isArray(fData) ? fData.map((f: any) => ({ ...f, id: f.id || f._id })) : []);
+   435→
+   436→      // Fetch announcements
+   437→      try {
+   438→        const annRes = await apiFetch('/api/announcements');
+   439→        if (annRes.ok) {
+   440→          const annData = await annRes.json().catch(() => []);
+   441→          setAnnouncements(Array.isArray(annData) ? annData.map((a: any) => ({ ...a, id: a.id || a._id })) : []);
+   442→        }
+   443→      } catch (annErr) {
+   444→        console.error("Could not load announcements: ", annErr);
+   445→      }
+   446→
+   447→      // Fetch banner config
+   448→      try {
+   449→        const bannerRes = await fetch('/api/settings/banner');
+   450→        if (bannerRes.ok) {
+   451→          setBannerConfig(await bannerRes.json().catch(() => ({})));
+   452→        }
+   453→      } catch {
+   454→        // defaults will be used
+   455→      }
+   456→
+   457→      // Fetch admin directory list
+   458→      try {
+   459→        const admRes = await apiFetch('/api/users/admins');
+   460→        if (admRes.ok) {
+   461→          const admData = await admRes.json().catch(() => []);
+   462→          setAdminsList(Array.isArray(admData) ? admData.map((u: any) => ({ ...u, id: u.id || u._id })) : []);
+   463→        }
+   464→      } catch (admErr) {
+   465→        console.error("Could not load admin directory: ", admErr);
+   466→      }
+   467→
+   468→      // Fetch statistics telemetry
+   469→      const statRes = await apiFetch('/api/stats');
+   470→      const statData = await statRes.json().catch(() => ({}));
+   471→      setStats(statData && typeof statData === 'object' ? statData : {});
+   472→
+   473→      // Fetch students list if user is an Administrator
+   474→      if (user?.role === 'admin' || user?.role === 'super_admin') {
+   475→        try {
+   476→          const studRes = await apiFetch('/api/users/students');
+   477→          if (studRes.ok) {
+   478→            const studData = await studRes.json();
+   479→            setStudentsList(studData.map((s: any) => ({ ...s, id: s.id || s._id })));
+   480→          }
+   481→        } catch (studErr) {
+   482→          console.error("Could not fetch students roster: ", studErr);
+   483→        }
+   484→      }
+   485→    } catch (err) {
+   486→      console.error("Workspace datalink could not be completed:", err);
+   487→    } finally {
+   488→      setIsLoading(false);
+   489→    }
+   490→  };
+   491→
+   492→  useEffect(() => {
+   493→    if (user) {
+   494→      refreshWorkspaceData();
+   495→    }
+   496→  }, [user?.id]);
+   497→
+   498→  // Live workspace refresh — replaces a broken WebSocket client that was
+   499→  // trying to connect to a non-existent /ws endpoint (no WebSocket server
+   500→  // exists in Next.js dev/prod). The old code logged 4 messages every 4
+   501→  // seconds per reconnect attempt, flooding the browser console.
+   502→  //
+   503→  // We now use a lightweight 30s polling interval for workspace refresh.
+   504→  // Real-time chat already uses long-polling in ClassroomDiscussion.tsx,
+   505→  // so no feature is lost.
+   506→  useEffect(() => {
+   507→    if (!user) return;
+   508→    let cancelled = false;
+   509→
+   510→    const refresh = async () => {
+   511→      if (cancelled) return;
+   512→      try {
+   513→        await refreshWorkspaceData();
+   514→      } catch (err) {
+   515→        // Silent — refresh failures already log to the bug monitor via apiFetch
+   516→        void err;
+   517→      }
+   518→    };
+   519→
+   520→    // Initial refresh on mount, then every 30s
+   521→    refresh();
+   522→    const interval = setInterval(refresh, 30_000);
+   523→
+   524→    return () => {
+   525→      cancelled = true;
+   526→      clearInterval(interval);
+   527→    };
+   528→  }, [user?.id]);
+   529→
+   530→  // Relative view distance helper for 'Recently Viewed' label
+   531→  const getRecentlyViewedMsg = (folderId: string) => {
+   532→    const timestamp = recentlyViewed[folderId];
+   533→    if (!timestamp) return null;
+   534→    const diff = Date.now() - timestamp;
+   535→    if (diff < 60000) return 'Just now';
+   536→    const mins = Math.floor(diff / 60000);
+   537→    if (mins < 60) return `${mins}m ago`;
+   538→    const hrs = Math.floor(diff / 3600000);
+   539→    if (hrs < 24) return `${hrs}h ago`;
+   540→    const days = Math.floor(hrs / 24);
+   541→    return `${days}d ago`;
+   542→  };
+   543→
+   544→  // Styling maps assigning specific neon highlights to different academic sectors
+   545→  const getSubjectMeta = (title: string) => {
+   546→    const norm = title.toLowerCase();
+   547→    if (norm.includes('physic')) {
+   548→      return {
+   549→        grad: "from-[#6366f1] to-[#4f46e5]",
+   550→        border: "hover:border-[#6366f1]/50 shadow-[#6366f1]/5",
+   551→        text: "text-[#818cf8]",
+   552→        bg: "bg-[#6366f1]/10",
+   553→        desc: "Waves, mechanics, and thermodynamic formulas."
+   554→      };
+   555→    } else if (norm.includes('chemist')) {
+   556→      return {
+   557→        grad: "from-[#10b981] to-[#059669]",
+   558→        border: "hover:border-[#10b981]/50 shadow-[#10b981]/5",
+   559→        text: "text-[#34d399]",
+   560→        bg: "bg-[#10b981]/10",
+   561→        desc: "Titrations, chemical reactions, and physical salt analyses."
+   562→      };
+   563→    } else if (norm.includes('biolog')) {
+   564→      return {
+   565→        grad: "from-[#84cc16] to-[#65a30d]",
+   566→        border: "hover:border-[#84cc16]/50 shadow-[#84cc16]/5",
+   567→        text: "text-[#a3e635]",
+   568→        bg: "bg-[#84cc16]/10",
+   569→        desc: "Cell slides, dissection sketches, and taxonomy structures."
+   570→      };
+   571→    } else if (norm.includes('math')) {
+   572→      return {
+   573→        grad: "from-[#d946ef] to-[#c084fc]",
+   574→        border: "hover:border-[#d946ef]/50 shadow-[#d946ef]/5",
+   575→        text: "text-[#f472b6]",
+   576→        bg: "bg-[#d946ef]/10",
+   577→        desc: "Vectors, geometry functions, and coordinate calculus plots."
+   578→      };
+   579→    } else if (norm.includes('ict')) {
+   580→      return {
+   581→        grad: "from-[#06b6d4] to-[#0891b2]",
+   582→        border: "hover:border-[#06b6d4]/50 shadow-[#06b6d4]/5",
+   583→        text: "text-[#22d3ee]",
+   584→        bg: "bg-[#06b6d4]/10",
+   585→        desc: "HTML tables, truth tables, and server layout diagrams."
+   586→      };
+   587→    } else {
+   588→      return {
+   589→        grad: "from-slate-600 to-indigo-750",
+   590→        border: "hover:border-slate-500 shadow-slate-500/5",
+   591→        text: "text-slate-400",
+   592→        bg: "bg-slate-500/10",
+   593→        desc: "Advanced lecture collections and experimental notes."
+   594→      };
+   595→    }
+   596→  };
+   597→
+   598→  // State Navigation Helper
+   599→  const setView = (view: string, subjectId?: string, folderId?: string) => {
+   600→    setSearchQuery('');
+   601→    // Admin CMS — allow both admin and super_admin
+   602→    if (view === 'admins' && user?.role !== 'admin' && user?.role !== 'super_admin') {
+   603→      return;
+   604→    }
+   605→    if (view === 'subject' && subjectId) {
+   606→      setSelectedSubjectId(subjectId);
+   607→      setSelectedFolderId(null);
+   608→    } else if (view === 'folder' && folderId) {
+   609→      setSelectedFolderId(folderId);
+   610→      const targetFolder = folders.find(f => f.id === folderId);
+   611→      if (targetFolder) {
+   612→        setSelectedSubjectId(targetFolder.subjectId);
+   613→      } else if (subjectId) {
+   614→        setSelectedSubjectId(subjectId);
+   615→      }
+   616→      // Save timestamp of opened folder in safeLocalStorage & update state
+   617→      const key = user ? `png_recent_views_${user.id}` : 'png_recent_views_guest';
+   618→      const now = Date.now();
+   619→      setRecentlyViewed((prev) => {
+   620→        const updated = { ...prev, [folderId]: now };
+   621→        safeLocalStorage.setItem(key, JSON.stringify(updated));
+   622→        return updated;
+   623→      });
+   624→    } else {
+   625→      setSelectedSubjectId(null);
+   626→      setSelectedFolderId(null);
+   627→    }
+   628→    setCurrentView(view as ViewState);
+   629→  };
+   630→
+   631→  // API Mutators
+   632→  const handleSaveFolder = async (title: string, description: string, subjectId: string) => {
+   633→    try {
+   634→      if (editFolderData) {
+   635→        // Edit Folder details
+   636→        const res = await apiFetch(`/api/folders/${editFolderData.id}`, {
+   637→          method: 'PUT',
+   638→          headers: { 'Content-Type': 'application/json' },
+   639→          body: JSON.stringify({ title, description })
+   640→        });
+   641→        if (!res.ok) {
+   642→          const errorData = await res.json().catch(() => ({}));
+   643→          throw new Error(errorData.error || "Could not apply edits to folder settings.");
+   644→        }
+   645→      } else {
+   646→        // Create new Folder metadata
+   647→        const res = await apiFetch('/api/folders', {
+   648→          method: 'POST',
+   649→          headers: { 'Content-Type': 'application/json' },
+   650→          body: JSON.stringify({ title, description, subjectId })
+   651→        });
+   652→        if (!res.ok) {
+   653→          const errorData = await res.json().catch(() => ({}));
+   654→          throw new Error(errorData.error || "Could not initialize folder document.");
+   655→        }
+   656→      }
+   657→      setEditFolderData(null);
+   658→      await refreshWorkspaceData();
+   659→    } catch (err: any) {
+   660→      addLiveNotification(err.message || "Operation failed.", "warning");
+   661→      throw err;
+   662→    }
+   663→  };
+   664→
+   665→  const handleDeleteFolder = async (id: string) => {
+   666→    try {
+   667→      const res = await apiFetch(`/api/folders/${id}`, {
+   668→        method: 'DELETE'
+   669→      });
+   670→      if (!res.ok) {
+   671→        const errorData = await res.json().catch(() => ({}));
+   672→        throw new Error(errorData.error || "Folder document unlinking failed.");
+   673→      }
+   674→
+   675→      setSelectedFolderId(null);
+   676→      setView('dashboard');
+   677→      await refreshWorkspaceData();
+   678→    } catch (err: any) {
+   679→      addLiveNotification(err.message || "Delete failed.", "warning");
+   680→      throw err;
+   681→    }
+   682→  };
+   683→
+   684→  // Admin & Announcements Mutators
+   685→  const handlePromoteEmail = async (e: React.FormEvent) => {
+   686→    e.preventDefault();
+   687→    setAdminPageSuccess(null);
+   688→    setAdminPageError(null);
+   689→    if (!promoteEmail.trim()) return;
+   690→
+   691→    try {
+   692→      const res = await apiFetch('/api/users/promote', {
+   693→        method: 'POST',
+   694→        headers: { 'Content-Type': 'application/json' },
+   695→        body: JSON.stringify({ email: promoteEmail })
+   696→      });
+   697→
+   698→      let data: any = {};
+   699→      const contentType = res.headers.get('content-type');
+   700→      if (contentType && contentType.includes('application/json')) {
+   701→        data = await res.json();
+   702→      } else {
+   703→        const textResponse = await res.text();
+   704→        const errorMessage = textResponse.includes('Access forbidden')
+   705→          ? "Access forbidden. Only the main authorized administrator can promote users."
+   706→          : `Elevating rights failed with status ${res.status}.`;
+   707→        throw new Error(errorMessage);
+   708→      }
+   709→
+   710→      if (!res.ok) {
+   711→        throw new Error(data.error || "Elevation could not be completed.");
+   712→      }
+   713→      setAdminPageSuccess(data.message || `Successfully elevated ${promoteEmail} to administrator.`);
+   714→      setPromoteEmail('');
+   715→      await refreshWorkspaceData();
+   716→    } catch (err: any) {
+   717→      setAdminPageError(err.message || "An unexpected error occurred during user elevation.");
+   718→    }
+   719→  };
+   720→
+   721→  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+   722→    e.preventDefault();
+   723→    setAdminPageSuccess(null);
+   724→    setAdminPageError(null);
+   725→    if (!announceTitle.trim() || !announceContent.trim()) {
+   726→      setAdminPageError("Title and description content are required to issue an alert.");
+   727→      return;
+   728→    }
+   729→
+   730→    try {
+   731→      const res = await apiFetch('/api/announcements', {
+   732→        method: 'POST',
+   733→        headers: { 'Content-Type': 'application/json' },
+   734→        body: JSON.stringify({
+   735→          title: announceTitle,
+   736→          content: announceContent,
+   737→          deadline: announceDeadline
+   738→        })
+   739→      });
+   740→
+   741→      let data: any = {};
+   742→      const contentType = res.headers.get('content-type');
+   743→      if (contentType && contentType.includes('application/json')) {
+   744→        data = await res.json();
+   745→      } else {
+   746→        const text = await res.text();
+   747→        throw new Error(text || "Could not publish internal notification alert.");
+   748→      }
+   749→
+   750→      if (!res.ok) {
+   751→        throw new Error(data.error || "Announcement registration could not be completed.");
+   752→      }
+   753→      setAdminPageSuccess("Successfully published practical submission deadline alert.");
+   754→      setAnnounceTitle('');
+   755→      setAnnounceContent('');
+   756→      setAnnounceDeadline('');
+   757→      await refreshWorkspaceData();
+   758→    } catch (err: any) {
+   759→      setAdminPageError(err.message || "Could not publish internal notification alert.");
+   760→    }
+   761→  };
+   762→
+   763→  const handleDeleteAnnouncement = (id: string) => {
+   764→    setConfirmDeleteAnnouncementId(id);
+   765→  };
+   766→
+   767→  const handleConfirmDeleteAnnouncement = async (id: string) => {
+   768→    setAdminPageSuccess(null);
+   769→    setAdminPageError(null);
+   770→    try {
+   771→      const res = await apiFetch(`/api/announcements/${id}`, {
+   772→        method: 'DELETE'
+   773→      });
+   774→
+   775→      let data: any = {};
+   776→      const contentType = res.headers.get('content-type');
+   777→      if (contentType && contentType.includes('application/json')) {
+   778→        data = await res.json();
+   779→      } else {
+   780→        const text = await res.text();
+   781→        throw new Error(text || "Retraction could not be completed.");
+   782→      }
+   783→
+   784→      if (!res.ok) {
+   785→        throw new Error(data.error || "Retraction could not be completed.");
+   786→      }
+   787→      setAdminPageSuccess("Announcement successfully retracted and removed.");
+   788→      await refreshWorkspaceData();
+   789→    } catch (err: any) {
+   790→      setAdminPageError(err.message || "Retraction failed.");
+   791→    }
+   792→  };
+   793→
+   794→  const handleAppendImage = async (url: string, titleStr: string) => {
+   795→    if (!selectedFolderId) return;
+   796→    try {
+   797→      const res = await apiFetch('/api/images', {
+   798→        method: 'POST',
+   799→        headers: { 'Content-Type': 'application/json' },
+   800→        body: JSON.stringify({
+   801→          folderId: selectedFolderId,
+   802→          imageUrl: url,
+   803→          title: titleStr
+   804→        })
+   805→      });
+   806→      if (!res.ok) throw new Error("Uploading script page rejected.");
+   807→      await refreshWorkspaceData();
+   808→    } catch (err: any) {
+   809→      addLiveNotification(err.message || "Failed to add image.", "warning");
+   810→    }
+   811→  };
+   812→
+   813→  const handleDeleteImage = (imgIndex: number) => {
+   814→    setConfirmDeleteImageIndex(imgIndex);
+   815→  };
+   816→
+   817→  const handleConfirmDeleteImage = async (imgIndex: number) => {
+   818→    if (!selectedFolderId) return;
+   819→    try {
+   820→      const res = await apiFetch(`/api/images/${selectedFolderId}/${imgIndex}`, {
+   821→        method: 'DELETE'
+   822→      });
+   823→      if (!res.ok) {
+   824→        const errorData = await res.json().catch(() => ({}));
+   825→        throw new Error(errorData.error || "Deletion rejected by api.");
+   826→      }
+   827→      await refreshWorkspaceData();
+   828→    } catch (err: any) {
+   829→      addLiveNotification(err.message || "Failed to delete image.", "warning");
+   830→    }
+   831→  };
+   832→
+   833→  // Find active subject & active folder for display
+   834→  const activeSubject = subjects.find(s => s.id === selectedSubjectId);
+   835→  const activeFolder = folders.find(f => f.id === selectedFolderId);
+   836→
+   837→  // Filtered lists for the active viewing context
+   838→  const filteredFolders = folders.filter(f => f.subjectId === selectedSubjectId);
+   839→
+   840→  // Search query filters for folders
+   841→  const searchedDashboardFolders = folders.filter(f =>
+   842→    f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+   843→    f.description.toLowerCase().includes(searchQuery.toLowerCase())
+   844→  );
+   845→
+   846→  const searchedSubjectFolders = filteredFolders.filter(f =>
+   847→    f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+   848→    f.description.toLowerCase().includes(searchQuery.toLowerCase())
+   849→  );
+   850→
+   851→  // Preserve access to internal state mutators referenced by Sidebar / Admin CMS
+   852→  void setUser;
+   853→  void studentsList;
+   854→  void confirmDemoteId;
+   855→  void setConfirmDemoteId;
+   856→  void promoteEmail;
+   857→  void setPromoteEmail;
+   858→  void announceTitle;
+   859→  void setAnnounceTitle;
+   860→  void announceContent;
+   861→  void setAnnounceContent;
+   862→  void announceDeadline;
+   863→  void setAnnounceDeadline;
+   864→  void adminPageSuccess;
+   865→  void setAdminPageSuccess;
+   866→  void adminPageError;
+   867→  void setAdminPageError;
+   868→  void handlePromoteEmail;
+   869→  void handleCreateAnnouncement;
+   870→  void bdTime;
+   871→
+   872→  return (
+   873→    <div className={`min-h-screen lg:min-h-0 flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden text-slate-100 relative transition-all duration-300 ${
+   874→      activeTheme === 'peaceful-purple' ? 'theme-peaceful-purple' :
+   875→      activeTheme === 'deep-blue' ? 'theme-deep-blue' :
+   876→      activeTheme === 'cosmic-black' ? 'theme-cosmic-black' :
+   877→      activeTheme === 'mesh-aurora' ? 'theme-mesh-aurora' :
+   878→      activeTheme === 'emerald-green' ? 'theme-emerald-green' :
+   879→      activeTheme === 'botanic-green' ? 'theme-botanic-green' :
+   880→      activeTheme === 'saffron-gold' ? 'theme-saffron-gold' :
+   881→      activeTheme === 'royal-purple' ? 'theme-royal-purple' :
+   882→      activeTheme === 'crimson-red' ? 'theme-crimson-red' :
+   883→      activeTheme === 'ocean-teal' ? 'theme-ocean-teal' :
+   884→      activeTheme === 'sunset-orange' ? 'theme-sunset-orange' :
+   885→      activeTheme === 'midnight-blue' ? 'theme-midnight-blue' :
+   886→      activeTheme === 'rose-pink' ? 'theme-rose-pink' :
+   887→      activeTheme === 'abyss-violet' ? 'theme-abyss-violet' :
+   888→      activeTheme === 'obsidian-gold' ? 'theme-obsidian-gold' :
+   889→      activeTheme === 'plasma-storm' ? 'theme-plasma-storm' :
+   890→      'glass-main-bg'
+   891→    }`}>
+   892→
+   893→      {/* 🔔 LIVE REAL-TIME RADIAL TOAST SYSTEM */}
+   894→      <div className="fixed top-6 right-6 z-[1000] flex flex-col gap-3 w-80 max-w-[90vw] pointer-events-none">
+   895→        <AnimatePresence>
+   896→          {liveNotifications.map((notif) => (
+   897→            <motion.div
+   898→              key={notif.id}
+   899→              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+   900→              animate={{ opacity: 1, x: 0, scale: 1 }}
+   901→              exit={{ opacity: 0, x: 20, scale: 0.95 }}
+   902→              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+   903→              className={`pointer-events-auto p-4 rounded-xl border border-slate-700/60 shadow-2xl flex items-start gap-3 backdrop-blur-md relative overflow-hidden group ${
+   904→                notif.type === 'success' ? 'bg-emerald-950/90 text-emerald-100 border-l-4 border-l-emerald-500' :
+   905→                notif.type === 'warning' ? 'bg-amber-950/90 text-amber-100 border-l-4 border-l-amber-500' :
+   906→                'bg-slate-900/95 text-slate-100 border-l-4 border-l-sky-500'
+   907→              }`}
+   908→            >
+   909→              <Bell className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+   910→                notif.type === 'success' ? 'text-emerald-400' :
+   911→                notif.type === 'warning' ? 'text-amber-400' :
+   912→                'text-sky-400 animate-pulse'
+   913→              }`} />
+   914→
+   915→              <div className="flex-1 text-sm font-medium tracking-wide break-words">
+   916→                {notif.message}
+   917→              </div>
+   918→
+   919→              <button
+   920→                onClick={() => setLiveNotifications((prev) => prev.filter(n => n.id !== notif.id))}
+   921→                className="text-slate-400 hover:text-white transition-colors duration-150 p-0.5 rounded-md hover:bg-white/10 min-h-[44px] min-w-[44px] flex items-center justify-center"
+   922→                aria-label="Dismiss notification"
+   923→              >
+   924→                <X className="w-4 h-4" />
+   925→              </button>
+   926→            </motion.div>
+   927→          ))}
+   928→        </AnimatePresence>
+   929→      </div>
+   930→
+   931→      {/* Mobile-first sticky header — hamburger triggers the Sidebar drawer (Sheet pattern handled inside Sidebar.tsx). Visible on mobile. */}
+   932→      <header className="lg:hidden sticky top-0 z-30 glass-header px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2 min-h-[4rem]">
+   933→        <button
+   934→          onClick={() => setIsMobileSidebarOpen(prev => !prev)}
+   935→          className="p-2 bg-white/5 border border-white/10 text-slate-300 hover:text-white rounded-lg shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+   936→          aria-label="Toggle navigation menu"
+   937→        >
+   938→          <Menu className="w-4 h-4" />
+   939→        </button>
+   940→        <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+   941→          <Logo size="sm" />
+   942→          {currentView !== 'dashboard' && currentView !== 'subject' && currentView !== 'folder' && (
+   943→            <span className="text-slate-400 text-[10px] sm:text-xs capitalize truncate">
+   944→              · {currentView === 'artists' ? 'Marketplace' :
+   945→                 currentView === 'artist_dashboard' ? 'Artist Dashboard' :
+   946→                 currentView === 'creds' ? 'System Credentials' :
+   947→                 currentView === 'bookings' ? 'Bookings' :
+   948→                 currentView === 'academy' ? 'AI Academy' :
+   949→                 currentView === 'profile' ? 'Profile' :
+   950→                 currentView === 'chat' ? 'Discussion Chat' :
+   951→                 currentView === 'admins' ? (user?.role === 'super_admin' ? 'Super Admin CMS' : 'Admin Portal') : currentView}
+   952→            </span>
+   953→          )}
+   954→        </div>
+   955→        <div className="flex items-center gap-1.5 shrink-0">
+   956→          <div className="flex items-center gap-1 bg-slate-950/80 border border-white/[0.04] rounded-xl p-1 shrink-0 max-w-[140px]">
+   957→            <select
+   958→              value={activeTheme}
+   959→              onChange={(e) => setActiveTheme(e.target.value)}
+   960→              className="bg-slate-900 border-none text-[10px] font-mono font-bold text-slate-300 rounded-lg py-1 px-1.5 focus:ring-1 focus:ring-indigo-500/50 cursor-pointer uppercase select-none outline-none max-w-[130px]"
+   961→            >
+   962→              <option value="default">🌌 Navy</option>
+   963→              <option value="peaceful-purple">🔮 Purple</option>
+   964→              <option value="deep-blue">🌊 Deep Blue</option>
+   965→              <option value="cosmic-black">🖤 Black</option>
+   966→              <option value="mesh-aurora">✨ Aurora</option>
+   967→              <option value="emerald-green">🌲 Emerald</option>
+   968→              <option value="botanic-green">🌿 Botanic Green</option>
+   969→              <option value="saffron-gold">🌟 Saffron Gold</option>
+   970→              <option value="royal-purple">👑 Royal Purple</option>
+   971→              <option value="crimson-red">🔴 Crimson Red</option>
+   972→              <option value="ocean-teal">🌊 Ocean Teal</option>
+   973→              <option value="sunset-orange">🌅 Sunset Orange</option>
+   974→              <option value="midnight-blue">🌙 Midnight Blue</option>
+   975→              <option value="rose-pink">🌸 Rose Pink</option>
+   976→              <option value="abyss-violet">🌌 Abyss Violet</option>
+   977→              <option value="obsidian-gold">⚫ Obsidian Gold</option>
+   978→              <option value="plasma-storm">⚡ Plasma Storm</option>
+   979→            </select>
+   980→          </div>
+   981→        </div>
+   982→      </header>
+   983→
+   984→      {/* Interactive sidebar element — Sidebar handles its own mobile drawer (Sheet pattern). */}
+   985→      <Sidebar
+   986→        currentView={currentView}
+   987→        setView={setView}
+   988→        stats={stats}
+   989→        onOpenFolderCreate={() => {
+   990→          setEditFolderData(null);
+   991→          setIsFolderModalOpen(true);
+   992→        }}
+   993→        isMobileOpen={isMobileSidebarOpen}
+   994→        setMobileOpen={setIsMobileSidebarOpen}
+   995→        sessionSeconds={sessionSeconds}
+   996→        subjects={subjects}
+   997→        selectedSubjectId={selectedSubjectId}
+   998→        selectedFolderId={selectedFolderId}
+   999→        folders={folders}
+  1000→        studyLogs={studyLogs}
+  1001→      />
+  1002→
+  1003→      {/* Main dashboard view container — independently scrollable on desktop */}
+  1004→      <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden lg:h-full lg:overflow-y-auto min-h-0">
+  1005→
+  1006→        {/* Desktop Navigation Admin Header */}
+  1007→        <header className="hidden lg:flex shrink-0 sticky top-0 glass-header py-3 px-3 sm:px-6 md:px-8 justify-between items-center z-30 min-h-[4rem] gap-2">
+  1008→          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
+  1009→            {/* Breadcrumb Navigation Trail */}
+  1010→            <div className="flex items-center gap-1 sm:gap-2 text-xs text-slate-400 font-sans tracking-wide min-w-0 flex-1 truncate">
+  1011→              <button
+  1012→                onClick={() => setView('dashboard')}
+  1013→                className="hover:text-white font-semibold transition-colors truncate max-w-[120px] sm:max-w-none hover:scale-102 duration-150 inline-flex items-center gap-1.5 shrink-0"
+  1014→              >
+  1015→                <Logo size="sm" />
+  1016→              </button>
+  1017→
+  1018→              {currentView === 'dashboard' && (
+  1019→                <>
+  1020→                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+  1021→                  <span className="text-slate-200 font-bold truncate">Dashboard</span>
+  1022→                </>
+  1023→              )}
+  1024→
+  1025→              {(currentView === 'subject' || currentView === 'folder') && selectedSubjectId && activeSubject && (
+  1026→                <>
+  1027→                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+  1028→                  <button
+  1029→                    onClick={() => setView('subject', selectedSubjectId)}
+  1030→                    className="hover:text-white font-semibold transition-colors text-indigo-400 truncate max-w-[100px] sm:max-w-none hover:scale-102 duration-150 inline-flex items-center"
+  1031→                  >
+  1032→                    {activeSubject.title}
+  1033→                  </button>
+  1034→                </>
+  1035→              )}
+  1036→
+  1037→              {currentView === 'folder' && selectedFolderId && activeFolder && (
+  1038→                <>
+  1039→                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+  1040→                  <span className="text-slate-200 font-bold truncate max-w-[120px] sm:max-w-xs inline-flex items-center">
+  1041→                    {activeFolder.title}
+  1042→                  </span>
+  1043→                </>
+  1044→              )}
+  1045→
+  1046→              {currentView !== 'dashboard' && currentView !== 'subject' && currentView !== 'folder' && (
+  1047→                <>
+  1048→                  <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0 self-center" />
+  1049→                  <span className="text-slate-200 font-bold capitalize truncate">
+  1050→                    {currentView === 'artists' ? 'Marketplace' :
+  1051→                     currentView === 'artist_dashboard' ? 'Artist Dashboard' :
+  1052→                     currentView === 'creds' ? 'System Credentials' :
+  1053→                     currentView === 'academy' ? 'AI Academy' :
+  1054→                     currentView === 'profile' ? 'Profile' :
+  1055→                     currentView === 'chat' ? 'Discussion Chat' :
+  1056→                     currentView === 'admins' ? (user?.role === 'super_admin' ? 'Super Admin CMS' : 'Admin Portal') : currentView}
+  1057→                  </span>
+  1058→                </>
+  1059→              )}
+  1060→            </div>
+  1061→          </div>
+  1062→
+  1063→          {/* Right Balanced Console Stats & Status */}
+  1064→          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+  1065→            {/* Theme Selection Panel */}
+  1066→            <div className="flex items-center gap-1 bg-slate-950/80 border border-white/[0.04] rounded-xl p-1 shrink-0 max-w-[130px] sm:max-w-none">
+  1067→              <span className="text-[9px] font-mono font-bold text-slate-500 uppercase px-1 hidden sm:inline">Theme:</span>
+  1068→              <select
+  1069→                value={activeTheme}
+  1070→                onChange={(e) => setActiveTheme(e.target.value)}
+  1071→                className="bg-slate-900 border-none text-[10px] font-mono font-bold text-slate-300 rounded-lg py-1 px-1.5 focus:ring-1 focus:ring-indigo-500/50 cursor-pointer uppercase select-none outline-none max-w-[110px] sm:max-w-none text-ellipsis overflow-hidden"
+  1072→              >
+  1073→                <option value="default">🌌 Navy</option>
+  1074→                <option value="peaceful-purple">🔮 Purple</option>
+  1075→                <option value="deep-blue">🌊 Blue</option>
+  1076→                <option value="cosmic-black">🖤 Black</option>
+  1077→                <option value="mesh-aurora">🌈 Aurora</option>
+  1078→                <option value="emerald-green">🌲 Emerald</option>
+  1079→                <option value="botanic-green">🌿 Botanic Green</option>
+  1080→                <option value="saffron-gold">🌟 Saffron Gold</option>
+  1081→                <option value="royal-purple">👑 Royal Purple</option>
+  1082→                <option value="crimson-red">🔴 Crimson Red</option>
+  1083→                <option value="ocean-teal">🌊 Ocean Teal</option>
+  1084→                <option value="sunset-orange">🌅 Sunset Orange</option>
+  1085→                <option value="midnight-blue">🌙 Midnight Blue</option>
+  1086→                <option value="rose-pink">🌸 Rose Pink</option>
+  1087→                <option value="abyss-violet">🌌 Abyss Violet</option>
+  1088→                <option value="obsidian-gold">⚫ Obsidian Gold</option>
+  1089→                <option value="plasma-storm">⚡ Plasma Storm</option>
+  1090→              </select>
+  1091→            </div>
+  1092→
+  1093→            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-slate-950/60 border border-white/[0.04] rounded-xl text-slate-400 text-[10px] font-mono uppercase tracking-wider">
+  1094→              <span className="w-1.5 h-1.5 rounded-full bg-[#22d3ee] animate-pulse" />
+  1095→            </div>
+  1096→          </div>
+  1097→        </header>
+  1098→
+  1099→        {/* Dashboard Pages wrapper */}
+
+[showing lines 400-1099 of 2254; use offset=1100 with limit to continue reading]

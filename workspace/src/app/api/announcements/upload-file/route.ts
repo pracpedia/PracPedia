@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { getUserFromRequest } from '@/lib/auth';
 import { uploadImage } from '@/lib/blob-storage';
 
@@ -7,11 +8,11 @@ import { uploadImage } from '@/lib/blob-storage';
  *
  * Admin/super_admin attaches a downloadable file to an announcement.
  * Accepts multipart/form-data with a single `file` field, returns a public
- * URL (Vercel Blob in production, base64 data URL in dev) so the client can
+ * URL (Cloudflare R2 in production, base64 data URL in dev) so the client can
  * then pass that URL to POST /api/announcements as `fileUrl`.
  *
  * No file size limit — admins can upload files of any size. In production
- * Vercel Blob handles large files; in dev the base64 fallback works for
+ * Cloudflare R2 handles large files; in dev the base64 fallback works for
  * any size that fits in memory.
  */
 export async function POST(request: NextRequest) {

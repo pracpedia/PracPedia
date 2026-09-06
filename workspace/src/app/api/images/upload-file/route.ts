@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeJsonParseArray } from '@/lib/json';
 import { getUserFromRequest } from '@/lib/auth';
 import { uploadImage } from '@/lib/blob-storage';
 
@@ -9,8 +10,8 @@ import { uploadImage } from '@/lib/blob-storage';
  * Returns the URL so the client can then call POST /api/images (with folderId
  * + imageUrl) to attach the image to a Folder.
  *
- * In dev (no BLOB_READ_WRITE_TOKEN) the file is returned as a base64 data URL.
- * In production the file is uploaded to Vercel Blob and a public URL is
+ * In dev (no R2_BUCKET_NAME) the file is returned as a base64 data URL.
+ * In production the file is uploaded to Cloudflare R2 and a public URL is
  * returned.
  */
 export async function POST(request: NextRequest) {
