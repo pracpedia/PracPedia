@@ -351,6 +351,21 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     }, 100);
   };
 
+  // Upload the ORIGINAL image as-is — no cropping, no perspective warp,
+  // no filters, no resizing. Preserves the full notebook page so no notes
+  // are cut off. Goes straight to Cloudinary.
+  const uploadOriginalNoCrop = () => {
+    if (!rawImageBase64) return;
+    // Use the raw image directly — skip the canvas perspective warp entirely
+    setScannedResultBase64(rawImageBase64);
+    // Get original dimensions from the hidden image element
+    if (hiddenImgRef.current) {
+      setScannedWidth(hiddenImgRef.current.naturalWidth || 0);
+      setScannedHeight(hiddenImgRef.current.naturalHeight || 0);
+    }
+    setStep(3); // Go straight to the save/upload step
+  };
+
   // Convert Base64 scan output to actual JPEG file blob to upload securely
   const submitAlignedPageUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -771,24 +786,39 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                       Choose different image
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={executePerspectiveAlign}
-                      disabled={isProcessing}
-                      className="px-4 sm:px-5 py-2.5 min-h-[44px] bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-lg flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      {isProcessing ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span className="truncate">Aligning page...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="truncate">Align & Flatten Document</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Upload Original — no crop, no warp, no filters.
+                          Preserves the full notebook page as-is. */}
+                      <button
+                        type="button"
+                        onClick={uploadOriginalNoCrop}
+                        disabled={isProcessing}
+                        className="px-4 py-2.5 min-h-[44px] bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-lg flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                        title="Upload the full original image without any cropping or perspective correction"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span className="truncate">Upload Original (No Crop)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={executePerspectiveAlign}
+                        disabled={isProcessing}
+                        className="px-4 sm:px-5 py-2.5 min-h-[44px] bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-lg flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {isProcessing ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span className="truncate">Aligning page...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="truncate">Align & Flatten Document</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -800,18 +830,19 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 <div className="w-full text-center space-y-1 mb-2">
                   <div className="text-xs font-extrabold text-white tracking-wide uppercase flex items-center justify-center gap-1.5 flex-wrap">
                     <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span className="truncate">Step 3: Save Final Aligned Sheet</span>
+                    <span className="truncate">Step 3: Save Notebook Image</span>
                   </div>
                   <p className="text-[10.5px] text-zinc-400 break-words px-2">
-                    Perfect alignment generated! Give this page a course name label, review the scanned output below, and upload.
+                    Review the image below, give it a label, and upload. The full original image is preserved — no cropping.
                   </p>
                 </div>
 
                 <div className="relative w-full max-w-[200px] aspect-[3/4] bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-inner shadow-black">
                   <img
                     src={scannedResultBase64}
-                    alt="Aligned Result Preview"
-                    className="w-full h-full object-cover"
+                    alt="Notebook Image Preview"
+                    className="w-full h-full object-contain"
+                    onError={(e) => { e.currentTarget.src = '/favicon.ico'; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
                   <span className="absolute bottom-2 left-2 text-[8px] font-mono bg-zinc-950/80 text-cyan-400 border border-zinc-800 px-1.5 py-0.5 rounded whitespace-nowrap">{scannedWidth} x {scannedHeight} {scannedWidth > scannedHeight ? '(Landscape HD)' : '(Portrait HD)'}</span>
