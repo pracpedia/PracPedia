@@ -77,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // update state (prevents stale response overwriting newer one).
         if (cancelled) return;
         if (res.ok) {
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
           if (cancelled) return;
           if (data.user) {
             setUser(data.user);
@@ -200,7 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           body: JSON.stringify({ seconds }),
         });
         if (res.ok) {
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
           if (typeof data.studyTime === 'number') {
             // Functional updater — avoids stale `user` closure that would
             // overwrite freshly-saved profilePic / name / bio with old values.
