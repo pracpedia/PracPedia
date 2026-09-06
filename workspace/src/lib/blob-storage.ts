@@ -1,70 +1,53 @@
 /**
- * Image storage abstraction — Cloudflare R2 (S3-compatible).
+ * Image storage abstraction — Cloudinary.
  *
- * FREE TIER: 10 GB storage, 1M writes/month, 10M reads/month, ZERO egress fees.
+ * FREE TIER (NO CARD REQUIRED): 25 GB storage, 25 GB bandwidth/month,
+ * automatic image optimization, global CDN.
  *
  * Setup:
- *   1. Create a Cloudflare account → R2 → Create bucket
- *   2. Settings → API → Create API Token (Object Read & Write)
- *   3. Enable public access (Custom Domain or r2.dev subdomain)
- *   4. Add these to .env:
+ *   1. Create a Cloudinary account (https://cloudinary.com — email only, no card)
+ *   2. Dashboard → copy your CLOUDINARY_URL
+ *   3. Add to .env:
  *
- *     R2_ACCOUNT_ID=your_account_id
- *     R2_ACCESS_KEY_ID=your_access_key
- *     R2_SECRET_ACCESS_KEY=your_secret_key
- *     R2_BUCKET_NAME=your_bucket_name
- *     R2_PUBLIC_URL=https://your-bucket.your-account.r2.dev
+ *     CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
  *
- * When R2 is NOT configured (missing env vars), falls back to base64 data URLs
- * stored inline in the DB — fine for local dev, not for production.
+ * When Cloudinary is NOT configured (missing env var), falls back to base64
+ * data URLs stored inline in the DB — fine for local dev, not for production.
+ *
+ * Usage:
+ *   import { uploadImage, deleteImage } from '@/lib/blob-storage';
+ *   const url = await uploadImage(file, 'folder-123');
+ *   await deleteImage(url);
  */
 
-import {
-  S3Client,
-  PutObjectCommand,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
+import { v2 as cloudinary } from 'cloudinary';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// R2 client (lazy-init — only created when first needed)
+// Cloudinary config (lazy-init — only configured when first needed)
 // ─────────────────────────────────────────────────────────────────────────────
 
-let r2Client: S3Client | null = null;
+let isConfigured = false;
 
-function getR2Client(): S3Client {
-  if (r2Client) return r2Client;
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    throw new Error('R2 not configured: missing R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, or R2_SECRET_ACCESS_KEY');
+function configureCloudinary(): void {
+  if (isConfigured) return;
+  // The CLOUDINARY_URL env var is the standard config format.
+  // cloudinary.v2.config() auto-reads it if set.
+  // But we call it explicitly to be safe.
+  const url = process.env.CLOUDINARY_URL;
+  if (!url) {
+    throw new Error('Cloudinary not configured: missing CLOUDINARY_URL env var');
   }
-  r2Client = new S3Client({
-    region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId,
-      secretAccessKey,
-    },
-    requestHandler: {
-      requestTimeout: 30000,
-      connectionTimeout: 10000,
-    } as any,
-  });
-  return r2Client;
+  // cloudinary auto-parses CLOUDINARY_URL on import, but let's be explicit:
+  // Format: cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+  cloudinary.config({ url });
+  isConfigured = true;
 }
 
 /**
- * Check whether R2 is configured (all required env vars present).
+ * Check whether Cloudinary is configured (CLOUDINARY_URL env var present).
  */
 export function isBlobStorageConfigured(): boolean {
-  return !!(
-    process.env.R2_ACCOUNT_ID &&
-    process.env.R2_ACCESS_KEY_ID &&
-    process.env.R2_SECRET_ACCESS_KEY &&
-    process.env.R2_BUCKET_NAME &&
-    process.env.R2_PUBLIC_URL
-  );
+  return !!process.env.CLOUDINARY_URL;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,10 +55,14 @@ export function isBlobStorageConfigured(): boolean {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Upload an image to R2 and return a publicly-accessible URL.
+ * Upload an image to Cloudinary and return a publicly-accessible URL.
  *
  * Accepts either a File/Blob (from multipart form upload) or a base64 data URL
  * string (from client-side FileReader). Auto-detects and handles both.
+ *
+ * @param input - File/Blob OR base64 data URL string
+ * @param namespace - Folder prefix (e.g. 'folders', 'chat', 'portfolio', 'avatars')
+ * @returns Public URL (Cloudinary URL or base64 data URL if not configured)
  */
 export async function uploadImage(
   input: File | Blob | string,
@@ -91,19 +78,16 @@ export async function uploadImage(
     return fileToDataUrl(input);
   }
 
-  // ── Production: Cloudflare R2 ──
-  const fileName = (input as File).name || '';
-  const ext = fileName.split('.').pop()?.toLowerCase() || '';
-  const safeExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif'].includes(ext) ? ext : 'jpg';
-  const filename = `${namespace}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${safeExt}`;
-  const contentType = getContentType(safeExt, (input as File).type);
+  // ── Production: Cloudinary ──
+  configureCloudinary();
 
+  // Convert File/Blob to Buffer
   let buffer: Buffer;
   try {
     const arrayBuffer = await input.arrayBuffer();
     buffer = Buffer.from(arrayBuffer);
   } catch (err) {
-    console.error('Failed to read file for R2 upload:', err);
+    console.error('Failed to read file for Cloudinary upload:', err);
     return fileToDataUrl(input);
   }
 
@@ -112,73 +96,71 @@ export async function uploadImage(
   let lastErr: any;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await getR2Client().send(
-        new PutObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME!,
-          Key: filename,
-          Body: buffer,
-          ContentType: contentType,
-          CacheControl: 'public, max-age=31536000, immutable',
-        })
-      );
-      return `${process.env.R2_PUBLIC_URL}/${filename}`;
+      const result = await uploadBuffer(buffer, namespace, (input as File).type);
+      return result;
     } catch (err: any) {
       lastErr = err;
-      console.error(`R2 upload attempt ${attempt}/${maxRetries} failed:`, err?.message || err);
+      console.error(`Cloudinary upload attempt ${attempt}/${maxRetries} failed:`, err?.message || err);
       if (attempt < maxRetries) {
         await new Promise((r) => setTimeout(r, 500 * attempt));
       }
     }
   }
 
-  console.error('R2 upload failed after all retries, falling back to base64:', lastErr?.message || lastErr);
+  console.error('Cloudinary upload failed after all retries, falling back to base64:', lastErr?.message || lastErr);
   return fileToDataUrl(input);
 }
 
 /**
- * Upload a base64 data URL to R2.
- * If R2 is not configured, returns the data URL as-is (dev fallback).
+ * Upload a base64 data URL to Cloudinary.
+ * If Cloudinary is not configured, returns the data URL as-is (dev fallback).
  */
 export async function uploadDataUrl(
   dataUrl: string,
   namespace: string = 'uploads'
 ): Promise<string> {
+  // Validate it's actually a data URL
   if (!dataUrl || !dataUrl.startsWith('data:')) {
     return dataUrl;
   }
 
+  // ── Dev fallback: keep as data URL ──
   if (!isBlobStorageConfigured()) {
     return dataUrl;
   }
 
-  const { mime, buffer } = dataUrlToBuffer(dataUrl);
-  const ext = mimeToExt(mime);
-  const filename = `${namespace}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  // ── Production: Cloudinary ──
+  configureCloudinary();
 
+  // Cloudinary accepts data URLs directly via upload()
   const maxRetries = 3;
   let lastErr: any;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await getR2Client().send(
-        new PutObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME!,
-          Key: filename,
-          Body: buffer,
-          ContentType: mime,
-          CacheControl: 'public, max-age=31536000, immutable',
-        })
-      );
-      return `${process.env.R2_PUBLIC_URL}/${filename}`;
+      const result = await new Promise<any>((resolve, reject) => {
+        cloudinary.uploader.upload(
+          dataUrl,
+          {
+            folder: `pracpedia/${namespace}`,
+            resource_type: 'image',
+          },
+          (err: any, res: any) => {
+            if (err) reject(err);
+            else resolve(res);
+          }
+        );
+      });
+      return result.secure_url;
     } catch (err: any) {
       lastErr = err;
-      console.error(`R2 data URL upload attempt ${attempt}/${maxRetries} failed:`, err?.message || err);
+      console.error(`Cloudinary data URL upload attempt ${attempt}/${maxRetries} failed:`, err?.message || err);
       if (attempt < maxRetries) {
         await new Promise((r) => setTimeout(r, 500 * attempt));
       }
     }
   }
 
-  console.error('R2 data URL upload failed after all retries, keeping base64:', lastErr?.message || lastErr);
+  console.error('Cloudinary data URL upload failed after all retries, keeping base64:', lastErr?.message || lastErr);
   return dataUrl;
 }
 
@@ -187,7 +169,7 @@ export async function uploadDataUrl(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Delete an image from R2.
+ * Delete an image from Cloudinary.
  * Safe to call with ANY URL type — never throws.
  */
 export async function deleteImage(url: string): Promise<void> {
@@ -195,20 +177,28 @@ export async function deleteImage(url: string): Promise<void> {
     if (!url || url.startsWith('data:')) return;
     if (!isBlobStorageConfigured()) return;
 
-    const r2Base = process.env.R2_PUBLIC_URL!;
-    if (!url.startsWith(r2Base)) return;
+    // Check if it's a Cloudinary URL
+    if (!url.includes('res.cloudinary.com')) return;
 
-    const key = url.substring(r2Base.length + 1);
-    if (!key) return;
+    configureCloudinary();
 
-    await getR2Client().send(
-      new DeleteObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME!,
-        Key: key,
-      })
-    );
+    // Extract public_id from Cloudinary URL
+    // URL format: https://res.cloudinary.com/{cloud}/image/upload/v{version}/{public_id}.{format}
+    const publicId = extractPublicId(url);
+    if (!publicId) return;
+
+    await new Promise<void>((resolve, reject) => {
+      cloudinary.uploader.destroy(
+        publicId,
+        { resource_type: 'image' },
+        (err: any) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
   } catch (err: any) {
-    console.error('R2 delete failed (non-fatal):', err?.message || err);
+    console.error('Cloudinary delete failed (non-fatal):', err?.message || err);
   }
 }
 
@@ -216,32 +206,51 @@ export async function deleteImage(url: string): Promise<void> {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function getContentType(ext: string, fallbackMime?: string): string {
-  const types: Record<string, string> = {
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    png: 'image/png',
-    gif: 'image/gif',
-    webp: 'image/webp',
-    svg: 'image/svg+xml',
-    avif: 'image/avif',
-  };
-  return types[ext] || fallbackMime || 'image/jpeg';
+/**
+ * Upload a Buffer to Cloudinary using upload_stream.
+ */
+function uploadBuffer(buffer: Buffer, namespace: string, mimeType?: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: `pracpedia/${namespace}`,
+        resource_type: 'image',
+      },
+      (err: any, res: any) => {
+        if (err) reject(err);
+        else resolve(res.secure_url);
+      }
+    );
+    stream.end(buffer);
+  });
 }
 
-function mimeToExt(mime: string): string {
-  const exts: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/png': 'png',
-    'image/gif': 'gif',
-    'image/webp': 'webp',
-    'image/svg+xml': 'svg',
-    'image/avif': 'avif',
-  };
-  return exts[mime] || 'jpg';
+/**
+ * Extract the public_id from a Cloudinary URL.
+ * Input:  https://res.cloudinary.com/tn1bzkyj/image/upload/v1234567890/folders/abc123.jpg
+ * Output: pracpedia/folders/abc123
+ */
+function extractPublicId(url: string): string | null {
+  try {
+    // Match everything after /image/upload/ and the optional version prefix
+    const match = url.match(/\/image\/upload\/(?:v\d+\/)?(.+)$/);
+    if (!match) return null;
+    let publicId = match[1];
+    // Remove file extension
+    const lastDot = publicId.lastIndexOf('.');
+    if (lastDot > 0) {
+      publicId = publicId.substring(0, lastDot);
+    }
+    return publicId;
+  } catch {
+    return null;
+  }
 }
 
+/**
+ * Convert a File/Blob to a base64 data URL.
+ * Server-safe: uses Buffer on server, FileReader in browser.
+ */
 async function fileToDataUrl(file: File | Blob): Promise<string> {
   if (typeof FileReader !== 'undefined') {
     return new Promise((resolve, reject) => {
@@ -256,11 +265,4 @@ async function fileToDataUrl(file: File | Blob): Promise<string> {
   const mime = (file as File).type || 'image/jpeg';
   const base64 = buffer.toString('base64');
   return `data:${mime};base64,${base64}`;
-}
-
-function dataUrlToBuffer(dataUrl: string): { mime: string; buffer: Buffer } {
-  const [meta, base64] = dataUrl.split(',');
-  const mime = meta.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
-  const buffer = Buffer.from(base64, 'base64');
-  return { mime, buffer };
 }
