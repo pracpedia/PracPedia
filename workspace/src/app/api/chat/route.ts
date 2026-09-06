@@ -3,6 +3,7 @@ import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { logActivity } from '@/lib/activity-log';
+import { uploadDataUrl } from '@/lib/blob-storage';
 
 /**
  * GET /api/chat
@@ -64,6 +65,25 @@ export async function POST(request: NextRequest) {
     if ((!text || !text.trim()) && !imageUrl) {
       return NextResponse.json({ error: 'Message text or image required.' }, { status: 400 });
     }
+
+    // If imageUrl is a base64 data URL, upload it to Cloudinary.
+    // This keeps the DB small (stores a Cloudinary URL instead of 500KB base64).
+    let finalImageUrl: string | null = null;
+    if (imageUrl) {
+      const raw = String(imageUrl);
+      if (raw.startsWith('data:image/')) {
+        // Upload to Cloudinary — falls back to base64 if Cloudinary not configured
+        finalImageUrl = await uploadDataUrl(raw, 'chat');
+        // Safety cap — if still a data URL (Cloudinary failed), cap at 500KB
+        if (finalImageUrl && finalImageUrl.startsWith('data:')) {
+          finalImageUrl = finalImageUrl.slice(0, 500000);
+        }
+      } else {
+        // Already a URL (e.g. from a previous Cloudinary upload) — use as-is
+        finalImageUrl = raw.slice(0, 2000);
+      }
+    }
+
     const created = await db.chatMessage.create({
       data: {
         userId: u.id,
@@ -71,7 +91,7 @@ export async function POST(request: NextRequest) {
         userRole: u.role,
         userAvatar: u.profilePic || null,
         text: String(text || '').slice(0, 4000),
-        imageUrl: imageUrl ? String(imageUrl).slice(0, 500000) : null,
+        imageUrl: finalImageUrl,
         subjectId: subjectId || null,
       },
     });
