@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import {
   X, Upload, Link as LinkIcon, FileImage, AlertTriangle,
   CheckCircle, Sparkles,
-  RotateCcw, Check, ArrowRight, RefreshCw
+  RotateCcw, Check, ArrowRight, RefreshCw, RotateCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -364,6 +364,57 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setScannedHeight(hiddenImgRef.current.naturalHeight || 0);
     }
     setStep(3); // Go straight to the save/upload step
+  };
+
+  // ── Rotate image 90° using canvas ──────────────────────────────────────
+  // Rotates the raw image clockwise (direction = 1) or counter-clockwise
+  // (direction = -1). The rotated result replaces rawImageBase64 so all
+  // downstream features (upload original, perspective align) use the
+  // rotated version. This lets the user turn a landscape image into
+  // portrait and vice versa.
+  const [isRotating, setIsRotating] = useState(false);
+  const rotateImage = (direction: 1 | -1) => {
+    if (!hiddenImgRef.current || !rawImageBase64 || isRotating) return;
+    setIsRotating(true);
+    try {
+      const img = hiddenImgRef.current;
+      const srcW = img.naturalWidth || img.width;
+      const srcH = img.naturalHeight || img.height;
+
+      // Swap dimensions for 90° rotation
+      const dstW = srcH;
+      const dstH = srcW;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = dstW;
+      canvas.height = dstH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setIsRotating(false);
+        return;
+      }
+
+      // Translate to center, rotate, draw
+      ctx.translate(dstW / 2, dstH / 2);
+      ctx.rotate((direction * Math.PI) / 2);
+      ctx.drawImage(img, -srcW / 2, -srcH / 2);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+      // Update the image — reset corners and imageLoaded so the UI re-renders
+      setRawImageBase64(dataUrl);
+      setImageLoaded(false);
+      setCorners({
+        tl: { x: 0.15, y: 0.15 },
+        tr: { x: 0.85, y: 0.15 },
+        br: { x: 0.85, y: 0.85 },
+        bl: { x: 0.15, y: 0.85 }
+      });
+    } catch (err) {
+      console.error('Rotate failed:', err);
+    } finally {
+      setIsRotating(false);
+    }
   };
 
   // Convert Base64 scan output to actual JPEG file blob to upload securely
@@ -785,6 +836,30 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     >
                       Choose different image
                     </button>
+
+                    {/* Rotate buttons — rotate 90° left/right to switch
+                        between landscape and portrait orientation */}
+                    <div className="flex items-center gap-1 px-1 bg-zinc-950 border border-zinc-850 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => rotateImage(-1)}
+                        disabled={isProcessing || isRotating}
+                        className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-amber-400 hover:text-amber-300 rounded-lg hover:bg-amber-500/10 transition-all cursor-pointer disabled:opacity-50"
+                        title="Rotate 90° counter-clockwise (left)"
+                      >
+                        {isRotating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                      </button>
+                      <span className="text-[9px] text-zinc-500 font-mono uppercase tracking-wider">Rotate</span>
+                      <button
+                        type="button"
+                        onClick={() => rotateImage(1)}
+                        disabled={isProcessing || isRotating}
+                        className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-amber-400 hover:text-amber-300 rounded-lg hover:bg-amber-500/10 transition-all cursor-pointer disabled:opacity-50"
+                        title="Rotate 90° clockwise (right)"
+                      >
+                        {isRotating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                      </button>
+                    </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
                       {/* Upload Original — no crop, no warp, no filters.
