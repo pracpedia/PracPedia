@@ -49,71 +49,46 @@ export const GeminiKeyModal: React.FC = () => {
     setStatus('testing');
     setMsg(language === 'bn' ? 'যাচাই করা হচ্ছে...' : 'Verifying Gemini API key...');
 
-    // Try multiple models in order — Google deprecates models frequently,
-    // so we try each until one works.
-    const modelsToTry = [
-      'gemini-3.8-flash',
-      'gemini-2.0-flash',
-      'gemini-2.5-flash',
-      'gemini-1.5-flash',
-      'gemini-flash-latest',
-    ];
+    // Verify the key via our server-side endpoint — this avoids
+    // "User location is not supported" errors because the request
+    // goes through the server (Vercel US/EU), not the user's browser.
+    try {
+      const res = await fetch('/api/gemini/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: cleanKey }),
+      });
 
-    let verified = false;
-    let lastError = '';
+      const data = await res.json().catch(() => ({}));
 
-    for (const model of modelsToTry) {
-      try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': cleanKey,
-            },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
-              generationConfig: { temperature: 0, maxOutputTokens: 5 },
-            }),
-          }
+      if (res.ok && data.valid) {
+        setGeminiApiKey(cleanKey);
+        setStatus('success');
+        setMsg(language === 'bn' ? 'গুগল জেমিনি এপিআই কি সফলভাবে সংযুক্ত হয়েছে!' : 'Google Gemini API key successfully linked!');
+        setTimeout(() => {
+          setIsKeyModalOpen(false);
+          setStatus('idle');
+        }, 1200);
+      } else if (res.ok && data.locationBlocked) {
+        // Key is valid but server location is blocked — allow saving anyway
+        setGeminiApiKey(cleanKey);
+        setStatus('success');
+        setMsg('API key is valid! Server location is currently blocked, but it will work when deployed to Vercel.');
+        setTimeout(() => {
+          setIsKeyModalOpen(false);
+          setStatus('idle');
+        }, 2500);
+      } else {
+        setStatus('error');
+        setMsg(
+          language === 'bn'
+            ? `কি যাচাই ব্যর্থ: ${data?.error || 'আপনার API কি চেক করুন'}`
+            : `Key verification failed: ${data?.error || 'Check your API key'}`
         );
-
-        if (res.ok) {
-          verified = true;
-          break; // Success — stop trying
-        }
-
-        // If 403 (invalid key), no point trying other models
-        if (res.status === 403) {
-          try { const e2 = await res.json().catch(() => ({})); lastError = e2?.error?.message || ''; } catch {}
-          break;
-        }
-
-        // 404 (model not found) — try next model
-        // Other errors — try next model
-        try { const e2 = await res.json().catch(() => ({})); lastError = e2?.error?.message || ''; } catch {}
-      } catch {
-        // Network error — try next model
-        lastError = 'Network error';
       }
-    }
-
-    if (verified) {
-      setGeminiApiKey(cleanKey);
-      setStatus('success');
-      setMsg(language === 'bn' ? 'গুগল জেমিনি এপিআই কি সফলভাবে সংযুক্ত হয়েছে!' : 'Google Gemini API key successfully linked!');
-      setTimeout(() => {
-        setIsKeyModalOpen(false);
-        setStatus('idle');
-      }, 1200);
-    } else {
+    } catch (err: any) {
       setStatus('error');
-      setMsg(
-        language === 'bn'
-          ? `কি যাচাই ব্যর্থ: ${lastError || 'আপনার API কি চেক করুন'}`
-          : `Key verification failed: ${lastError || 'Check your API key'}`
-      );
+      setMsg(language === 'bn' ? 'নেটওয়ার্ক ত্রুটি: কি যাচাই করা যায়নি' : 'Network error: could not verify key');
     }
   };
 
