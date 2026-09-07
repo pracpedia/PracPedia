@@ -18,7 +18,6 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 // Use any valid Gemini model name, e.g.:
 //   gemini-2.5-flash (default, fast + cheap)
 //   gemini-2.5-pro (higher quality, slower)
-//   gemini-2.0-flash (legacy, being deprecated)
 //   gemini-3.6-flash (if available on your account)
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
