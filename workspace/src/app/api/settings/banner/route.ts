@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { withRetry } from '@/lib/db-retry';
 
 /**
  * GET /api/settings/banner
@@ -10,9 +11,11 @@ import { getUserFromRequest } from '@/lib/auth';
  */
 export async function GET() {
   try {
-    const config = await db.announcement.findFirst({
-      where: { targetUserId: 'banner-config' },
-    });
+    const config = await withRetry(() =>
+      db.announcement.findFirst({
+        where: { targetUserId: 'banner-config' },
+      })
+    );
 
     if (!config) {
       return NextResponse.json({
@@ -33,7 +36,14 @@ export async function GET() {
     });
   } catch (err: any) {
     console.error('GET /api/settings/banner error:', err);
-    return NextResponse.json({ error: 'Could not load banner config.' }, { status: 500 });
+    // Return defaults instead of 500 — the page can still render without banner
+    return NextResponse.json({
+      enabled: true,
+      text: '⭐ 2026 Bangladesh National Board Curriculum Standards Fully Integrated for HSC Candidates',
+      bgColor: 'rgba(8, 47, 73, 0.4)',
+      textColor: '#22d3ee',
+      size: 'md',
+    });
   }
 }
 

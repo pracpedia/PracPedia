@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { withRetry } from '@/lib/db-retry';
 
 /**
  * GET /api/settings/landing
@@ -13,9 +14,11 @@ import { getUserFromRequest } from '@/lib/auth';
  */
 export async function GET() {
   try {
-    const config = await db.announcement.findFirst({
-      where: { targetUserId: 'landing-config' },
-    });
+    const config = await withRetry(() =>
+      db.announcement.findFirst({
+        where: { targetUserId: 'landing-config' },
+      })
+    );
 
     if (!config) {
       return NextResponse.json({
@@ -32,7 +35,10 @@ export async function GET() {
     });
   } catch (err: any) {
     console.error('GET /api/settings/landing error:', err);
-    return NextResponse.json({ error: 'Could not load landing config.' }, { status: 500 });
+    // Return defaults instead of 500 — the landing page can still render
+    return NextResponse.json({
+      trustBadge: { enabled: true, useCustomCount: false, customCount: 0 },
+    });
   }
 }
 

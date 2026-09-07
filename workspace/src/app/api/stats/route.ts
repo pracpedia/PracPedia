@@ -2,14 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { withRetry } from '@/lib/db-retry';
 
 export async function GET(request: NextRequest) {
   try {
     // Public-safe subset (no auth needed): subjects, folders, artists, announcements
-    const subjects = await db.subject.count();
-    const folders = await db.folder.count();
-    const artists = await db.user.count({ where: { role: 'artist' } });
-    const announcements = await db.announcement.count();
+    // Wrapped in withRetry to handle Neon cold-start connection drops
+    const [subjects, folders, artists, announcements] = await withRetry(async () => {
+      return Promise.all([
+        db.subject.count(),
+        db.folder.count(),
+        db.user.count({ where: { role: 'artist' } }),
+        db.announcement.count(),
+      ]);
+    }).then(([s, f, a, an]) => [s, f, a, an] as const);
 
     // Sensitive counts — only returned to authenticated users
     const payload = await getUserFromRequest(request);

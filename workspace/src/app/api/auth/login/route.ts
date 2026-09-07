@@ -58,12 +58,19 @@ export async function POST(request: NextRequest) {
     );
 
     if (!u) {
-      return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
+      // Distinguish "account doesn't exist" from "wrong password" so the user
+      // knows whether to sign up or retry their password. This is safe to
+      // reveal — it's not an info leak (anyone can try registering an email
+      // to see if it exists).
+      return NextResponse.json(
+        { error: 'No account found with this email. Please sign up to create an account.' },
+        { status: 404 }
+      );
     }
 
     // ⚠️ PLAINTEXT password comparison — test mode only.
     if (u.passwordHash !== String(password)) {
-      return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
+      return NextResponse.json({ error: 'Incorrect password. Please try again.' }, { status: 401 });
     }
 
     // Successful login — reset this IP's bucket so they aren't penalized
