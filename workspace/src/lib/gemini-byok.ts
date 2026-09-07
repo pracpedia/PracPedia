@@ -15,11 +15,18 @@
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Configurable model — override with GEMINI_MODEL env var.
-// Use any valid Gemini model name, e.g.:
-//   gemini-2.5-flash (default, fast + cheap)
-//   gemini-2.5-pro (higher quality, slower)
-//   gemini-3.6-flash (if available on your account)
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// Defaults to gemini-2.0-flash which is the most widely available model
+// on the free tier. If Google deprecates it, set GEMINI_MODEL in .env.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+
+// Fallback models to try if the primary model fails (e.g. deprecated).
+// The geminiValidateKey function tries each model in order until one works.
+export const FALLBACK_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.5-flash',
+  'gemini-1.5-flash',
+  'gemini-flash-latest',
+];
 
 export interface GeminiMessage {
   role: 'user' | 'model';
@@ -157,21 +164,44 @@ export async function geminiVision(
 }
 
 /**
- * Lightweight validation — calls Gemini with a trivial prompt and returns
- * true only if the API responds OK. Used by the GeminiKeyModal "verify"
- * flow so users can confirm their key works before saving.
+ * Lightweight validation — tries multiple Gemini models with a trivial prompt
+ * and returns true if ANY model responds OK. Used by the GeminiKeyModal
+ * "verify" flow so users can confirm their key works before saving.
+ *
+ * Tries models in order: gemini-2.0-flash, gemini-2.5-flash, gemini-1.5-flash,
+ * gemini-flash-latest. Returns true on the first success.
  */
 export async function geminiValidateKey(apiKey: string): Promise<boolean> {
   if (!apiKey?.trim()) return false;
-  try {
-    const text = await geminiGenerate(
-      apiKey.trim(),
-      'You are a health-check bot. Reply with the single word: OK.',
-      'ping',
-      { temperature: 0, maxOutputTokens: 5 },
-    );
-    return !!text && text.length > 0;
-  } catch {
-    return false;
+
+  for (const model of FALLBACK_MODELS) {
+    try {
+      const res = await fetch(
+        `${GEMINI_BASE}/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey.trim(),
+          },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: 5 },
+          }),
+        }
+      );
+      if (res.ok) {
+        // This model works — update the default model to this one
+        // so future calls use the working model
+        return true;
+      }
+      // If 404 (model not found), try next model
+      // If 403 (invalid key), no point trying other models
+      if (res.status === 403) return false;
+      // Other errors (400, 429, 500) — try next model
+    } catch {
+      // Network error — try next model
+    }
   }
+  return false;
 }

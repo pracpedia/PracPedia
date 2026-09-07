@@ -6,6 +6,7 @@ import { serializeUser } from '@/lib/user-serializer';
 import { registerLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 import { logActivity } from '@/lib/activity-log';
 import { shouldBlockEmail, GMAIL_BLOCK_ERROR } from '@/lib/gmail-check';
+import { withRetry } from '@/lib/db-retry';
 
 // Basic email format check
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -47,7 +48,9 @@ export async function POST(request: NextRequest) {
     // Artist registration includes rate fields
     const isArtist = role === 'artist';
 
-    const existing = await db.user.findUnique({ where: { email: String(email).toLowerCase() } });
+    const existing = await withRetry(() =>
+      db.user.findUnique({ where: { email: String(email).toLowerCase() } })
+    );
     if (existing) {
       return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 409 });
     }
@@ -55,23 +58,25 @@ export async function POST(request: NextRequest) {
     // ⚠️ PLAINTEXT password storage — test mode only.
     // No bcrypt. Password is stored as-is in the passwordHash column.
     const passwordHash = String(password);
-    const newUser = await db.user.create({
-      data: {
-        email: String(email).toLowerCase(),
-        name: String(name || email.split('@')[0]).slice(0, 100),
-        passwordHash,
-        role: isArtist ? 'artist' : 'user',
-        phoneNumber: phoneNumber ? String(phoneNumber).slice(0, 30) : null,
-        profilePic: profilePic || null,
-        // Artist-specific marketplace fields
-        rateDrawingOnly: isArtist ? Number(body.rateDrawingOnly) || 150 : 0,
-        rateDrawingWriting: isArtist ? Number(body.rateDrawingWriting) || 300 : 0,
-        specialtiesJson: isArtist && body.specialties
-          ? JSON.stringify(Array.isArray(body.specialties) ? body.specialties : String(body.specialties).split(',').map((s: string) => s.trim()).filter(Boolean))
-          : '[]',
-        isAvailable: isArtist ? body.isAvailable !== false : true,
-      },
-    });
+    const newUser = await withRetry(() =>
+      db.user.create({
+        data: {
+          email: String(email).toLowerCase(),
+          name: String(name || email.split('@')[0]).slice(0, 100),
+          passwordHash,
+          role: isArtist ? 'artist' : 'user',
+          phoneNumber: phoneNumber ? String(phoneNumber).slice(0, 30) : null,
+          profilePic: profilePic || null,
+          // Artist-specific marketplace fields
+          rateDrawingOnly: isArtist ? Number(body.rateDrawingOnly) || 150 : 0,
+          rateDrawingWriting: isArtist ? Number(body.rateDrawingWriting) || 300 : 0,
+          specialtiesJson: isArtist && body.specialties
+            ? JSON.stringify(Array.isArray(body.specialties) ? body.specialties : String(body.specialties).split(',').map((s: string) => s.trim()).filter(Boolean))
+            : '[]',
+          isAvailable: isArtist ? body.isAvailable !== false : true,
+        },
+      })
+    );
 
     // Successful registration — reset this IP's bucket
     registerLimiter.reset(ip);

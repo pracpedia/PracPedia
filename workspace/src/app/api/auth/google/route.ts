@@ -6,6 +6,7 @@ import { serializeUser } from '@/lib/user-serializer';
 import { loginLimiter, registerLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 import { logActivity } from '@/lib/activity-log';
 import { isGmailAddress } from '@/lib/gmail-check';
+import { withRetry } from '@/lib/db-retry';
 
 /**
  * Google Sign-In endpoint — combined "login or register" flow for @gmail.com
@@ -64,8 +65,10 @@ export async function POST(request: NextRequest) {
     const isArtist = role === 'artist';
     const displayName = String(name || normalizedEmail.split('@')[0]).slice(0, 100);
 
-    // ── Look up existing user ───────────────────────────────────────────────
-    const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
+    // ── Look up existing user (with retry for Neon cold-start) ──────────────
+    const existing = await withRetry(() =>
+      db.user.findUnique({ where: { email: normalizedEmail } })
+    );
 
     let user;
     let action: 'login' | 'register';
@@ -73,28 +76,28 @@ export async function POST(request: NextRequest) {
     if (existing) {
       // Existing user — verify plaintext password (test mode)
       if (existing.passwordHash !== String(password)) {
-        return NextResponse.json({ error: 'Invalid Google account credentials.' }, { status: 401 });
+        return NextResponse.json({ error: 'Invalid Google account credentials. Check your password.' }, { status: 401 });
       }
       user = existing;
       action = 'login';
     } else {
       // New user — create with role from the form (student or artist)
-      user = await db.user.create({
-        data: {
-          email: normalizedEmail,
-          name: displayName,
-          passwordHash: String(password),
-          role: isArtist ? 'artist' : 'user',
-          profilePic: profilePic || null,
-          // Artist marketplace defaults
-          rateDrawingOnly: isArtist ? 150 : 0,
-          rateDrawingWriting: isArtist ? 300 : 0,
-          specialtiesJson: '[]',
-          isAvailable: isArtist ? true : true,
-        },
-      });
+      user = await withRetry(() =>
+        db.user.create({
+          data: {
+            email: normalizedEmail,
+            name: displayName,
+            passwordHash: String(password),
+            role: isArtist ? 'artist' : 'user',
+            profilePic: profilePic || null,
+            rateDrawingOnly: isArtist ? 150 : 0,
+            rateDrawingWriting: isArtist ? 300 : 0,
+            specialtiesJson: '[]',
+            isAvailable: true,
+          },
+        })
+      );
       action = 'register';
-      // Successful registration — reset register bucket for this IP
       registerLimiter.reset(ip);
     }
 

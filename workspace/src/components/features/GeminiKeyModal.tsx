@@ -49,47 +49,70 @@ export const GeminiKeyModal: React.FC = () => {
     setStatus('testing');
     setMsg(language === 'bn' ? 'যাচাই করা হচ্ছে...' : 'Verifying Gemini API key...');
 
-    try {
-      // Verify the key by calling Gemini with a trivial prompt.
-      // Uses the x-goog-api-key header (NOT URL param) for security.
-      // Model is configurable via GEMINI_MODEL env var on the server side,
-      // but client-side we hardcode gemini-2.5-flash (current default).
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': cleanKey,
-          },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
-            generationConfig: { temperature: 0, maxOutputTokens: 5 },
-          }),
-        }
-      );
+    // Try multiple models in order — Google deprecates models frequently,
+    // so we try each until one works.
+    const modelsToTry = [
+      'gemini-2.0-flash',
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+      'gemini-flash-latest',
+    ];
 
-      if (res.ok) {
-        setGeminiApiKey(cleanKey);
-        setStatus('success');
-        setMsg(language === 'bn' ? 'গুগল জেমিনি এপিআই কি সফলভাবে সংযুক্ত হয়েছে!' : 'Google Gemini API key successfully linked!');
-        setTimeout(() => {
-          setIsKeyModalOpen(false);
-          setStatus('idle');
-        }, 1200);
-      } else {
-        let detail = '';
-        try { const e2 = await res.json().catch(() => ({})); detail = e2?.error?.message || ''; } catch {}
-        setStatus('error');
-        setMsg(
-          language === 'bn'
-            ? `কি যাচাই ব্যর্থ (${res.status}): ${detail || res.statusText}`
-            : `Key verification failed (${res.status}): ${detail || res.statusText}`
+    let verified = false;
+    let lastError = '';
+
+    for (const model of modelsToTry) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': cleanKey,
+            },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+              generationConfig: { temperature: 0, maxOutputTokens: 5 },
+            }),
+          }
         );
+
+        if (res.ok) {
+          verified = true;
+          break; // Success — stop trying
+        }
+
+        // If 403 (invalid key), no point trying other models
+        if (res.status === 403) {
+          try { const e2 = await res.json().catch(() => ({})); lastError = e2?.error?.message || ''; } catch {}
+          break;
+        }
+
+        // 404 (model not found) — try next model
+        // Other errors — try next model
+        try { const e2 = await res.json().catch(() => ({})); lastError = e2?.error?.message || ''; } catch {}
+      } catch {
+        // Network error — try next model
+        lastError = 'Network error';
       }
-    } catch (err: any) {
+    }
+
+    if (verified) {
+      setGeminiApiKey(cleanKey);
+      setStatus('success');
+      setMsg(language === 'bn' ? 'গুগল জেমিনি এপিআই কি সফলভাবে সংযুক্ত হয়েছে!' : 'Google Gemini API key successfully linked!');
+      setTimeout(() => {
+        setIsKeyModalOpen(false);
+        setStatus('idle');
+      }, 1200);
+    } else {
       setStatus('error');
-      setMsg(language === 'bn' ? 'নেটওয়ার্ক ত্রুটি: কি যাচাই করা যায়নি' : 'Network error: could not verify key');
+      setMsg(
+        language === 'bn'
+          ? `কি যাচাই ব্যর্থ: ${lastError || 'আপনার API কি চেক করুন'}`
+          : `Key verification failed: ${lastError || 'Check your API key'}`
+      );
     }
   };
 

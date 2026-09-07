@@ -6,29 +6,7 @@ import { serializeUser } from '@/lib/user-serializer';
 import { loginLimiter, getClientIp, rateLimitHeaders } from '@/lib/rate-limit';
 import { logActivity } from '@/lib/activity-log';
 import { shouldBlockEmail, GMAIL_BLOCK_ERROR } from '@/lib/gmail-check';
-
-/**
- * Retry wrapper — Neon serverless Postgres can drop idle connections.
- * If the first query fails with a connection error, wait 1s and retry.
- */
-async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
-  let lastErr: any;
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn();
-    } catch (err: any) {
-      lastErr = err;
-      // If it's a connection error, wait and retry
-      if (err?.code === 'P1001' || err?.message?.includes('connection') || err?.message?.includes('timed out')) {
-        console.warn(`DB connection error (attempt ${i + 1}/${retries}), retrying...`);
-        await new Promise((r) => setTimeout(r, 1000));
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw lastErr;
-}
+import { withRetry } from '@/lib/db-retry';
 
 export async function POST(request: NextRequest) {
   try {
