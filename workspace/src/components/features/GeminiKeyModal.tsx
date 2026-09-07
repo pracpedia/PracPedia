@@ -50,14 +50,18 @@ export const GeminiKeyModal: React.FC = () => {
     setMsg(language === 'bn' ? 'যাচাই করা হচ্ছে...' : 'Verifying Gemini API key...');
 
     try {
-      // Actually call Gemini with a trivial prompt to verify the key.
-      // The previous version called /api/health which never reads the
-      // header — so the test always succeeded even for garbage keys.
+      // Verify the key by calling Gemini with a trivial prompt.
+      // Uses the x-goog-api-key header (NOT URL param) for security.
+      // Model is configurable via GEMINI_MODEL env var on the server side,
+      // but client-side we hardcode gemini-2.5-flash (current default).
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(cleanKey)}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': cleanKey,
+          },
           body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
             generationConfig: { temperature: 0, maxOutputTokens: 5 },
@@ -75,7 +79,7 @@ export const GeminiKeyModal: React.FC = () => {
         }, 1200);
       } else {
         let detail = '';
-        try { const e2 = await res.json(); detail = e2?.error?.message || ''; } catch (_) {}
+        try { const e2 = await res.json().catch(() => ({})); detail = e2?.error?.message || ''; } catch {}
         setStatus('error');
         setMsg(
           language === 'bn'

@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Fix "package-lock.json outside Git repository" warning.
+  // Tells Turbopack to use the project root, ignoring parent .git dirs.
+  turbopack: {
+    root: __dirname,
+  },
+
   // Disable React Strict Mode in dev to halve memory pressure (Strict Mode
   // double-renders every component in dev, which doubles heap usage during
   // route compilation — fatal on memory-constrained hosts). Re-enable only

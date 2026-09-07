@@ -2,23 +2,25 @@
  * Gemini BYOK helper — call the Google Gemini REST API directly with the
  * user's own API key (Bring Your Own Key).
  *
- * Why not use the z-ai-web-dev-sdk?
- *   The SDK reads its key from a `.z-ai-config` JSON file (cwd, homedir, or
- *   /etc/.z-ai-config). It does NOT read `process.env.GEMINI_API_KEY`, so
- *   mutating that env var per-request (the previous BYOK approach) had two
- *   critical bugs:
- *     1. The SDK ignored the mutated env var entirely.
- *     2. Even if it had read it, concurrent requests from different users
- *        would have leaked each other's keys (process.env is global state).
+ * Uses the `x-goog-api-key` header (NOT URL query param) for security —
+ * URL params get logged by proxies/CDNs and can leak the key.
  *
- *   This helper bypasses the SDK entirely and calls the public Gemini REST
- *   endpoints with the user's key as the `x-goog-api-key` header. Per-request,
- *   no global state, no race condition.
+ * The model is configurable via the GEMINI_MODEL env var, so you can switch
+ * to any available Gemini model without code changes. Defaults to
+ * gemini-2.5-flash (the current recommended flash model).
  *
  * @see https://ai.google.dev/api/rest/v1beta/models/generateContent
  */
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+// Configurable model — override with GEMINI_MODEL env var.
+// Use any valid Gemini model name, e.g.:
+//   gemini-2.5-flash (default, fast + cheap)
+//   gemini-2.5-pro (higher quality, slower)
+//   gemini-2.0-flash (legacy, being deprecated)
+//   gemini-3.6-flash (if available on your account)
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 export interface GeminiMessage {
   role: 'user' | 'model';
@@ -26,7 +28,7 @@ export interface GeminiMessage {
 }
 
 /**
- * Generate text with Gemini Pro.
+ * Generate text with Gemini.
  *
  * @param apiKey  User's Gemini API key (BYOK)
  * @param systemPrompt  System instruction (optional)
@@ -56,10 +58,13 @@ export async function geminiGenerate(
   }
 
   const res = await fetch(
-    `${GEMINI_BASE}/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`,
+    `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey.trim(),
+      },
       body: JSON.stringify(body),
     },
   );
@@ -67,15 +72,15 @@ export async function geminiGenerate(
   if (!res.ok) {
     let detail = '';
     try {
-      const e = await res.json();
+      const e = await res.json().catch(() => ({}));
       detail = e?.error?.message || '';
-    } catch (_) { /* ignore */ }
+    } catch { /* ignore */ }
     throw new Error(
       `Gemini API error (${res.status}): ${detail || res.statusText}. Check your API key and try again.`,
     );
   }
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Gemini returned an empty response. Please try again.');
@@ -103,6 +108,7 @@ export async function geminiVision(
     throw new Error('Gemini API key required.');
   }
 
+  // For vision, use the same model (2.5-flash supports vision)
   const body: any = {
     contents: [{
       role: 'user',
@@ -121,10 +127,13 @@ export async function geminiVision(
   }
 
   const res = await fetch(
-    `${GEMINI_BASE}/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`,
+    `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey.trim(),
+      },
       body: JSON.stringify(body),
     },
   );
@@ -132,15 +141,15 @@ export async function geminiVision(
   if (!res.ok) {
     let detail = '';
     try {
-      const e = await res.json();
+      const e = await res.json().catch(() => ({}));
       detail = e?.error?.message || '';
-    } catch (_) { /* ignore */ }
+    } catch { /* ignore */ }
     throw new Error(
       `Gemini Vision API error (${res.status}): ${detail || res.statusText}. Check your API key and try again.`,
     );
   }
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('Gemini returned an empty response. Please try again.');
@@ -163,7 +172,7 @@ export async function geminiValidateKey(apiKey: string): Promise<boolean> {
       { temperature: 0, maxOutputTokens: 5 },
     );
     return !!text && text.length > 0;
-  } catch (_) {
+  } catch {
     return false;
   }
 }
