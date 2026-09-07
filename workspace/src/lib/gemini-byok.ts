@@ -18,12 +18,12 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 // Defaults to gemini-3.8-flash which is the current stable model.
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
-// Fallback models to try if the primary model fails (e.g. deprecated).
+// Fallback models to try if the primary model fails.
+// Only models that currently EXIST (not deprecated):
+// - gemini-3.8-flash: current stable (HTTP 400 = exists, just location blocked)
+// - gemini-flash-latest: always points to latest flash model (HTTP 400 = exists)
 const FALLBACK_MODELS = [
   'gemini-3.8-flash',
-  'gemini-2.0-flash',
-  'gemini-2.5-flash',
-  'gemini-1.5-flash',
   'gemini-flash-latest',
 ];
 

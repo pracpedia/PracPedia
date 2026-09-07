@@ -22,14 +22,10 @@ export async function POST(request: NextRequest) {
 
     const cleanKey = apiKey.trim();
 
-    // Try multiple models in order — Google deprecates models frequently.
-    // Try each until one works.
+    // Try multiple models in order — only models that currently exist.
     const modelsToTry = [
       'gemini-3.8-flash',
       'gemini-flash-latest',
-      'gemini-2.0-flash',
-      'gemini-2.5-flash',
-      'gemini-1.5-flash',
     ];
 
     for (const model of modelsToTry) {
