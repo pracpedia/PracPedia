@@ -76,12 +76,23 @@ export async function POST(request: NextRequest) {
     if (existing) {
       // Existing user — verify plaintext password (test mode)
       if (existing.passwordHash !== String(password)) {
-        return NextResponse.json({ error: 'Invalid Google account credentials. Check your password.' }, { status: 401 });
+        return NextResponse.json({ error: 'Incorrect password. Please try again.' }, { status: 401 });
       }
       user = existing;
       action = 'login';
     } else {
-      // New user — create with role from the form (student or artist)
+      // New user — only create if this is a signup (register) request.
+      // The frontend sends isSignup=true when the user is on the "Sign Up" tab.
+      const isSignup = body.isSignup === true;
+      if (!isSignup) {
+        // Login attempt for non-existent account — tell user to sign up
+        return NextResponse.json(
+          { error: 'No account found with this email. Please sign up to create an account.' },
+          { status: 404 }
+        );
+      }
+
+      // Create new user
       user = await withRetry(() =>
         db.user.create({
           data: {

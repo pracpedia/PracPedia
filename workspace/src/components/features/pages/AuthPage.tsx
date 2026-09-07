@@ -152,7 +152,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
           name: accName,
           role: authType,
           profilePic: accAvatar,
-          password: accPassword || googlePasswordInput || 'google-pass-123'
+          password: accPassword || googlePasswordInput || 'google-pass-123',
+          isSignup: !isLogin,  // true when in sign-up mode, false when in login mode
         }),
       });
 
