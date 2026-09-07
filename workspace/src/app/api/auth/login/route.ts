@@ -73,9 +73,9 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     console.error('Login error:', err);
     // Provide a more helpful error message for DB connection issues
-    if (err?.message?.includes('connection') || err?.code === 'P1001') {
+    if (err?.code === 'P1001' || err?.code === 'P1002' || err?.message?.includes('connection') || err?.message?.includes('timed out') || err?.message?.includes('Can\'t reach')) {
       return NextResponse.json(
-        { error: 'Database connection issue. Please try again in a moment.' },
+        { error: 'The database is warming up. Please wait a few seconds and try again.' },
         { status: 503 }
       );
     }

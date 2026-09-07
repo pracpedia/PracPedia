@@ -1,32 +1,35 @@
 /**
  * Retry wrapper for Prisma DB queries — handles Neon serverless connection drops.
  *
- * Neon scales to zero when idle. The first request after idle can fail with
- * P1001 ("Can't reach database server"). This wrapper retries the query
- * with exponential backoff so the route returns a successful response
- * instead of a 500 error.
+ * Neon scales to zero when idle. The first request after idle can take 5-10
+ * seconds to wake up. This wrapper retries with generous delays so the route
+ * succeeds instead of returning a 503/500.
  *
  * Usage:
  *   import { withRetry } from '@/lib/db-retry';
  *   const user = await withRetry(() => db.user.findUnique({ where: { id } }));
  */
 
-const MAX_RETRIES = 3;
-const INITIAL_DELAY_MS = 500;
+const MAX_RETRIES = 4;
+const INITIAL_DELAY_MS = 1000;
 
 function isConnectionError(err: any): boolean {
   if (!err) return false;
   // Prisma P1001 = can't reach database server
   if (err?.code === 'P1001') return true;
+  // Prisma P1002 = server has timed out
+  if (err?.code === 'P1002') return true;
   // Check message for common connection error patterns
   const msg = err?.message || String(err);
   return (
-    msg.includes('Can\'t reach database server') ||
+    msg.includes("Can't reach database server") ||
     msg.includes('connection') ||
     msg.includes('timed out') ||
+    msg.includes('Timed out') ||
     msg.includes('ECONNREFUSED') ||
     msg.includes('ETIMEDOUT') ||
-    msg.includes('ENOTFOUND')
+    msg.includes('ENOTFOUND') ||
+    msg.includes('Server has timed out')
   );
 }
 
@@ -41,7 +44,8 @@ export async function withRetry<T>(
     } catch (err: any) {
       lastErr = err;
       if (isConnectionError(err) && i < retries - 1) {
-        const delay = INITIAL_DELAY_MS * Math.pow(2, i); // 500ms, 1000ms, 2000ms
+        // Generous delays: 1s, 2s, 4s — gives Neon time to wake up
+        const delay = INITIAL_DELAY_MS * Math.pow(2, i);
         console.warn(`DB connection error (attempt ${i + 1}/${retries}), retrying in ${delay}ms...`);
         await new Promise((r) => setTimeout(r, delay));
         continue;
@@ -50,4 +54,25 @@ export async function withRetry<T>(
     }
   }
   throw lastErr;
+}
+
+/**
+ * Warm up the database connection — call this on server startup or before
+ * the first user-facing query. Fires a trivial query (SELECT 1) that wakes
+ * up Neon without blocking the caller.
+ */
+let warmingUp = false;
+export async function warmupDb(): Promise<void> {
+  if (warmingUp) return;
+  warmingUp = true;
+  try {
+    // Import dynamically to avoid circular dependency
+    const { db } = await import('@/lib/db');
+    await db.$queryRaw`SELECT 1`.catch(() => {});
+    console.log('DB warmup complete');
+  } catch {
+    // Silent — warmup is best-effort
+  } finally {
+    warmingUp = false;
+  }
 }
