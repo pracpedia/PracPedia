@@ -15,13 +15,12 @@
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Configurable model — override with GEMINI_MODEL env var.
-// Defaults to gemini-2.0-flash which is the most widely available model
-// on the free tier. If Google deprecates it, set GEMINI_MODEL in .env.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+// Defaults to gemini-3.8-flash which is the current stable model.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
 // Fallback models to try if the primary model fails (e.g. deprecated).
-// The geminiValidateKey function tries each model in order until one works.
-export const FALLBACK_MODELS = [
+const FALLBACK_MODELS = [
+  'gemini-3.8-flash',
   'gemini-2.0-flash',
   'gemini-2.5-flash',
   'gemini-1.5-flash',

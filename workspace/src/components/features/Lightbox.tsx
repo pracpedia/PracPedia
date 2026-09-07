@@ -86,8 +86,8 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || zoomLevel <= 1) return;
     e.preventDefault();
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
+    const dx = (e.clientX - dragStartRef.current.x) * 1.5;
+    const dy = (e.clientY - dragStartRef.current.y) * 1.5;
     setPanX(dragStartRef.current.panX + dx);
     setPanY(dragStartRef.current.panY + dy);
   };
@@ -130,10 +130,10 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
         }
       }
     } else if (e.touches.length === 1 && isDragging && zoomLevel > 1) {
-      // Single finger pan
+      // Single finger pan — 1.5x multiplier for faster response
       e.preventDefault();
-      const dx = e.touches[0].clientX - dragStartRef.current.x;
-      const dy = e.touches[0].clientY - dragStartRef.current.y;
+      const dx = (e.touches[0].clientX - dragStartRef.current.x) * 1.5;
+      const dy = (e.touches[0].clientY - dragStartRef.current.y) * 1.5;
       setPanX(dragStartRef.current.panX + dx);
       setPanY(dragStartRef.current.panY + dy);
     }
@@ -439,9 +439,17 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
               </span>
 
               <button
-                onClick={onClose}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // If AI guide is open, close it first instead of closing the lightbox
+                  if (showAiAssistant) {
+                    setShowAiAssistant(false);
+                  } else {
+                    onClose();
+                  }
+                }}
                 className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20 hover:bg-rose-600 hover:border-transparent text-rose-300 hover:text-white transition-all cursor-pointer shadow-sm"
-                title="Exit viewer"
+                title={showAiAssistant ? "Close AI Guide" : "Exit viewer"}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -461,7 +469,14 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
             )}
 
             <div
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                // Clicking the image area closes AI guide if it's open
+                if (showAiAssistant) {
+                  setShowAiAssistant(false);
+                  return;
+                }
+              }}
               className="w-full h-full flex items-center justify-center p-2 relative min-h-0 overflow-hidden"
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -493,7 +508,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
                 }}
                 onMouseDown={handleMouseDown}
                 draggable={false}
-                className="max-w-[95vw] max-h-[34vh] sm:max-h-[38vh] lg:max-h-[72vh] object-contain rounded-2xl border border-white/10 select-none pointer-events-auto touch-none"
+                className="max-w-[98vw] max-h-[55vh] sm:max-h-[60vh] lg:max-h-[78vh] object-contain rounded-2xl border border-white/10 select-none pointer-events-auto touch-none"
               />
             </div>
 
@@ -804,10 +819,10 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
             <div className="absolute right-3 bottom-14 lg:bottom-8 z-30 select-none">
               <button
                 onClick={() => setShowAiAssistant(true)}
-                className="flex items-center gap-1.5 px-2.5 py-2 min-h-[36px] min-w-[36px] rounded-full bg-gradient-to-r from-cyan-500 to-indigo-600 border border-white/20 text-slate-950 font-sans text-[9px] font-black tracking-wide uppercase shadow-[0_6px_15px_rgba(6,182,212,0.35)] animate-bounce cursor-pointer active:scale-95"
+                className="flex items-center gap-2 px-3 py-2.5 min-h-[40px] min-w-[40px] rounded-full bg-gradient-to-r from-cyan-500 to-indigo-600 border border-white/20 text-slate-950 font-sans text-[10px] font-black tracking-wide uppercase shadow-[0_6px_15px_rgba(6,182,212,0.35)] animate-bounce cursor-pointer active:scale-95"
               >
-                <Sparkles className="w-3 h-3 text-slate-950 animate-pulse shrink-0" />
-                <span className="truncate hidden sm:inline">AI Guide</span>
+                <Sparkles className="w-3.5 h-3.5 text-slate-950 animate-pulse shrink-0" />
+                <span className="truncate">AI Guide</span>
               </button>
             </div>
           )}

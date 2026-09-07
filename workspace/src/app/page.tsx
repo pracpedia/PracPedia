@@ -963,7 +963,7 @@ function PortalConsole() {
               <option value="peaceful-purple">🔮 Purple</option>
               <option value="deep-blue">🌊 Deep Blue</option>
               <option value="cosmic-black">🖤 Black</option>
-              <option value="mesh-aurora">✨ Aurora</option>
+              <option value="mesh-aurora">🌌 Aurora</option>
               <option value="emerald-green">🌲 Emerald</option>
               <option value="botanic-green">🌿 Botanic Green</option>
               <option value="saffron-gold">🌟 Saffron Gold</option>
@@ -1074,7 +1074,7 @@ function PortalConsole() {
                 <option value="peaceful-purple">🔮 Purple</option>
                 <option value="deep-blue">🌊 Blue</option>
                 <option value="cosmic-black">🖤 Black</option>
-                <option value="mesh-aurora">🌈 Aurora</option>
+                <option value="mesh-aurora">🌌 Aurora</option>
                 <option value="emerald-green">🌲 Emerald</option>
                 <option value="botanic-green">🌿 Botanic Green</option>
                 <option value="saffron-gold">🌟 Saffron Gold</option>
