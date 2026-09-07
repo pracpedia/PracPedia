@@ -34,53 +34,49 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
 
   // Carousel states
   const [index, setIndex] = useState(initialIndex);
-  const [zoom, setZoom] = useState(false);
-  // Multi-level zoom: 1x, 1.5x, 2x, 3x, 4x — click image to cycle,
-  // or use zoom in/out buttons for precise control
+  // Pinch-to-zoom + pan system (touch gesture based, no buttons)
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  // Pinch tracking
+  const pinchRef = useRef({ startDist: 0, startZoom: 1 });
+  const lastTapRef = useRef(0);
 
   // Reset zoom/pan when switching images
   useEffect(() => {
     setZoomLevel(1);
     setPanX(0);
     setPanY(0);
-    setZoom(false);
   }, [index]);
 
-  const zoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev + 0.5, 5));
-  };
-  const zoomOut = () => {
-    setZoomLevel((prev) => {
-      const next = Math.max(prev - 0.5, 1);
-      if (next === 1) {
-        setPanX(0);
-        setPanY(0);
-      }
-      return next;
-    });
-  };
   const resetZoom = () => {
     setZoomLevel(1);
     setPanX(0);
     setPanY(0);
-    setZoom(false);
   };
 
-  // Click to cycle zoom: 1 → 2 → 3 → 1
+  // Double-tap / double-click to toggle zoom (1x ↔ 2.5x)
   const handleImageClick = () => {
-    setZoomLevel((prev) => {
-      if (prev === 1) return 2;
-      if (prev === 2) return 3;
-      return 1;
-    });
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      // Double tap
+      setZoomLevel((prev) => {
+        if (prev > 1) {
+          setPanX(0);
+          setPanY(0);
+          return 1;
+        }
+        return 2.5;
+      });
+      lastTapRef.current = 0;
+    } else {
+      lastTapRef.current = now;
+    }
   };
 
-  // Pan support — drag to move zoomed image
+  // Mouse drag to pan (desktop)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoomLevel <= 1) return;
     e.preventDefault();
@@ -99,21 +95,54 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
     setIsDragging(false);
   };
 
-  // Touch pan support for mobile
+  // Touch: pinch-to-zoom + drag-to-pan (mobile)
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (zoomLevel <= 1) return;
-    const touch = e.touches[0];
-    setIsDragging(true);
-    dragStartRef.current = { x: touch.clientX, y: touch.clientY, panX, panY };
+    if (e.touches.length === 2) {
+      // Pinch start — track initial distance and zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = {
+        startDist: Math.hypot(dx, dy),
+        startZoom: zoomLevel,
+      };
+      setIsDragging(false);
+    } else if (e.touches.length === 1 && zoomLevel > 1) {
+      // Single finger drag start (only when zoomed in)
+      setIsDragging(true);
+      dragStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, panX, panY };
+    }
   };
+
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || zoomLevel <= 1) return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    const dx = touch.clientX - dragStartRef.current.x;
-    const dy = touch.clientY - dragStartRef.current.y;
-    setPanX(dragStartRef.current.panX + dx);
-    setPanY(dragStartRef.current.panY + dy);
+    if (e.touches.length === 2) {
+      // Pinch zoom
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      if (pinchRef.current.startDist > 0) {
+        const ratio = dist / pinchRef.current.startDist;
+        const newZoom = Math.max(1, Math.min(pinchRef.current.startZoom * ratio, 6));
+        setZoomLevel(newZoom);
+        if (newZoom === 1) {
+          setPanX(0);
+          setPanY(0);
+        }
+      }
+    } else if (e.touches.length === 1 && isDragging && zoomLevel > 1) {
+      // Single finger pan
+      e.preventDefault();
+      const dx = e.touches[0].clientX - dragStartRef.current.x;
+      const dy = e.touches[0].clientY - dragStartRef.current.y;
+      setPanX(dragStartRef.current.panX + dx);
+      setPanY(dragStartRef.current.panY + dy);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length === 0) {
+      setIsDragging(false);
+    }
   };
 
   // HSC Science AI Helper States
@@ -170,7 +199,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
   // Reset state when swiping notebook sheets
   const handleIndexChange = (newIdx: number) => {
     setIndex(newIdx);
-    setZoom(false);
+    resetZoom();
     setAnalysisResult(null);
     setChatLogs([]);
     setErrorMessage(null);
@@ -410,17 +439,6 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
               </span>
 
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoom(!zoom);
-                }}
-                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer hidden md:flex"
-                title={zoom ? "Zoom Out" : "Zoom In"}
-              >
-                {zoom ? <ZoomOut className="w-4 h-4" /> : <ZoomIn className="w-4 h-4" />}
-              </button>
-
-              <button
                 onClick={onClose}
                 className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20 hover:bg-rose-600 hover:border-transparent text-rose-300 hover:text-white transition-all cursor-pointer shadow-sm"
                 title="Exit viewer"
@@ -448,8 +466,9 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
+              onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
-              onTouchEnd={handleMouseUp}
+              onTouchEnd={handleTouchEnd}
             >
               <motion.img
                 key={index}
@@ -459,7 +478,7 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
                   x: panX,
                   y: panY,
                   opacity: 1,
-                  cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
+                  cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
                 }}
                 exit={{ opacity: 0 }}
                 transition={{ type: "spring", damping: 30, stiffness: 220 }}
@@ -467,50 +486,15 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
                 alt={currentImage?.title || 'Image'}
                 onError={(e) => { e.currentTarget.src = '/favicon.ico'; }}
                 onClick={(e) => {
-                  if (zoomLevel > 1 && !isDragging) {
+                  if (!isDragging) {
                     e.stopPropagation();
-                    resetZoom();
-                  } else if (!isDragging) {
                     handleImageClick();
                   }
                 }}
                 onMouseDown={handleMouseDown}
-                onTouchStart={handleTouchStart}
                 draggable={false}
-                className="max-w-[95vw] max-h-[34vh] sm:max-h-[38vh] lg:max-h-[72vh] object-contain rounded-2xl border border-white/10 select-none pointer-events-auto"
+                className="max-w-[95vw] max-h-[34vh] sm:max-h-[38vh] lg:max-h-[72vh] object-contain rounded-2xl border border-white/10 select-none pointer-events-auto touch-none"
               />
-
-              {/* Zoom control buttons */}
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-slate-950/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 shadow-xl z-20">
-                <button
-                  onClick={(e) => { e.stopPropagation(); zoomOut(); }}
-                  disabled={zoomLevel <= 1}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/15 text-white transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Zoom out"
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </button>
-                <span className="text-[10px] font-mono font-bold text-cyan-400 min-w-[36px] text-center select-none">
-                  {Math.round(zoomLevel * 100)}%
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); zoomIn(); }}
-                  disabled={zoomLevel >= 5}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/15 text-white transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Zoom in"
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
-                {zoomLevel > 1 && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); resetZoom(); }}
-                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer"
-                    title="Reset zoom"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
             </div>
 
             {images.length > 1 && (
@@ -817,13 +801,13 @@ export const Lightbox: React.FC<LightboxProps> = ({ images, initialIndex, onClos
             </motion.div>
           ) : (
             // Small responsive pull button when AI teacher assistant is hidden on mobile
-            <div className="absolute right-4 bottom-16 lg:bottom-10 z-30 select-none">
+            <div className="absolute right-3 bottom-14 lg:bottom-8 z-30 select-none">
               <button
                 onClick={() => setShowAiAssistant(true)}
-                className="flex items-center gap-2 px-3 sm:px-4 py-3 min-h-[44px] rounded-full bg-gradient-to-r from-cyan-500 to-indigo-600 border border-white/20 text-slate-950 font-sans text-xs font-black tracking-wide uppercase shadow-[0_10px_25px_rgba(6,182,212,0.4)] animate-bounce cursor-pointer active:scale-95"
+                className="flex items-center gap-1.5 px-2.5 py-2 min-h-[36px] min-w-[36px] rounded-full bg-gradient-to-r from-cyan-500 to-indigo-600 border border-white/20 text-slate-950 font-sans text-[9px] font-black tracking-wide uppercase shadow-[0_6px_15px_rgba(6,182,212,0.35)] animate-bounce cursor-pointer active:scale-95"
               >
-                <Sparkles className="w-4 h-4 text-slate-950 animate-pulse shrink-0" />
-                <span className="truncate">Open AI Guide</span>
+                <Sparkles className="w-3 h-3 text-slate-950 animate-pulse shrink-0" />
+                <span className="truncate hidden sm:inline">AI Guide</span>
               </button>
             </div>
           )}

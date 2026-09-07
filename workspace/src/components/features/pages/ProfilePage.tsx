@@ -1522,48 +1522,14 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* Account type */}
-      <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
-        <CardHeader className="pb-4 border-b border-white/[0.04]">
-          <SectionTitle
-            icon={Crown}
-            title="Account Type"
-            sub={isPremium ? 'Premium scholar with extended limits' : 'Free tier — upgrade to unlock more'}
-          />
-        </CardHeader>
-        <CardContent className="pt-5">
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <div className="min-w-0">
-              <div className="text-sm font-bold text-white">
-                {role === 'artist' ? 'Artist / Scholar' : 'Student / Scholar'}
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                {isPremium
-                  ? 'Premium features active — unlimited AI requests and reduced rate limits.'
-                  : 'Free tier — request a premium upgrade from an admin to unlock unlimited AI usage.'}
-              </p>
-            </div>
-            {isPremium ? (
-              <Badge className="bg-amber-500/15 border-amber-500/30 text-amber-300">
-                <Crown className="w-3 h-3" />
-                Premium
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="border-white/10 text-slate-400">
-                Free
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Change password (placeholder) */}
+      {/* Change password — super_admin only */}
+      {role === 'super_admin' && (
       <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
         <CardHeader className="pb-4 border-b border-white/[0.04]">
           <SectionTitle
             icon={Lock}
             title="Change Password"
-            sub="Update your sign-in credentials"
+            sub="Super admin only — update sign-in credentials"
           />
         </CardHeader>
         <CardContent className="pt-5 space-y-4">
@@ -1633,6 +1599,7 @@ const SecurityTab: React.FC<SecurityTabProps> = ({
           </Button>
         </div>
       </Card>
+      )}
 
       {/* Email display */}
       <Card className="bg-slate-900/40 border-white/[0.06] gap-0 py-5 shadow-none">
