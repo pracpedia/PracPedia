@@ -55,6 +55,7 @@ const lobsterTwo = Lobster_Two({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://pracpedia.vercel.app"),
   title: "PracPedia — Practical Notebook Gallery",
   description:
     "PracPedia: The ultimate practical notebook encyclopedia and study gallery for physics, chemistry, biology, and ICT experiments.",

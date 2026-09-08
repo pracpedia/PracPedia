@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 Generate a detailed, structured lesson on the requested topic.
 Subject: ${subject || 'General Science'}
 Topic: ${topic || prompt}
-Response Language: ${language === 'bn' ? 'Bengali (Bangla)' : 'English'}
+Response Language: ${language === 'bn' || language === 'bn_book' ? 'Bengali (Bangla)' : 'English'}
 
 Format your response in Markdown with these sections:
 1. ## Lesson Overview (1-2 paragraph intro)

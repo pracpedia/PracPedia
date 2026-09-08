@@ -14,9 +14,31 @@
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-// Configurable model — override with GEMINI_MODEL env var.
-// Defaults to gemini-3.8-flash which is the current stable model.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+// Default model (env fallback). Admin can override via /api/settings/gemini-model
+const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+
+// Runtime model cache — updated by /api/settings/gemini-model GET
+let runtimeModel: string | null = null;
+
+/**
+ * Get the current Gemini model. Checks DB-stored admin config first,
+ * falls back to GEMINI_MODEL env var, then to gemini-3.8-flash.
+ */
+async function getGeminiModel(): Promise<string> {
+  if (runtimeModel) return runtimeModel;
+  try {
+    const { db } = await import('@/lib/db');
+    const { withRetry } = await import('@/lib/db-retry');
+    const config = await withRetry(() =>
+      db.announcement.findFirst({ where: { targetUserId: 'gemini-model' } })
+    );
+    if (config?.title) {
+      runtimeModel = config.title;
+      return runtimeModel;
+    }
+  } catch { /* fall back to default */ }
+  return DEFAULT_GEMINI_MODEL;
+}
 
 // Fallback models to try if the primary model fails.
 // Only models that currently EXIST (not deprecated):
@@ -63,7 +85,7 @@ export async function geminiGenerate(
   }
 
   const res = await fetch(
-    `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent`,
+    `${GEMINI_BASE}/models/${await getGeminiModel()}:generateContent`,
     {
       method: 'POST',
       headers: {
@@ -154,7 +176,7 @@ export async function geminiVision(
   }
 
   const res = await fetch(
-    `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent`,
+    `${GEMINI_BASE}/models/${await getGeminiModel()}:generateContent`,
     {
       method: 'POST',
       headers: {

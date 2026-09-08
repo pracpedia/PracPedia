@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 Subject: ${subject || 'General Science'}
 Topic: ${topic || 'General'}
 Number of questions: ${count}
-Response Language: ${language === 'bn' ? 'Bengali (Bangla)' : 'English'}
+Response Language: ${language === 'bn' || language === 'bn_book' ? 'Bengali (Bangla)' : 'English'}
 
 Return a JSON array of ${count} multiple choice questions. Each question must have:
 - "question": the question text

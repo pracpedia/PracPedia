@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const sysPrompt = `You are an expert tutor for creative questions (CQ) on the PracPedia academy platform.
 Subject: ${subject || 'General Science'}
 Topic: ${topic || 'General'}
-Response Language: ${language === 'bn' ? 'Bengali (Bangla)' : 'English'}
+Response Language: ${language === 'bn' || language === 'bn_book' ? 'Bengali (Bangla)' : 'English'}
 
 Provide a detailed step-by-step solution to the creative question. Use Markdown with these sections:
 1. **Question Understanding** — restate the question briefly

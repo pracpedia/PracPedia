@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     const sysPrompt = `You are an AI academic tutor on the PracPedia platform.
 Subject context: ${subject || 'General Science'}
-Respond in: ${language === 'bn' ? 'Bengali (Bangla)' : 'English'}
+Respond in: ${language === 'bn' || language === 'bn_book' ? 'Bengali (Bangla)' : 'English'}
 
 Provide clear, concise, helpful answers. Use Markdown formatting when appropriate.
 Include code blocks for formulas, examples, or step-by-step solutions.
