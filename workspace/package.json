@@ -17,9 +17,6 @@
     "db:seed": "bunx tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },
-  "prisma": {
-    "seed": "bunx tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^6.11.1",
     "@radix-ui/react-avatar": "^1.1.10",
