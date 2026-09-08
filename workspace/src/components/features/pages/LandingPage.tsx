@@ -203,6 +203,17 @@ const ParallaxSectionHeading: React.FC<{ children: React.ReactNode; className?: 
   const ref = useRef<HTMLDivElement>(null);
   // Only apply parallax on desktop — on mobile, scroll listeners + transforms cause scroll jank
   const [isDesktop, setIsDesktop] = useState(false);
+  // Trust badge config from CMS (AdminCmsPage landing settings)
+  const [trustBadgeConfig, setTrustBadgeConfig] = useState<{ enabled: boolean; useCustomCount: boolean; customCount: number }>({ enabled: true, useCustomCount: false, customCount: 0 });
+  const [realUserCount, setRealUserCount] = useState<number>(0);
+
+  // Compute the display count for the trust badge
+  const trustBadgeCount = trustBadgeConfig.useCustomCount
+    ? trustBadgeConfig.customCount
+    : Math.max(realUserCount, 1);
+  const trustBadgeText = trustBadgeConfig.enabled
+    ? `Trusted by ${trustBadgeCount.toLocaleString()}+ HSC students`
+    : '';
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 768);
     check();
@@ -365,6 +376,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
      On mobile, will-change:transform + useScroll listeners cause the scroll to
      stutter badly. We detect the viewport and conditionally apply parallax. */
   const [isDesktop, setIsDesktop] = useState(false);
+  // Trust badge config from CMS (AdminCmsPage landing settings)
+  const [trustBadgeConfig, setTrustBadgeConfig] = useState<{ enabled: boolean; useCustomCount: boolean; customCount: number }>({ enabled: true, useCustomCount: false, customCount: 0 });
+  const [realUserCount, setRealUserCount] = useState<number>(0);
+
+  // Compute the display count for the trust badge
+  const trustBadgeCount = trustBadgeConfig.useCustomCount
+    ? trustBadgeConfig.customCount
+    : Math.max(realUserCount, 1);
+  const trustBadgeText = trustBadgeConfig.enabled
+    ? `Trusted by ${trustBadgeCount.toLocaleString()}+ HSC students`
+    : '';
   // useLayoutEffect runs before paint, so isDesktop is set before the first
   // render hits the screen. This prevents the hydration flip where parallax
   // starts at 0 (mobile) then jumps to desktop values after mount.
@@ -832,6 +854,30 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const el = document.getElementById('footer-akash-text');
+
+    // ── Fetch landing config (trust badge settings from CMS) ──
+    const fetchLandingConfig = async () => {
+      try {
+        const res = await fetch('/api/settings/landing');
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setTrustBadgeConfig(data.trustBadge || { enabled: true, useCustomCount: false, customCount: 0 });
+        }
+      } catch { /* defaults */ }
+    };
+    fetchLandingConfig();
+
+    // ── Fetch real user count from stats (for "auto" trust badge mode) ──
+    const fetchUserCount = async () => {
+      try {
+        const res = await fetch('/api/stats');
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (typeof data.users === 'number') setRealUserCount(data.users);
+        }
+      } catch { /* defaults */ }
+    };
+    fetchUserCount();
     if (!el) return;
 
     const finalText = 'DEVELOPED BY MR. AKASH';
@@ -1271,7 +1317,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 ))}
               </div>
               <span className="text-[9px] sm:text-[11px] text-slate-300 uppercase tracking-wider font-bold">
-                Trusted by 2,400+ HSC students
+                {trustBadgeText || 'Trusted by HSC students'}
               </span>
             </div>
 
@@ -1856,7 +1902,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Ready to ace your HSC practical exam?
               </GsapHeading>
               <p className="text-cyan-100 text-base sm:text-lg leading-relaxed">
-                Join 2,400+ Bangladeshi students who trust PracPedia for verified procedures,
+                Join {trustBadgeCount.toLocaleString()}+ Bangladeshi students who trust PracPedia for verified procedures,
                 Gemini-powered help, and pro illustrations. Free to start — no credit card required.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">

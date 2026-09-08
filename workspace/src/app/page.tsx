@@ -36,7 +36,6 @@ import {
   Trash2,
   Calendar,
   FileText,
-  Clock,
   ArrowLeft,
   Compass,
   BookOpen,
@@ -97,7 +96,6 @@ type ViewState = 'landing' | 'auth' | 'dashboard' | 'subject' | 'folder' | 'admi
 // Unused-import guards: preserve original API surface so tree-shaking does not strip
 // icons/components referenced by the original Vite file (kept for behavioral parity).
 void FileText;
-void Clock;
 void Database;
 void Layers;
 void ShieldCheck;
@@ -242,7 +240,6 @@ function PortalConsole() {
 
   // Session hours tracking locally and through cloud endpoints
   const [sessionSeconds, setSessionSeconds] = useState(0);
-  const [bdTime, setBdTime] = useState('');
 
   // Track study logs by subject and folder
   const [studyLogs, setStudyLogs] = useState<{
@@ -251,21 +248,7 @@ function PortalConsole() {
   }>({ subjects: {}, folders: {} });
 
   useEffect(() => {
-    const updateTime = () => {
-      const d = new Date();
-      const utc = d.getTime() + d.getTimezoneOffset() * 60000;
-      const bd = new Date(utc + (3600000 * 6));
-      const year = bd.getFullYear();
-      const month = String(bd.getMonth() + 1).padStart(2, '0');
-      const date = String(bd.getDate()).padStart(2, '0');
-      const hours = String(bd.getHours()).padStart(2, '0');
-      const minutes = String(bd.getMinutes()).padStart(2, '0');
-      const seconds = String(bd.getSeconds()).padStart(2, '0');
-      setBdTime(`${year}-${month}-${date} ${hours}:${minutes}:${seconds}`);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+    // BD time clock removed — no longer needed
   }, []);
 
   // Load study logs on mount/user change
@@ -867,7 +850,6 @@ function PortalConsole() {
   void setAdminPageError;
   void handlePromoteEmail;
   void handleCreateAnnouncement;
-  void bdTime;
 
   return (
     <div className={`min-h-screen lg:min-h-0 flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden text-slate-100 relative transition-all duration-300 ${
@@ -1992,11 +1974,6 @@ function PortalConsole() {
               </span>
             </div>
             <div className="flex items-center gap-3 flex-wrap justify-center">
-              {bdTime && (
-                <span className="text-slate-500 hidden sm:inline">
-                  BD Time: <span className="text-cyan-400">{bdTime}</span>
-                </span>
-              )}
             </div>
           </div>
         </footer>
