@@ -113,13 +113,35 @@ export async function geminiVision(
     throw new Error('Gemini API key required.');
   }
 
-  // For vision, use the same model (2.5-flash supports vision)
+  // Convert the image to inline base64 data — Gemini's file_data only works
+  // with Google Cloud Storage URLs, not external URLs like Cloudinary.
+  // For external URLs, we must fetch the image and send it as inline_data.
+  let imagePart: any;
+
+  if (imageUrl.startsWith('data:')) {
+    // Already a data URL — use directly
+    const [meta, base64] = imageUrl.split(',');
+    const mime = meta.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+    imagePart = { inline_data: { mime_type: mime, data: base64 } };
+  } else {
+    // External URL (Cloudinary, etc.) — fetch and convert to base64
+    const imgRes = await fetch(imageUrl);
+    if (!imgRes.ok) {
+      throw new Error(`Failed to fetch image: ${imgRes.status}`);
+    }
+    const arrayBuffer = await imgRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
+    const mime = imgRes.headers.get('content-type') || 'image/jpeg';
+    imagePart = { inline_data: { mime_type: mime, data: base64 } };
+  }
+
   const body: any = {
     contents: [{
       role: 'user',
       parts: [
         { text: userPrompt },
-        { file_data: { mime_type: 'image/jpeg', file_uri: imageUrl } },
+        imagePart,
       ],
     }],
     generationConfig: {
