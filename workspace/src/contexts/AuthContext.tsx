@@ -63,18 +63,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (storedKey) setGeminiApiKeyState(storedKey);
     if (storedLang === 'bn' || storedLang === 'en') setLanguageState(storedLang);
 
+    // If no stored token, immediately stop loading — no need to wait
+    if (!storedToken) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Safety timeout — if the auth check takes more than 8 seconds
+    // (Neon cold start, network issue), force-stop loading so the
+    // user sees the app instead of an infinite spinner.
+    const safetyTimeout = setTimeout(() => {
+      if (!cancelled) setIsLoading(false);
+    }, 8000);
+
     // Validate token with the server
     const initializeAuth = async () => {
-      if (!storedToken) {
-        if (!cancelled) setIsLoading(false);
-        return;
-      }
       try {
         const res = await fetch('/api/auth/me', {
           headers: { Authorization: `Bearer ${storedToken}` },
         });
-        // Guard against unmount or rapid remount — if cancelled, don't
-        // update state (prevents stale response overwriting newer one).
         if (cancelled) return;
         if (res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -82,32 +89,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (data.user) {
             setUser(data.user);
           } else {
-            // Token is invalid — clear it so the user sees the login page
             safeLocalStorage.removeItem('png_token');
             setToken(null);
           }
         } else if (res.status === 401 || res.status === 404) {
-          // 401 = token is genuinely invalid; 404 = user no longer exists in DB.
-          // Both cases: clear the token so the user sees the login page.
           safeLocalStorage.removeItem('png_token');
           setToken(null);
         } else {
-          // 503 (DB down), 500 (server error), network blip — DON'T clear the
-          // token. Keep the user logged in so they can retry when the DB
-          // comes back. Previous code cleared the token on ANY non-200,
-          // which logged everyone out during transient Neon connection drops.
+          // 503/500/network — keep token, user can retry
           console.warn(`Auth check returned ${res.status}, keeping token`);
         }
       } catch (err) {
         if (cancelled) return;
         console.error('Failed to authenticate session token on startup:', err);
-        // Network error or DB connection dropped — DON'T clear the token.
-        // Keep the user logged in so they can retry when the network/DB
-        // comes back. Previous code cleared the token on every network error,
-        // logging users out during transient Neon connection drops.
-        // The user will see a "reconnecting" state in the UI instead.
+        // Don't clear token on network error
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          clearTimeout(safetyTimeout);
+          setIsLoading(false);
+        }
       }
     };
 
@@ -115,6 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimeout);
     };
   }, []);
 
