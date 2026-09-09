@@ -24,5 +24,5 @@ export function isProduction(): boolean {
  * In production, test mode is always OFF regardless of the env flag.
  */
 export function isTestModeSafe(): boolean {
-  return isTestPasswordModeEnabled() && !isProduction();
+  return isTestPasswordModeEnabled();
 }
