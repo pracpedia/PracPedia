@@ -485,6 +485,11 @@ function PortalConsole() {
     if (user) {
       refreshWorkspaceData();
     }
+    // Safety timeout — if the initial data load takes more than 15s
+    // (e.g., Neon cold start), force-hide the loading screen so the
+    // user isn't stuck on a loader forever.
+    const timeout = setTimeout(() => setIsLoading(false), 15000);
+    return () => clearTimeout(timeout);
   }, [user?.id]);
 
   // Live workspace refresh — replaces a broken WebSocket client that was
@@ -2258,13 +2263,12 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // Safety timeout — force-load after 30s no matter what (covers the case
+  // Safety timeout — force-load after 10s no matter what (covers the case
   // where the JS bundle DID load but AuthContext's fetch is hanging).
-  // This should ONLY fire in genuine crash scenarios, never during normal
-  // operation. Was 4s → 10s → now 30s to eliminate false positives.
+  // 10s is enough for Neon cold start + auth check.
   useEffect(() => {
     if (!isLoading) return;
-    const t = setTimeout(() => setForceLoaded(true), 30000);
+    const t = setTimeout(() => setForceLoaded(true), 10000);
     return () => clearTimeout(t);
   }, [isLoading]);
 
@@ -2284,7 +2288,7 @@ export default function Home() {
       } catch {
         window.location.reload();
       }
-    }, 60000);
+    }, 20000);
     return () => clearTimeout(t);
   }, [isLoading, forceLoaded]);
 
