@@ -15,7 +15,7 @@
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Default model (env fallback). Admin can override via /api/settings/gemini-model
-const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
 // Runtime model cache — updated by /api/settings/gemini-model GET
 let runtimeModel: string | null = null;
@@ -45,7 +45,7 @@ async function getGeminiModel(): Promise<string> {
 // - gemini-3.8-flash: current stable (HTTP 400 = exists, just location blocked)
 // - gemini-flash-latest: always points to latest flash model (HTTP 400 = exists)
 const FALLBACK_MODELS = [
-  'gemini-3.8-flash',
+  'gemini-3.6-flash',
   'gemini-flash-latest',
 ];
 
