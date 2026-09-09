@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
 Generate a detailed, structured lesson on the requested topic.
 Subject: ${subject || 'General Science'}
 Topic: ${topic || prompt}
+IMPORTANT: Use LaTeX format for ALL math formulas — inline with $...$ and block with $$...$$. Do NOT use unicode math symbols.
 Response Language: ${language === 'bn' || language === 'bn_book' ? 'Bengali (Bangla)' : 'English'}
 
 Format your response in Markdown with these sections:

@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
 Subject: ${subject || 'General Science'}
 Topic: ${topic || 'General'}
 Number of questions: ${count}
+IMPORTANT: Use LaTeX format for ALL math formulas — inline with $...$ and block with $$...$$. Do NOT use unicode math symbols.
 Response Language: ${language === 'bn' || language === 'bn_book' ? 'Bengali (Bangla)' : 'English'}
 
 Return a JSON array of ${count} multiple choice questions. Each question must have:

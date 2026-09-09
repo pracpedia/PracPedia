@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
     const sysPrompt = `You are an expert tutor for creative questions (CQ) on the PracPedia academy platform.
 Subject: ${subject || 'General Science'}
 Topic: ${topic || 'General'}
+IMPORTANT: Use LaTeX format for ALL math formulas — inline with $...$ and block with $$...$$. Do NOT use unicode math symbols.
 Response Language: ${language === 'bn' || language === 'bn_book' ? 'Bengali (Bangla)' : 'English'}
 
 Provide a detailed step-by-step solution to the creative question. Use Markdown with these sections:

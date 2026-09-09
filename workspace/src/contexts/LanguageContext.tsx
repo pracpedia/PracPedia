@@ -60,8 +60,8 @@ const translations: Record<Language, Record<string, string>> = {
     placeholderChannel: 'Post study query in',
     deleteMessage: 'Delete this message',
 
-    academyTitleMain: 'Aura Intellect &',
-    academyTitleSub: 'ICT Science Academy',
+    academyTitleMain: 'PracPedia AI Academy &',
+    academyTitleSub: 'PracPedia AI Academy',
     academyDesc:
       'Step into a premium learning deck aligned with the Bangladesh NCTB Board and International Board Standards. Master complex Newtonian mechanics, organic synthesis protocols, biological pathways, and C algorithms with instant interactive lessons.',
     responseLanguage: 'Response Language',
