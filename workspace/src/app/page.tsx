@@ -2263,14 +2263,14 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // Safety timeout — force-load after 10s no matter what (covers the case
-  // where the JS bundle DID load but AuthContext's fetch is hanging).
-  // 10s is enough for Neon cold start + auth check.
+  // Safety timeout — force-load after 5s no matter what.
+  // This is the ULTIMATE fallback. If AuthContext's fetch is hanging
+  // (Neon cold start, slow compilation, network issue), the user
+  // sees the landing page after 5 seconds instead of an infinite spinner.
   useEffect(() => {
-    if (!isLoading) return;
-    const t = setTimeout(() => setForceLoaded(true), 10000);
+    const t = setTimeout(() => setForceLoaded(true), 5000);
     return () => clearTimeout(t);
-  }, [isLoading]);
+  }, []);
 
   // SSR-level safety net — ONLY fires if the loading screen is still
   // visible after 60s (genuine ChunkLoadError / server crash). Uses

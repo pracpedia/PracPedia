@@ -69,12 +69,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Safety timeout — if the auth check takes more than 8 seconds
-    // (Neon cold start, network issue), force-stop loading so the
-    // user sees the app instead of an infinite spinner.
+    // Safety timeout — if the auth check takes more than 5 seconds
+    // (Neon cold start, network issue), force-stop loading.
     const safetyTimeout = setTimeout(() => {
       if (!cancelled) setIsLoading(false);
-    }, 8000);
+    }, 5000);
 
     // Validate token with the server
     const initializeAuth = async () => {
