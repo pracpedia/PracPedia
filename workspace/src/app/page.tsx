@@ -413,21 +413,33 @@ function PortalConsole() {
   // sets isLoading. Setting it on every refresh causes the loading screen
   // to flash + triggers the forceLoaded/SSR auto-reload timeouts, which
   // reload the page and wipe all user state (AI answers, chat, etc.).
+  //
+  // Each fetch is given a 5s AbortController so a hung network call can't
+  // keep the SYNCHRONIZING loader stuck — the finally block always runs.
   const refreshWorkspaceData = async () => {
+    const fetchWithTimeout = async (url: string, opts: RequestInit = {}) => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5000);
+      try {
+        return await apiFetch(url, { ...opts, signal: ctrl.signal });
+      } finally {
+        clearTimeout(t);
+      }
+    };
     try {
       // Fetch subjects
-      const subRes = await apiFetch('/api/subjects');
+      const subRes = await fetchWithTimeout('/api/subjects');
       const subData = await subRes.json().catch(() => []);
       setSubjects(Array.isArray(subData) ? subData.map((s: any) => ({ ...s, id: s.id || s._id })) : []);
 
       // Fetch folder registries
-      const fRes = await apiFetch('/api/folders');
+      const fRes = await fetchWithTimeout('/api/folders');
       const fData = await fRes.json().catch(() => []);
       setFolders(Array.isArray(fData) ? fData.map((f: any) => ({ ...f, id: f.id || f._id })) : []);
 
       // Fetch announcements
       try {
-        const annRes = await apiFetch('/api/announcements');
+        const annRes = await fetchWithTimeout('/api/announcements');
         if (annRes.ok) {
           const annData = await annRes.json().catch(() => []);
           setAnnouncements(Array.isArray(annData) ? annData.map((a: any) => ({ ...a, id: a.id || a._id })) : []);
@@ -438,7 +450,7 @@ function PortalConsole() {
 
       // Fetch banner config
       try {
-        const bannerRes = await fetch('/api/settings/banner');
+        const bannerRes = await fetchWithTimeout('/api/settings/banner');
         if (bannerRes.ok) {
           setBannerConfig(await bannerRes.json().catch(() => ({})));
         }
@@ -448,7 +460,7 @@ function PortalConsole() {
 
       // Fetch admin directory list
       try {
-        const admRes = await apiFetch('/api/users/admins');
+        const admRes = await fetchWithTimeout('/api/users/admins');
         if (admRes.ok) {
           const admData = await admRes.json().catch(() => []);
           setAdminsList(Array.isArray(admData) ? admData.map((u: any) => ({ ...u, id: u.id || u._id })) : []);
@@ -458,17 +470,17 @@ function PortalConsole() {
       }
 
       // Fetch statistics telemetry
-      const statRes = await apiFetch('/api/stats');
+      const statRes = await fetchWithTimeout('/api/stats');
       const statData = await statRes.json().catch(() => ({}));
       setStats(statData && typeof statData === 'object' ? statData : {});
 
       // Fetch students list if user is an Administrator
       if (user?.role === 'admin' || user?.role === 'super_admin') {
         try {
-          const studRes = await apiFetch('/api/users/students');
+          const studRes = await fetchWithTimeout('/api/users/students');
           if (studRes.ok) {
-            const studData = await studRes.json();
-            setStudentsList(studData.map((s: any) => ({ ...s, id: s.id || s._id })));
+            const studData = await studRes.json().catch(() => []);
+            setStudentsList(Array.isArray(studData) ? studData.map((s: any) => ({ ...s, id: s.id || s._id })) : []);
           }
         } catch (studErr) {
           console.error("Could not fetch students roster: ", studErr);
@@ -485,10 +497,11 @@ function PortalConsole() {
     if (user) {
       refreshWorkspaceData();
     }
-    // Safety timeout — if the initial data load takes more than 15s
-    // (e.g., Neon cold start), force-hide the loading screen so the
-    // user isn't stuck on a loader forever.
-    const timeout = setTimeout(() => setIsLoading(false), 15000);
+    // Safety timeout — if the initial data load takes more than 6s
+    // (e.g., Neon cold start, slow network), force-hide the SYNCHRONIZING
+    // loader so the user is never stuck. The dashboard can keep loading
+    // data in the background; UI shell renders immediately after 6s.
+    const timeout = setTimeout(() => setIsLoading(false), 6000);
     return () => clearTimeout(timeout);
   }, [user?.id]);
 
