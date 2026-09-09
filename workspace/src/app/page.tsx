@@ -50,6 +50,7 @@ import {
   Eye,
   Settings,
   Sparkles,
+  Loader2,
   Bell,
   LayoutGrid,
   List
@@ -228,6 +229,14 @@ function PortalConsole() {
   // Overlay indicators
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  // Folder AI Analysis state
+  const [isFolderAiModalOpen, setIsFolderAiModalOpen] = useState(false);
+  const [folderAiMode, setFolderAiMode] = useState<'explain' | 'qa'>('explain');
+  const [folderAiQuestion, setFolderAiQuestion] = useState('');
+  const [folderAiResult, setFolderAiResult] = useState<string | null>(null);
+  const [folderAiLoading, setFolderAiLoading] = useState(false);
+  const [folderAiError, setFolderAiError] = useState<string | null>(null);
   const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
   const [galleryViewMode, setGalleryViewMode] = useState<'grid' | 'list'>('grid');
   const [editFolderData, setEditFolderData] = useState<any>(null);
@@ -1643,6 +1652,23 @@ function PortalConsole() {
                             Scan & Attach Sheet
                           </button>
                         )}
+
+                        {/* AI Analyze Entire Practical button — available to all logged-in users */}
+                        {user && activeFolder.images && activeFolder.images.length > 0 && (
+                          <button
+                            onClick={() => {
+                              setFolderAiMode('explain');
+                              setFolderAiQuestion('');
+                              setFolderAiResult(null);
+                              setFolderAiLoading(false);
+                              setIsFolderAiModalOpen(true);
+                            }}
+                            className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold rounded-xl text-xs tracking-wide flex items-center gap-1.5 shadow-lg shadow-indigo-950/50 border border-indigo-500/30 transition-all duration-200 active:scale-95 cursor-pointer min-h-[44px]"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                            AI Analyze Practical
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -2017,6 +2043,144 @@ function PortalConsole() {
           folderTitle={activeFolder.title}
           onUploadSuccess={handleAppendImage}
         />
+      )}
+
+      {/* AI Folder Analysis Modal */}
+      {isFolderAiModalOpen && activeFolder && (
+        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-slate-950 border border-indigo-500/20 rounded-3xl shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/[0.06] gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 shrink-0">
+                  <Sparkles className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black text-white truncate">AI Practical Analysis</h3>
+                  <p className="text-[10px] text-slate-400 truncate">{activeFolder.title}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsFolderAiModalOpen(false)}
+                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-600 hover:border-transparent hover:text-white transition-all cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 sm:p-5 space-y-4">
+              {/* Mode toggle */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setFolderAiMode('explain'); setFolderAiResult(null); setFolderAiError(null); }}
+                  className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[44px] ${
+                    folderAiMode === 'explain'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-white/5'
+                  }`}
+                >
+                  Explain Entire Practical
+                </button>
+                <button
+                  onClick={() => { setFolderAiMode('qa'); setFolderAiResult(null); setFolderAiError(null); }}
+                  className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer min-h-[44px] ${
+                    folderAiMode === 'qa'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-white/5'
+                  }`}
+                >
+                  Ask Question
+                </button>
+              </div>
+
+              {/* Q&A input */}
+              {folderAiMode === 'qa' && (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={folderAiQuestion}
+                    onChange={(e) => setFolderAiQuestion(e.target.value)}
+                    placeholder="Ask about this practical..."
+                    className="flex-1 px-3 py-2.5 bg-slate-900 border border-white/10 text-slate-100 placeholder:text-slate-500 rounded-xl text-xs outline-none focus:border-indigo-500/50 min-h-[44px]"
+                  />
+                </div>
+              )}
+
+              {/* Analyze button */}
+              <button
+                onClick={async () => {
+                  setFolderAiLoading(true);
+                  setFolderAiError(null);
+                  setFolderAiResult(null);
+                  try {
+                    const res = await apiFetch('/api/academy/analyze-folder', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        folderId: activeFolder.id,
+                        mode: folderAiMode,
+                        question: folderAiMode === 'qa' ? folderAiQuestion : undefined,
+                        language: 'en',
+                      }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                      throw new Error(data.error || 'Analysis failed');
+                    }
+                    setFolderAiResult(data.content || 'No response from AI.');
+                  } catch (err: any) {
+                    setFolderAiError(err.message || 'Could not analyze practical.');
+                  } finally {
+                    setFolderAiLoading(false);
+                  }
+                }}
+                disabled={folderAiLoading || (folderAiMode === 'qa' && !folderAiQuestion.trim())}
+                className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
+              >
+                {folderAiLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Analyzing {activeFolder.images?.length || 0} pages...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    {folderAiMode === 'explain' ? 'Analyze Entire Practical' : 'Ask AI'}
+                  </>
+                )}
+              </button>
+
+              {/* Error */}
+              {folderAiError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+                  {folderAiError}
+                </div>
+              )}
+
+              {/* Result */}
+              {folderAiResult && (
+                <div className="p-4 rounded-xl bg-slate-900 border border-white/[0.06] text-slate-200 text-sm leading-relaxed whitespace-pre-wrap max-h-[50vh] overflow-y-auto">
+                  {folderAiResult}
+                </div>
+              )}
+
+              {/* Info */}
+              {!folderAiResult && !folderAiError && !folderAiLoading && (
+                <div className="p-4 rounded-xl bg-slate-900/50 border border-dashed border-white/5 text-center">
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    {folderAiMode === 'explain'
+                      ? 'AI will analyze all pages of this practical together and provide a complete explanation including objective, apparatus, procedure, observations, calculations, and results.'
+                      : 'Ask any question about this practical — AI will examine all pages and answer.'}
+                  </p>
+                  <p className="text-[10px] text-slate-600 mt-2">
+                    Requires Gemini API key. Click "Connect AI Key" in the sidebar if you haven't already.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {confirmDeleteImageIndex !== null && (
