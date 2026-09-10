@@ -1183,8 +1183,8 @@ export const AiAcademyRoom: React.FC = () => {
         className="relative p-4 sm:p-6 md:p-8 rounded-3xl overflow-hidden border border-white/10 bg-slate-950/60 backdrop-blur-xl shadow-2xl flex flex-col xl:flex-row items-center justify-between gap-4 sm:gap-6"
       >
         {/* Background glowing gradients */}
-        <div className="absolute top-0 right-0 w-[45%] h-full rounded-full bg-gradient-to-l from-indigo-500/15 to-transparent blur-3xl pointer-events-none select-none" />
-        <div className="absolute bottom-0 left-0 w-[25%] h-2/3 rounded-full bg-gradient-to-tr from-cyan-500/10 to-transparent blur-2xl pointer-events-none select-none" />
+        <div className="absolute top-0 right-0 w-[45%] h-full rounded-full bg-linear-to-l from-indigo-500/15 to-transparent blur-3xl pointer-events-none select-none" />
+        <div className="absolute bottom-0 left-0 w-[25%] h-2/3 rounded-full bg-linear-to-tr from-cyan-500/10 to-transparent blur-2xl pointer-events-none select-none" />
 
         {/* Left Side title / descriptions */}
         <div className="space-y-3 sm:space-y-4 text-center xl:text-left w-full min-w-0">
@@ -1542,7 +1542,7 @@ export const AiAcademyRoom: React.FC = () => {
             </div>
           </motion.div>
 
-          <div className="bg-slate-950/70 border border-white/5 rounded-2.5xl p-4 sm:p-5 md:p-6 space-y-4 shadow-xl">
+          <div className="bg-slate-950/70 border border-white/5 rounded-2xl p-4 sm:p-5 md:p-6 space-y-4 shadow-xl">
             <div className="flex items-center justify-between border-b border-white/[0.04] pb-2 text-xs font-mono font-black tracking-widest text-[#22d3ee]">
               <span className="flex items-center gap-1.5 min-w-0"><Layers3 className="w-4 h-4 text-cyan-400 shrink-0" /> <span className="truncate">{t('boardBlueprint')}</span></span>
               <span className="text-[10px] text-slate-500 shrink-0">[{curriculum}]</span>
@@ -1695,10 +1695,10 @@ export const AiAcademyRoom: React.FC = () => {
         </div>
 
         {/* RIGHT COLUMN: INTERACTIVE VIEWPORT (7 cols) - Mobile Robust Height wrapped */}
-        <div className="lg:col-span-7 bg-[#05080e] border border-white/5 rounded-2.5xl flex flex-col min-h-[500px] lg:h-[700px] overflow-hidden shadow-2xl relative">
+        <div className="lg:col-span-7 bg-[#05080e] border border-white/5 rounded-2xl flex flex-col min-h-[500px] lg:h-[700px] overflow-hidden shadow-2xl relative">
 
           {/* Viewport header bar */}
-          <div className="p-3 sm:p-4 bg-slate-950/60 border-b border-white/[0.04] flex flex-wrap gap-2 items-center justify-between shrink-0">
+          <div className="p-3 sm:p-4 bg-slate-950/60 border-b white/4 flex flex-wrap gap-2 items-center justify-between shrink-0">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="p-2 rounded-xl bg-indigo-650/15 text-indigo-400 border border-indigo-500/20 shrink-0">
                 <Sparkles className="w-4 h-4 animate-pulse text-cyan-400" />

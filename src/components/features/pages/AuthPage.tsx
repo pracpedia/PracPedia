@@ -141,10 +141,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
       return;
     }
 
-    setGoogleModalLoading(true);
+        setGoogleModalLoading(true);
     setGoogleModalError(null);
 
     try {
+      // Build artist-specific payload (mirrors the standard /api/artists/register body)
+      const artistPayload = authType === 'artist' ? {
+        phoneNumber: phoneNumber.trim() || undefined,
+        bio: artistBio || undefined,
+        rateDrawingOnly: Number(artistRate) || 150,
+        rateDrawingWriting: (Number(artistRate) || 150) * 2,
+        specialties: artistSpecialties.split(',').map(s => s.trim()).filter(Boolean),
+      } : {
+        phoneNumber: phoneNumber.trim() || undefined,
+      };
+
       const res = await apiFetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -155,6 +166,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
           profilePic: accAvatar,
           password: accPassword || googlePasswordInput || 'google-pass-123',
           isSignup: !isLogin,  // true when in sign-up mode, false when in login mode
+          ...artistPayload,
         }),
       });
 
@@ -290,7 +302,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
 
           <div className="hidden sm:inline-flex items-center gap-2 text-[9px] font-mono font-bold bg-slate-950/80 border border-white/[0.06] px-3.5 py-1.5 rounded-full text-slate-300 uppercase tracking-widest shadow-inner backdrop-blur-md">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
-            <span>256-BIT SSL GATEWAY</span>
+            {/* <span>256-BIT SSL GATEWAY</span> */}
           </div>
         </div>
 
@@ -908,10 +920,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                     setGoogleModalError('Google Sign-In is for Gmail accounts only. For Yahoo, Outlook, Hotmail, and all other email providers, please close this dialog and use the standard form below.');
                     return;
                   }
-                  // Name is required for sign-up (not for login — existing users already have one)
+                                   // Name is required for sign-up (not for login — existing users already have one)
                   if (!isLogin && !googleNameInput.trim()) {
                     setGoogleModalError('Please enter your full name to create your PracPedia account.');
                     return;
+                  }
+                  // Phone is required for sign-up (for order SMS notifications)
+                  if (!isLogin && !phoneNumber.trim()) {
+                    setGoogleModalError('Please enter your mobile number for order SMS notifications.');
+                    return;
+                  }
+                  // Artist-specific validation
+                  if (!isLogin && authType === 'artist') {
+                    if (!artistRate.trim() || Number(artistRate) < 50) {
+                      setGoogleModalError('Please enter a valid base rate (minimum ৳50 BDT per sheet).');
+                      return;
+                    }
+                    if (!artistSpecialties.trim()) {
+                      setGoogleModalError('Please list your subject specialties (e.g., Optics, Circuits, Botany).');
+                      return;
+                    }
+                    if (!artistBio.trim()) {
+                      setGoogleModalError('Please write a short artist pitch / bio so students know your skills.');
+                      return;
+                    }
                   }
                   handleSelectGoogleAccount(googleEmailInput, googleNameInput.trim() || undefined, undefined, googlePasswordInput);
                 }}
@@ -997,7 +1029,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                       {googleShowPassword ? 'Hide password' : 'Show password'}
                     </button>
                   </div>
-                  <div className="relative flex items-center">
+                                    <div className="relative flex items-center">
                     <input
                       type={googleShowPassword ? 'text' : 'password'}
                       required
@@ -1009,6 +1041,99 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                     <Lock className="w-4 h-4 text-slate-500 absolute right-3.5 pointer-events-none" />
                   </div>
                 </div>
+
+                {/* Phone Number field — shown only in signup mode (for order SMS notifications) */}
+                {!isLogin && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      Mobile Number <span className="text-rose-400">*</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-3.5 text-slate-500 font-mono text-xs">+88</span>
+                      <input
+                        type="tel"
+                        required
+                        value={phoneNumber}
+                        onChange={(e) => {
+                          setPhoneNumber(e.target.value);
+                          if (googleModalError) setGoogleModalError(null);
+                        }}
+                        placeholder="01XXXXXXXXX"
+                        className="w-full bg-slate-950/90 border border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-12 pr-4 py-2.5 text-xs text-white placeholder:text-slate-600 outline-none transition-all font-mono min-h-[44px]"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                      For order status SMS notifications when students hire you.
+                    </p>
+                  </div>
+                )}
+
+                {/* Illustrator Parameters — shown only in signup mode AND artist role */}
+                {!isLogin && authType === 'artist' && (
+                  <div className="space-y-3 p-4 bg-amber-500/[0.03] rounded-2xl border border-amber-500/15">
+                    <div className="text-[10px] uppercase font-mono font-bold tracking-widest text-amber-400 pb-1.5 border-b border-white/[0.06] flex items-center justify-between gap-2 flex-wrap">
+                      <span className="flex items-center gap-1.5">
+                        <Paintbrush className="w-3.5 h-3.5 shrink-0" /> Illustrator Parameters
+                      </span>
+                      <span className="text-[9px] font-mono text-slate-400">BDT Rates</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[8.5px] font-mono uppercase font-bold text-slate-400 block px-1">
+                          Base Rate (৳ BDT Per Sheet) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={artistRate}
+                          onChange={(e) => {
+                            setArtistRate(e.target.value);
+                            if (googleModalError) setGoogleModalError(null);
+                          }}
+                          required
+                          min={50}
+                          max={2000}
+                          placeholder="150"
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-700 focus:outline-none font-mono min-h-[44px]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[8.5px] font-mono uppercase font-bold text-slate-400 block px-1">
+                          Subject Specialties <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={artistSpecialties}
+                          onChange={(e) => {
+                            setArtistSpecialties(e.target.value);
+                            if (googleModalError) setGoogleModalError(null);
+                          }}
+                          required
+                          placeholder="Optics, Circuits, Botany..."
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder:text-slate-700 focus:outline-none font-sans min-h-[44px]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[8.5px] font-mono uppercase font-bold text-slate-400 block px-1">
+                        Artist Pitch &amp; Bio <span className="text-rose-400">*</span>
+                      </label>
+                      <textarea
+                        value={artistBio}
+                        onChange={(e) => {
+                          setArtistBio(e.target.value);
+                          if (googleModalError) setGoogleModalError(null);
+                        }}
+                        required
+                        rows={2}
+                        placeholder="Tell students about your drawing precision, pencil grading, and turnaround speed..."
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-700 focus:outline-none resize-none leading-relaxed font-sans"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-2 flex items-center justify-between gap-3">
 

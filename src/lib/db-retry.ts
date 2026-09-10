@@ -19,6 +19,13 @@ function isConnectionError(err: any): boolean {
   if (err?.code === 'P1001') return true;
   // Prisma P1002 = server has timed out
   if (err?.code === 'P1002') return true;
+  // Prisma P1003 = database does not exist
+  if (err?.code === 'P1003') return true;
+  // Neon/Postgres "Closed" error — connection dropped after idle.
+  // err has shape: { kind: 'Closed', cause: None }
+  if (err?.kind === 'Closed') return true;
+  // Nested cause may also carry the kind
+  if (err?.cause?.kind === 'Closed') return true;
   // Check message for common connection error patterns
   const msg = err?.message || String(err);
   return (
@@ -29,7 +36,11 @@ function isConnectionError(err: any): boolean {
     msg.includes('ECONNREFUSED') ||
     msg.includes('ETIMEDOUT') ||
     msg.includes('ENOTFOUND') ||
-    msg.includes('Server has timed out')
+    msg.includes('Server has timed out') ||
+    msg.includes('Connection terminated') ||
+    msg.includes('Connection closed') ||
+    msg.includes('kind: Closed') ||
+    msg.includes('closed the connection')
   );
 }
 

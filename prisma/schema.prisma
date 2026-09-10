@@ -44,10 +44,14 @@ model User {
   // IP address tracking
   lastIpAddress String?
 
-  // Trial-credit recharge cooldown — set to the current time when the user
+    // Trial-credit recharge cooldown — set to the current time when the user
   // self-recharges via /api/users/recharge-trial. Regular users are limited
   // to one recharge per 24h. Platform owners bypass.
   lastRechargeAt DateTime?
+
+  // Presence tracking — updated every 30s by /api/presence/heartbeat.
+  // Used by ClassroomDiscussion to show "Active Scholars Online" indicator.
+  lastSeenAt DateTime?
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -58,6 +62,7 @@ model User {
 
   @@index([role])
   @@index([isAvailable, rating])
+  @@index([lastSeenAt])
   @@map("users")
 }
 

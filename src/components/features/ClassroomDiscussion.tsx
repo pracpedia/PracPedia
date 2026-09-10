@@ -91,11 +91,68 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
     messagesRef.current = messages;
   }, [messages]);
 
-  // Real-time active users — guard against SSR (window is undefined on server)
-  const [activeUsers, setActiveUsers] = useState<any[]>(() => {
-    if (typeof window === 'undefined') return [];
-    return (window as any).__activeUsers || [];
-  });
+  // Real-time active users — fetched from /api/presence/online every 30s.
+  // Also includes the current user (you) so the lobby always shows at least
+  // one avatar when the user is signed in.
+  const [activeUsers, setActiveUsers] = useState<any[]>([]);
+
+  // ── Presence: heartbeat every 30s + fetch online users every 30s ──────────
+  // This is the "who's online right now" indicator for the Classroom Lobby.
+  // Heartbeat updates the user's lastSeenAt column; /api/presence/online
+  // returns everyone whose lastSeenAt is within the last 2 minutes.
+  useEffect(() => {
+    if (!user?.id) return; // only heartbeat when authenticated
+
+    let cancelled = false;
+
+    // 1. Send a heartbeat immediately (so this user appears online fast)
+    const sendHeartbeat = async () => {
+      try {
+        await apiFetch('/api/presence/heartbeat', { method: 'POST' });
+      } catch {
+        // silent — presence is best-effort
+      }
+    };
+
+    // 2. Fetch the list of online users
+    const fetchOnline = async () => {
+      try {
+        const res = await apiFetch('/api/presence/online');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({ online: [] }));
+        if (cancelled) return;
+        if (Array.isArray(data.online)) {
+          setActiveUsers(data.online);
+        }
+      } catch {
+        // silent — best-effort
+      }
+    };
+
+    // Kick both off immediately
+    sendHeartbeat();
+    fetchOnline();
+
+    // Then schedule them on 30s intervals
+    const heartbeatInterval = setInterval(sendHeartbeat, 30_000);
+    const pollInterval = setInterval(fetchOnline, 30_000);
+
+    // When the user switches back to this tab, refresh immediately
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        sendHeartbeat();
+        fetchOnline();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      clearInterval(heartbeatInterval);
+      clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user?.id, apiFetch]);
 
   // Quick Action triggers removed per user request — chat input is now clean.
 
@@ -316,23 +373,8 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
       window.removeEventListener('chat-updated', handleRemoteChatUpdate);
     };
   }, [activeChannelId]);
-
-  // Sync initial components presence data and update when event triggers
-  useEffect(() => {
-    if ((window as any).__activeUsers) {
-      setActiveUsers((window as any).__activeUsers);
-    }
-    const handlePresenceUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail && customEvent.detail.activeUsers) {
-        setActiveUsers(customEvent.detail.activeUsers);
-      }
-    };
-    window.addEventListener('presence-updated', handlePresenceUpdated);
-    return () => {
-      window.removeEventListener('presence-updated', handlePresenceUpdated);
-    };
-  }, []);
+  // (Old placeholder presence code removed — real presence is now handled
+  // by the heartbeat/online useEffect above.)
 
   // Handle user-friendly quiet auto-scrolling on load or when sending message
   const lastMessageCountRef = useRef<number>(0);
@@ -401,9 +443,9 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
     <div
       id="classroom-chat-root"
       className="
-        w-full min-h-[600px] lg:h-[calc(100vh-180px)]
+        w-full min-h-197.5 lg:h-[calc(100vh-180px)]
         flex flex-col lg:flex-row
-        rounded-3xl border border-white/[0.06]
+        rounded-3xl border border-white/6
         bg-slate-950/40 overflow-hidden
         backdrop-blur-2xl relative shadow-2xl
       "
@@ -415,7 +457,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
         className={`
           w-full lg:w-80 xl:w-96 shrink-0
           flex flex-col gap-3
-          bg-slate-950/70 border-r border-white/[0.04]
+          bg-slate-950/70 border-r border-white/4
           overflow-hidden
           ${mobileView === 'channels' ? 'flex' : 'hidden lg:flex'}
         `}
@@ -438,39 +480,40 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
 
         {/* Active users strip */}
         <div className="px-3 shrink-0">
-          <div className="bg-slate-900/40 border border-white/[0.03] p-2.5 rounded-2xl">
+          <div className="bg-slate-900/40 border border-white/3 p-2.5 rounded-2xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{t('activeScholars')}</span>
               <span className="text-[9px] font-mono text-cyan-400">{activeUsers.length} {t('onlineSuffix')}</span>
             </div>
-            <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+                        <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
               {activeUsers.length === 0 ? (
-                <span className="text-[10px] text-slate-500 italic px-1">Connecting…</span>
+                <span className="text-[10px] text-slate-500 italic px-1">No scholars online right now</span>
               ) : (
                 activeUsers.slice(0, 8).map((item, idx) => (
-                  <div key={item.id || idx} className="relative group shrink-0 flex flex-col items-center gap-1" title={`${item.name} (${item.role})`}>
+                  <div key={item.id || idx} className="relative group shrink-0 flex flex-col items-center gap-1" title={`${item.name} (${item.role})${item.isYou ? ' — you' : ''}`}>
                     <div className="relative">
                       {item.profilePic ? (
                         <img
                           src={item.profilePic}
                           alt={item.name}
                           referrerPolicy="no-referrer"
-                          className="w-8 h-8 rounded-full object-cover border border-emerald-500/60 bg-slate-950"
+                          className={`w-8 h-8 rounded-full object-cover bg-slate-950 ${item.isYou ? 'border-2 border-cyan-400' : 'border border-emerald-500/60'}`}
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full border border-emerald-500/60 bg-slate-900 flex items-center justify-center text-slate-200 text-[10px] font-bold">
+                        <div className={`w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-slate-200 text-[10px] font-bold ${item.isYou ? 'border-2 border-cyan-400' : 'border border-emerald-500/60'}`}>
                           {item.name ? item.name.charAt(0).toUpperCase() : '?'}
                         </div>
                       )}
                       <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-950" />
                     </div>
-                    <span className="text-[8px] text-slate-400 font-bold max-w-[44px] truncate leading-none text-center">
-                      {item.name ? item.name.split(' ')[0] : 'Scholar'}
+                    <span className={`text-[8px] font-bold max-w-[44px] truncate leading-none text-center ${item.isYou ? 'text-cyan-400' : 'text-slate-400'}`}>
+                      {item.isYou ? 'You' : (item.name ? item.name.split(' ')[0] : 'Scholar')}
                     </span>
                   </div>
                 ))
               )}
             </div>
+
           </div>
         </div>
 
