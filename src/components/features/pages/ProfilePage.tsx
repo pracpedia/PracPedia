@@ -512,7 +512,7 @@ const AvatarField: React.FC<AvatarFieldProps> = ({ url, onApply, saving }) => {
         <span className="truncate">Upload from device</span>
       </Button>
 
-      {draft.startsWith('data:') && (
+            {draft.startsWith('data:') && (
         <button
           type="button"
           onClick={() => setDraft('')}
@@ -522,10 +522,27 @@ const AvatarField: React.FC<AvatarFieldProps> = ({ url, onApply, saving }) => {
         </button>
       )}
 
+      {/* Remove saved profile pic entirely (revert to default initials avatar) */}
+      {url && !draft.startsWith('data:') && (
+        <button
+          type="button"
+          onClick={() => {
+            if (confirm('Remove your profile picture? You will revert to the default initials avatar.')) {
+              setDraft('');
+              void onApply('');
+            }
+          }}
+          disabled={saving}
+          className="text-[10px] text-rose-300 hover:text-rose-200 underline cursor-pointer disabled:opacity-50 disabled:no-underline"
+        >
+          Remove profile picture
+        </button>
+      )}
+
       <Button
         type="button"
         size="sm"
-        disabled={saving || isUnchanged || !draft.trim()}
+        disabled={saving || isUnchanged || (!draft.trim() && !url)}
         onClick={() => void onApply(draft.trim())}
         className="w-full min-w-0 shrink h-9 min-h-[36px] text-[12px] bg-amber-500/20 border border-amber-500/30 text-amber-200 hover:bg-amber-500/30 gap-1.5"
       >
@@ -1836,12 +1853,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
     setProfilePic(user.profilePic || '');
   };
 
-  /* ---- save avatar (one-click from sidebar) ---- */
+    /* ---- save avatar (one-click from sidebar) ---- */
+  // url can be '' to REMOVE the profile pic (revert to default initials avatar)
   const handleSaveAvatar = async (url: string) => {
-    if (!url.trim()) {
-      showError('Avatar URL cannot be empty.');
-      return;
-    }
     setSavingAvatar(true);
     try {
       const res = await apiFetch('/api/profile', {
