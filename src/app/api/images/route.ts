@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Folder not found' }, { status: 404 });
     }
 
-    const finalUrl = imageUrl.startsWith('data:')
-      ? await uploadDataUrl(String(imageUrl), 'folders')
+            const finalUrl = imageUrl.startsWith('data:')
+      ? await uploadDataUrl(String(imageUrl), 'folders', title)
       : String(imageUrl);
 
     // Transaction + read-from-row to avoid the lost-update race where two

@@ -28,11 +28,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden — admin only.' }, { status: 403 });
     }
 
-    const formData = await request.formData();
+        const formData = await request.formData();
     const file = formData.get('image');
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: 'Image file is required.' }, { status: 400 });
     }
+    // Optional title field — used as the Cloudinary public_id (slugified)
+    const title = (formData.get('title') as string) || undefined;
 
     // 10 MB cap — protects the dev fallback (base64 inline) from blowing up
     // the DB row size.
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const url = await uploadImage(file, 'folders');
+    const url = await uploadImage(file, 'folders', title);
     return NextResponse.json({ url });
   } catch (err: any) {
     console.error('POST /api/images/upload-file error:', err);

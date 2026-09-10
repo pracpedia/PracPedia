@@ -25,10 +25,13 @@ export async function PUT(request: NextRequest) {
     if (name !== undefined) updateData.name = String(name);
     if (phoneNumber !== undefined) updateData.phoneNumber = String(phoneNumber);
     if (bio !== undefined) updateData.bio = String(bio);
-    if (profilePic !== undefined) {
-      // Upload avatar to blob storage if it's a data URL
+       if (profilePic !== undefined) {
+      // Upload avatar to blob storage if it's a data URL.
+      // Use the user's name as the Cloudinary title so the asset is easily
+      // identifiable in the Cloudinary Media Library.
+      const displayName = name !== undefined ? String(name) : (u.name || 'user');
       updateData.profilePic = profilePic.startsWith('data:')
-        ? await uploadDataUrl(String(profilePic), 'avatars')
+        ? await uploadDataUrl(String(profilePic), 'avatars', displayName)
         : String(profilePic);
     }
     if (isArtist) {

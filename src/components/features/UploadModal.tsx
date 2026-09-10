@@ -443,9 +443,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       }
       const blob = new Blob(byteArrays, { type: 'image/jpeg' });
 
-      // Package into standard Multipart FormData
+            // Package into standard Multipart FormData
       const formData = new FormData();
       formData.append('image', blob, 'scanned_notebook_page.jpg');
+      // Pass the user-supplied title to the backend so Cloudinary names the
+      // asset with the title (slugified) instead of a random gibberish ID.
+      formData.append('title', checkTitle);
 
       // 1. Upload scan image to backend uploads folder with secure validation
       const uploadRes = await apiFetch('/api/images/upload-file', {
