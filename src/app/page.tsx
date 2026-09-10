@@ -876,8 +876,12 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
     setConfirmDeleteImageIndex(imgIndex);
   };
 
-  const handleConfirmDeleteImage = async (imgIndex: number) => {
+    const handleConfirmDeleteImage = async (imgIndex: number) => {
     if (!selectedFolderId) return;
+    // Optimistically clear the confirm dialog + close lightbox so the UI
+    // feels responsive immediately — don't wait for the network round-trip.
+    setConfirmDeleteImageIndex(null);
+    if (activeLightboxIndex === imgIndex) setActiveLightboxIndex(null);
     try {
       const res = await apiFetch(`/api/images/${selectedFolderId}/${imgIndex}`, {
         method: 'DELETE'
@@ -886,9 +890,15 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || "Deletion rejected by api.");
       }
+      // Refresh workspace data so the folder's image list is up-to-date.
+      // This is what makes the image disappear from the frontend.
       await refreshWorkspaceData();
+      addLiveNotification("Image deleted successfully.", "success");
     } catch (err: any) {
       addLiveNotification(err.message || "Failed to delete image.", "warning");
+      // Refresh anyway so the UI matches the actual DB state (the image
+      // may have been deleted on the server even if the response failed).
+      await refreshWorkspaceData();
     }
   };
 
@@ -1248,7 +1258,7 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
                               </button>
                             )}
 
-                            <div className="flex items-center justify-between pt-4 mt-3 border-t border-white/[0.03] text-[10.5px] font-mono gap-2 flex-wrap">
+                            <div className="flex items-center justify-between pt-4 mt-3 border-t border-white/3-[10.5px] font-mono gap-2 flex-wrap">
                               <span className="text-slate-400 font-sans truncate min-w-0">Posted by: {ann.createdByName}</span>
                               {ann.deadline && (
                                 <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-extrabold border border-amber-500/20 shrink-0">
@@ -1264,7 +1274,7 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
 
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <div className="min-w-0">
-                      <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight break-words">University Archive Panel</h2>
+                      <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight wrap-break-word">University Archive Panel</h2>
                       <p className="text-xs text-slate-400 mt-1">Select from five premium subject areas to access specific experiment galleries.</p>
                     </div>
 
