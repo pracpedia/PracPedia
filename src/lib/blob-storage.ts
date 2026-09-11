@@ -142,17 +142,22 @@ async function uploadToCloudinary(
     if (slug) uploadOptions.public_id = slug;
   }
 
+  console.log('[uploadImage] Cloudinary upload starting — namespace:', namespace, 'title:', title || '(none)');
+
+  // String input = data URL → use cloudinary.uploader.upload
   if (typeof input === 'string') {
-    if (!input.startsWith('data:')) return input;
+    if (!input.startsWith('data:')) return input; // already a URL, pass through
     const result = await new Promise<any>((resolve, reject) => {
       cloudinary.uploader.upload(input, uploadOptions, (err: any, res: any) => {
         if (err) reject(err);
         else resolve(res);
       });
     });
+    console.log('[uploadImage] Cloudinary upload OK — public_id:', result.public_id, 'url:', result.secure_url.slice(0, 80));
     return result.secure_url;
   }
 
+  // File/Blob input → convert to buffer, use upload_stream
   const buffer = await toBuffer(input);
   const result = await new Promise<any>((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(uploadOptions, (err: any, res: any) => {
@@ -161,6 +166,7 @@ async function uploadToCloudinary(
     });
     stream.end(buffer);
   });
+  console.log('[uploadImage] Cloudinary upload OK — public_id:', result.public_id, 'url:', result.secure_url.slice(0, 80));
   return result.secure_url;
 }
 
@@ -224,10 +230,14 @@ async function uploadToB2(
   const bucket = process.env.B2_BUCKET_NAME!;
   const publicUrlBase = process.env.B2_PUBLIC_URL_BASE!;
 
+  console.log('[uploadImage] B2 upload starting — namespace:', namespace, 'title:', title || '(none)');
+
+  // Normalize input to buffer + mime
   let buffer: Buffer;
   let mime: string;
   if (typeof input === 'string') {
-    if (!input.startsWith('data:')) return input;
+    if (!input.startsWith('data:')) return input; // already a URL, pass through
+    // Parse data URL: data:image/jpeg;base64,xxxx
     const match = input.match(/^data:([^;]+);base64,(.+)$/);
     if (!match) throw new Error('Invalid data URL');
     mime = match[1];
@@ -248,8 +258,12 @@ async function uploadToB2(
     ContentType: mime,
   }));
 
+  // Construct public URL: <B2_PUBLIC_URL_BASE>/pracpedia/<namespace>/<filename>
+  // B2_PUBLIC_URL_BASE should NOT have a trailing slash (we normalize it)
   const base = publicUrlBase.replace(/\/+$/, '');
-  return `${base}/${key}`;
+  const finalUrl = `${base}/${key}`;
+  console.log('[uploadImage] B2 upload OK — key:', key, 'url:', finalUrl.slice(0, 80));
+  return finalUrl;
 }
 
 async function deleteFromB2(url: string): Promise<void> {
