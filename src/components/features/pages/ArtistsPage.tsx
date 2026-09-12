@@ -1752,7 +1752,7 @@ export const ArtistsPage: React.FC<ArtistsPageProps> = ({ activeTheme }) => {
   /* ---------------------------------------------------------------------- */
 
   return (
-    <div className="text-slate-100 pb-6 select-none relative overflow-hidden bg-[#04060b]">
+    <div className="text-slate-100 pb-6 select-none relative overflow-hidden bg-[#04060b] rounded-2xl border border-white/6 shadow-2xl shadow-black/40">
       {/* Ambient glows */}
       <div className="absolute top-[3%] left-[10%] w-[45%] h-[28%] rounded-full bg-gradient-to-br from-amber-500/10 to-transparent blur-[140px] pointer-events-none" />
       <div className="absolute bottom-[8%] right-[12%] w-[40%] h-[30%] rounded-full bg-gradient-to-tr from-indigo-500/10 to-transparent blur-[140px] pointer-events-none" />

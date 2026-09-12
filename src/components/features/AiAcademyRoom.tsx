@@ -1201,7 +1201,7 @@ export const AiAcademyRoom: React.FC = () => {
 
           <h2 className="text-xl sm:text-2xl md:text-3xl xl:text-3.5xl font-sans font-black tracking-tight text-white leading-tight">
             {t('academyTitleMain')} <br />
-            <span className="bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400 text-transparent bg-clip-text filter drop-shadow-[0_0_15px_rgba(6,182,212,0.15)]">
+            <span className="bg-linear-to-r from-cyan-400 via-sky-300 to-indigo-400 text-transparent bg-clip-text filter drop-shadow-[0_0_15px_rgba(6,182,212,0.15)]">
               {t('academyTitleSub')}
             </span>
           </h2>
@@ -1245,7 +1245,7 @@ export const AiAcademyRoom: React.FC = () => {
           <div className="grid grid-cols-2 gap-1.5 bg-slate-900/60 p-1 rounded-xl">
             <button
               onClick={() => setCurriculum('NCTB')}
-              className={`px-3 sm:px-4 py-2 min-h-[36px] rounded-lg text-[10.5px] font-black uppercase tracking-wide transition-all cursor-pointer whitespace-nowrap text-center ${
+              className={`px-3 sm:px-4 py-2 min-h-9 rounded-lg text-[10.5px] font-black uppercase tracking-wide transition-all cursor-pointer whitespace-nowrap text-center ${
                 curriculum === 'NCTB' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -1253,7 +1253,7 @@ export const AiAcademyRoom: React.FC = () => {
             </button>
             <button
               onClick={() => setCurriculum('International')}
-              className={`px-3 sm:px-4 py-2 min-h-[36px] rounded-lg text-[10.5px] font-black uppercase tracking-wide transition-all cursor-pointer whitespace-nowrap text-center ${
+              className={`px-3 sm:px-4 py-2 min-h-9 rounded-lg text-[10.5px] font-black uppercase tracking-wide transition-all cursor-pointer whitespace-nowrap text-center ${
                 curriculum === 'International' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -1266,7 +1266,7 @@ export const AiAcademyRoom: React.FC = () => {
               <button
                 key={lvl}
                 onClick={() => setDifficulty(lvl)}
-                className={`py-1.5 min-h-[36px] rounded-lg text-[9.5px] font-bold uppercase tracking-wider transition-all cursor-pointer text-center ${
+                className={`py-1.5 min-h-9 rounded-lg text-[9.5px] font-bold uppercase tracking-wider transition-all cursor-pointer text-center ${
                   difficulty === lvl ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -1280,7 +1280,7 @@ export const AiAcademyRoom: React.FC = () => {
             <div className="flex gap-1 bg-slate-950 p-0.5 rounded-lg">
               <button
                 onClick={() => handleLanguageChange('en')}
-                className={`px-2 py-1 min-h-[32px] rounded text-[9.5px] font-bold tracking-normal transition-all cursor-pointer ${
+                className={`px-2 py-1 min-h-8 rounded text-[9.5px] font-bold tracking-normal transition-all cursor-pointer ${
                   aiLanguage === 'en' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -1288,7 +1288,7 @@ export const AiAcademyRoom: React.FC = () => {
               </button>
               <button
                 onClick={() => handleLanguageChange('bn_book')}
-                className={`px-2 py-1 min-h-[32px] rounded text-[9.5px] font-bold tracking-normal transition-all cursor-pointer ${
+                className={`px-2 py-1 min-h-8 rounded text-[9.5px] font-bold tracking-normal transition-all cursor-pointer ${
                   aiLanguage === 'bn_book' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -1302,7 +1302,7 @@ export const AiAcademyRoom: React.FC = () => {
       {/* ==============================================
           Google Account AI Credits Key Integration Banner
           ============================================== */}
-      <div className="bg-gradient-to-r from-blue-900/30 via-indigo-900/20 to-slate-900/60 border border-cyan-500/30 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl relative overflow-hidden backdrop-blur-sm mb-4">
+      <div className="bg-linear-to-r from-blue-900/30 via-indigo-900/20 to-slate-900/60 border border-cyan-500/30 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl relative overflow-hidden backdrop-blur-sm mb-4">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-5 relative z-10">
           <div className="space-y-2 text-left w-full min-w-0">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-[10px] font-mono font-bold uppercase tracking-wider">
@@ -1313,12 +1313,12 @@ export const AiAcademyRoom: React.FC = () => {
               {geminiApiKey ? (
                 <>
                   <span className="text-emerald-400">🟢</span>
-                  <span className="break-words">{language === 'bn' ? 'গুগল অ্যাকাউন্ট সংযুক্ত রয়েছে (অসীম ফ্রি এআই ক্রেডিট)' : 'Connected to Google Account (Unlimited AI Credits)'}</span>
+                  <span className="wrap-break-word">{language === 'bn' ? 'গুগল অ্যাকাউন্ট সংযুক্ত রয়েছে (অসীম ফ্রি এআই ক্রেডিট)' : 'Connected to Google Account (Unlimited AI Credits)'}</span>
                 </>
               ) : (
                 <>
                   <span className="text-cyan-400">🔑</span>
-                  <span className="break-words">{language === 'bn' ? 'আপনার গুগল অ্যাকাউন্ট সংযোগ করুন (নিজের জেমিনি এআই ক্রেডিট দিয়ে পড়ুন)' : 'Connect Your Google Account to Use Personal AI Credits'}</span>
+                  <span className="wrap-break-word">{language === 'bn' ? 'আপনার গুগল অ্যাকাউন্ট সংযোগ করুন (নিজের জেমিনি এআই ক্রেডিট দিয়ে পড়ুন)' : 'Connect Your Google Account to Use Personal AI Credits'}</span>
                 </>
               )}
             </h3>
@@ -1339,13 +1339,13 @@ export const AiAcademyRoom: React.FC = () => {
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => setIsKeyModalOpen(true)}
-                  className="flex-1 sm:flex-none min-h-[44px] bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 px-4 py-2.5 rounded-2xl text-xs font-bold cursor-pointer transition-all"
+                  className="flex-1 sm:flex-none min-h-11 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 px-4 py-2.5 rounded-2xl text-xs font-bold cursor-pointer transition-all"
                 >
                   {language === 'bn' ? 'কি পরিবর্তন করুন' : 'Change Key'}
                 </button>
                 <button
                   onClick={handleDisconnectGoogleKey}
-                  className="flex-1 sm:flex-none min-h-[44px] bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 px-4 py-2.5 rounded-2xl text-xs font-bold cursor-pointer transition-all"
+                  className="flex-1 sm:flex-none min-h-11 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 px-4 py-2.5 rounded-2xl text-xs font-bold cursor-pointer transition-all"
                 >
                   {language === 'bn' ? 'সংযোগ বিচ্ছিন্ন করুন' : 'Disconnect'}
                 </button>
@@ -1574,7 +1574,7 @@ export const AiAcademyRoom: React.FC = () => {
                     {/* Chapter Header Button */}
                     <button
                       onClick={() => setActiveChapterIndex(isOpen ? null : cIdx)}
-                      className="w-full flex items-center justify-between p-3 min-h-[44px] text-left transition-all cursor-pointer font-sans"
+                      className="w-full flex items-center justify-between p-3 min-h-11 text-left transition-all cursor-pointer font-sans"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <BookMarked className={`w-4 h-4 shrink-0 ${isOpen ? 'text-cyan-400 animate-pulse' : 'text-slate-500'}`} />

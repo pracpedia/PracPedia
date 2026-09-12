@@ -443,7 +443,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
     <div
       id="classroom-chat-root"
       className="
-        w-full min-h-197.5 lg:h-[calc(100vh-180px)]
+        w-full min-h-[500px] lg:h-[calc(100vh-180px)]
         flex flex-col lg:flex-row
         rounded-3xl border border-white/6
         bg-slate-950/40 overflow-hidden
