@@ -96,9 +96,13 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
   const [hireRequests, setHireRequests] = useState<HireRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  // Rating state: per-booking draft + submission tracking
+  const [ratingDrafts, setRatingDrafts] = useState<Record<string, { stars: number; review: string }>>({});
+  const [submittingRatingId, setSubmittingRatingId] = useState<string | null>(null);
 
   const isSuperAdmin = user?.role === 'super_admin';
   const isAdmin = user?.role === 'admin' || isSuperAdmin;
@@ -185,10 +189,70 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
       setHireRequests((prev) =>
         prev.map((h) => (h.id === hireId ? { ...h, status: newStatus } : h)),
       );
-    } catch (e: any) {
+     } catch (e: any) {
       setError(e?.message || 'Failed to update hire request');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  // ── Rating helpers ────────────────────────────────────────────────────────
+  // The backend stores ratings as markers in artistNotes:
+  //   [Rating: 4/5 — "Optional review text"]
+  // We parse this to detect "already rated" + to display the submitted rating.
+
+  /**
+   * Extract the rating marker from a booking's artistNotes.
+   * Returns { stars, review } or null if no rating has been submitted.
+   */
+  const extractRatingMarker = (notes: string | null): { stars: number; review: string } | null => {
+    if (!notes) return null;
+    // Match: [Rating: 4/5 — "review text"]  OR  [Rating: 4/5]
+    const match = notes.match(/\[Rating:\s*(\d)\/5(?:\s*—\s*"([^"]*)")?\]/);
+    if (!match) return null;
+    return {
+      stars: Math.max(1, Math.min(5, parseInt(match[1], 10) || 5)),
+      review: match[2] || '',
+    };
+  };
+
+  /**
+   * Submit a rating for a completed booking.
+   * Calls POST /api/bookings/[id]/rate with { rating, review }.
+   * On success, refreshes the bookings list so the artist's avg rating updates.
+   */
+  const submitRating = async (bookingId: string) => {
+    const draft = ratingDrafts[bookingId];
+    if (!draft || draft.stars < 1 || draft.stars > 5) {
+      setError('Please select a star rating (1-5).');
+      return;
+    }
+    setSubmittingRatingId(bookingId);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await apiFetch(`/api/bookings/${bookingId}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: draft.stars, review: draft.review.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setSuccess(`Thanks! You rated this artist ${draft.stars} star${draft.stars === 1 ? '' : 's'}.`);
+      // Clear the draft for this booking
+      setRatingDrafts((prev) => {
+        const next = { ...prev };
+        delete next[bookingId];
+        return next;
+      });
+      // Refresh bookings so the artist's avg rating + the marker appear
+      await fetchBookings();
+    } catch (e: any) {
+      setError(e?.message || 'Could not submit rating.');
+    } finally {
+      setSubmittingRatingId(null);
     }
   };
 
@@ -450,7 +514,7 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
           </div>
         )}
 
-        {/* Completed/cancelled — show step label */}
+                {/* Completed/cancelled — show step label */}
         {(b.status === 'completed' || b.status === 'cancelled') && (
           <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-[10px] font-mono text-slate-500">
             <span>
@@ -463,6 +527,112 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
             )}
           </div>
         )}
+
+        {/* ── Client rating widget (only for completed bookings, only for the client) ── */}
+        {isClient && b.status === 'completed' && (() => {
+          const existing = extractRatingMarker(b.artistNotes);
+          const draft = ratingDrafts[b.id] || { stars: 0, review: '' };
+          const isSubmitting = submittingRatingId === b.id;
+
+          // Already rated — show the submitted rating (read-only)
+          if (existing) {
+            return (
+              <div className="mt-2 p-3 rounded-xl bg-amber-500/[0.04] border border-amber-500/15">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-amber-400" /> Your Rating
+                  </span>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Star
+                        key={n}
+                        className={`w-3.5 h-3.5 ${n <= existing.stars ? 'fill-amber-400 text-amber-400' : 'text-slate-600'}`}
+                      />
+                    ))}
+                    <span className="ml-1 text-[10px] font-mono text-amber-300 font-bold">{existing.stars}/5</span>
+                  </div>
+                </div>
+                {existing.review && (
+                  <p className="text-[11px] text-slate-400 italic leading-relaxed">"{existing.review}"</p>
+                )}
+              </div>
+            );
+          }
+
+          // Not yet rated — show the star picker + review input
+          return (
+            <div className="mt-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1">
+                  <Star className="w-3 h-3 text-amber-400" /> Rate this artist
+                </span>
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => {
+                        setRatingDrafts((prev) => ({
+                          ...prev,
+                          [b.id]: { ...(prev[b.id] || { stars: 0, review: '' }), stars: n },
+                        }));
+                      }}
+                      className={`p-0.5 transition-transform ${isSubmitting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:scale-110 active:scale-95'}`}
+                      title={`${n} star${n === 1 ? '' : 's'}`}
+                      aria-label={`Rate ${n} star${n === 1 ? '' : 's'}`}
+                    >
+                      <Star
+                        className={`w-5 h-5 transition-colors ${n <= draft.stars ? 'fill-amber-400 text-amber-400' : 'text-slate-600 hover:text-amber-500/50'}`}
+                      />
+                    </button>
+                  ))}
+                  {draft.stars > 0 && (
+                    <span className="ml-1 text-[10px] font-mono text-amber-300 font-bold">{draft.stars}/5</span>
+                  )}
+                </div>
+              </div>
+
+              <textarea
+                value={draft.review}
+                onChange={(e) => {
+                  setRatingDrafts((prev) => ({
+                    ...prev,
+                    [b.id]: { ...(prev[b.id] || { stars: 0, review: '' }), review: e.target.value.slice(0, 500) },
+                  }));
+                }}
+                disabled={isSubmitting}
+                rows={2}
+                placeholder="Optional: write a short review of your experience working with this artist…"
+                className="w-full bg-slate-950/60 border border-white/[0.06] focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/20 rounded-lg px-3 py-2 text-[11px] text-slate-200 placeholder:text-slate-600 outline-none resize-none leading-relaxed disabled:opacity-50"
+              />
+
+              <div className="flex items-center justify-between mt-2 gap-2">
+                <span className="text-[9px] font-mono text-slate-500">
+                  {draft.review.length}/500 chars
+                </span>
+                <button
+                  type="button"
+                  disabled={isSubmitting || draft.stars < 1}
+                  onClick={() => void submitRating(b.id)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-200 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Submitting…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Star className="w-3 h-3" />
+                      <span>Submit Rating</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -563,11 +733,22 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
       </div>
 
       {/* Error */}
-      {error && (
+            {error && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
           <button onClick={() => setError(null)} className="ml-auto text-rose-400 hover:text-rose-300">
+            <XCircle className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Success toast (for rating submissions etc.) */}
+      {success && (
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {success}
+          <button onClick={() => setSuccess(null)} className="ml-auto text-emerald-400 hover:text-emerald-300">
             <XCircle className="w-4 h-4" />
           </button>
         </div>

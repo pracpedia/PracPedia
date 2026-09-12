@@ -280,7 +280,7 @@ const StatTile: React.FC<StatTileProps> = ({
     initial={{ opacity: 0, y: 8 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.25 }}
-    className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-slate-900/40 p-4 sm:p-5 backdrop-blur-sm"
+    className="relative overflow-hidden rounded-2xl border border-white/6 bg-slate-900/40 p-4 sm:p-5 backdrop-blur-sm"
   >
     <div className="flex items-center justify-between gap-3">
       <span className="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest text-slate-400 font-bold">
@@ -305,7 +305,7 @@ const SectionTitle: React.FC<{
 }> = ({ icon: Icon, title, sub, action }) => (
   <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
     <div className="flex items-center gap-3 min-w-0">
-      <div className="p-2 rounded-xl border border-white/[0.08] bg-white/[0.02] text-slate-200 shrink-0">
+      <div className="p-2 rounded-xl border border-white/8 bg-white/2 text-slate-200 shrink-0">
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0">
@@ -331,9 +331,9 @@ const EmptyState: React.FC<{
   <motion.div
     initial={{ opacity: 0, y: 8 }}
     animate={{ opacity: 1, y: 0 }}
-    className="rounded-2xl border border-dashed border-white/[0.08] bg-slate-900/30 px-6 py-12 sm:py-16 flex flex-col items-center text-center"
+    className="rounded-2xl border border-dashed border-white/8 bg-slate-900/30 px-6 py-12 sm:py-16 flex flex-col items-center text-center"
   >
-    <div className="p-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] text-slate-500">
+    <div className="p-3 rounded-2xl border border-white/8 bg-white/8 text-slate-500">
       <Icon className="w-7 h-7" />
     </div>
     <h3 className="mt-4 text-sm font-bold text-slate-300">{title}</h3>
@@ -348,7 +348,7 @@ const OrdersSkeleton: React.FC = () => (
     {Array.from({ length: 3 }).map((_, i) => (
       <div
         key={i}
-        className="rounded-2xl border border-white/[0.06] bg-slate-900/40 p-4 sm:p-5 flex flex-col gap-3"
+        className="rounded-2xl border border-white/8 bg-slate-900/40 p-4 sm:p-5 flex flex-col gap-3"
       >
         <div className="flex items-center gap-3">
           <Skeleton className="w-10 h-10 rounded-full" />
