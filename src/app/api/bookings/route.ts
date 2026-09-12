@@ -3,6 +3,7 @@ import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { logActivity } from '@/lib/activity-log';
+import { sendOrderPlacedEmails } from '@/lib/email';
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,8 +117,30 @@ export async function POST(request: NextRequest) {
         subject,
         price,
       },
-      request,
+            request,
     });
+
+    // ── Send transactional emails (fire-and-forget, non-blocking) ──
+    const client = await db.user.findUnique({
+      where: { id: payload.userId },
+      select: { name: true, email: true },
+    });
+    if (client?.email && artist.email) {
+      void sendOrderPlacedEmails({
+        bookingId: booking.id,
+        serviceType: svc,
+        notebookProvider: np,
+        subject: String(subject),
+        description: String(description),
+        price,
+        clientName: client.name,
+        clientEmail: client.email,
+        artistName: artist.name,
+        artistEmail: artist.email,
+        artistRating: artist.rating,
+        appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://pracpedia.vercel.app',
+      }).catch((e) => console.error('[email] order_placed send failed:', e));
+    }
 
     return NextResponse.json({
       ...booking,

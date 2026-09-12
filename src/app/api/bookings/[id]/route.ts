@@ -3,6 +3,7 @@ import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { logActivity } from '@/lib/activity-log';
+import { sendOrderAcceptedEmail, sendOrderDeliveredEmail } from '@/lib/email';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -145,9 +146,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       // Fetch client + artist names for the log
       const client = await db.user.findUnique({ where: { id: booking.clientId }, select: { name: true, email: true } });
-      const artist = await db.user.findUnique({ where: { id: booking.artistId }, select: { name: true } });
+            const artist = await db.user.findUnique({ where: { id: booking.artistId }, select: { name: true, email: true } });
 
-      await logActivity({
+           await logActivity({
         userId: payload.userId,
         userName: payload.email,
         userRole: payload.role,
@@ -157,6 +158,31 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         metadata: { bookingId: id, newStatus, paymentStatus, commissionPercent, price: booking.price },
         request,
       }).catch(() => {}); // non-blocking
+
+      // ── Send transactional emails based on the new status ──
+      const emailContext = {
+        bookingId: booking.id,
+        serviceType: booking.serviceType,
+        notebookProvider: booking.notebookProvider,
+        subject: booking.subject,
+        description: booking.description,
+        price: booking.price,
+        clientName: client?.name || 'Client',
+        clientEmail: client?.email || '',
+        artistName: artist?.name || 'Artist',
+        artistEmail: artist?.email || '',
+        appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://pracpedia.vercel.app',
+      };
+
+      if (newStatus === 'in_progress' && client?.email) {
+        void sendOrderAcceptedEmail(emailContext).catch((e) =>
+          console.error('[email] order_accepted send failed:', e)
+        );
+      } else if (newStatus === 'completed' && client?.email) {
+        void sendOrderDeliveredEmail(emailContext).catch((e) =>
+          console.error('[email] order_delivered send failed:', e)
+        );
+      }
     }
 
     return NextResponse.json({
