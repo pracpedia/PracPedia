@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { safeJsonParseArray } from '@/lib/json';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
+import { withRetry } from '@/lib/db-retry';
 
 /**
  * POST /api/bookings/[id]/rate
@@ -15,12 +16,27 @@ import { getUserFromRequest } from '@/lib/auth';
  *   - Only completed bookings can be rated
  *   - Rating is stored as a marker in `artistNotes`:
  *     `[Rating: 4/5 — "Optional review text"]`
- *   - The artist's average `rating` is recalculated from all their completed
- *     bookings that have the marker.
+ *   - The artist's `rating` is recalculated using a BAYESIAN AVERAGE (see below).
  *
- * The marker-in-artistNotes approach is a pragmatic choice for SQLite (no
- * schema migration needed). On Postgres, you'd add a dedicated `ratings`
- * table with foreign keys.
+ * ── Bayesian Average ──────────────────────────────────────────────────────
+ * Unlike a simple mean, the Bayesian average pulls artists with few ratings
+ * toward the global mean. This prevents a new artist with one 5-star review
+ * from outranking a veteran with 100 4.8-star reviews.
+ *
+ * Formula:
+ *   bayesianRating = (C × m + Σratings) / (m + N)
+ *
+ * Where:
+ *   C = global average rating across ALL rated bookings on the platform
+ *   m = minimum ratings needed to "trust" an artist's own average (prior strength)
+ *   Σratings = sum of this artist's ratings
+ *   N = number of this artist's ratings
+ *
+ * Example (C=4.2, m=3):
+ *   New artist, 1 rating of 5: (4.2×3 + 5) / (3+1) = 4.40
+ *   Veteran, 100 ratings avg 4.8: (4.2×3 + 480) / (3+100) = 4.80
+ *
+ * The veteran now correctly ranks higher than the newcomer.
  */
 export async function POST(
   request: NextRequest,
@@ -35,7 +51,7 @@ export async function POST(
     const rating = Math.max(1, Math.min(5, Number(body.rating) || 5));
     const review = body.review ? String(body.review).slice(0, 500) : null;
 
-    const booking = await db.booking.findUnique({ where: { id } });
+    const booking = await withRetry(() => db.booking.findUnique({ where: { id } }));
     if (!booking) return NextResponse.json({ error: 'Booking not found.' }, { status: 404 });
 
     // Only the client can rate
@@ -58,35 +74,76 @@ export async function POST(
     const marker = `[Rating: ${rating}/5${review ? ` — "${review}"` : ''}]`;
     const newArtistNotes = `${booking.artistNotes || ''}\n${marker}`.trim();
 
-    await db.booking.update({
-      where: { id },
-      data: { artistNotes: newArtistNotes },
-    });
+    await withRetry(() =>
+      db.booking.update({
+        where: { id },
+        data: { artistNotes: newArtistNotes },
+      })
+    );
 
-    // Recalculate the artist's average rating from all completed bookings
-    const allBookings = await db.booking.findMany({
-      where: { artistId: booking.artistId, status: 'completed' },
-      select: { artistNotes: true },
-    });
+    // ── Fetch ALL completed bookings with ratings for this artist ────────────
+    const artistBookings = await withRetry(() =>
+      db.booking.findMany({
+        where: { artistId: booking.artistId, status: 'completed' },
+        select: { artistNotes: true },
+      })
+    );
 
-    const ratings: number[] = [];
-    for (const b of allBookings) {
+    const artistRatings: number[] = [];
+    for (const b of artistBookings) {
       const match = b.artistNotes?.match(/\[Rating:\s*(\d)/);
-      if (match) ratings.push(Number(match[1]));
+      if (match) artistRatings.push(Number(match[1]));
     }
 
-    const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 5.0;
+    // ── Compute Bayesian average ────────────────────────────────────────────
+    // m = prior strength (how many ratings needed to "trust" the artist's own avg)
+    const m = 3;
+    // C = global average rating across ALL rated bookings on the platform.
+    // Computed dynamically so it stays accurate as the platform grows.
+    let C = 4.2; // sensible default if the platform has no ratings yet
+    try {
+      const allRatedBookings = await withRetry(() =>
+        db.booking.findMany({
+          where: { status: 'completed' },
+          select: { artistNotes: true },
+        })
+      );
+      const allRatings: number[] = [];
+      for (const b of allRatedBookings) {
+        const match = b.artistNotes?.match(/\[Rating:\s*(\d)/);
+        if (match) allRatings.push(Number(match[1]));
+      }
+      if (allRatings.length > 0) {
+        C = allRatings.reduce((a, b) => a + b, 0) / allRatings.length;
+      }
+    } catch (err) {
+      // If the global query fails, fall back to the default C — non-fatal
+      console.warn('[rate] Could not compute global average, using default C=4.2:', err);
+    }
 
-    await db.user.update({
-      where: { id: booking.artistId },
-      data: { rating: Math.round(avgRating * 10) / 10 },
-    });
+    const N = artistRatings.length;
+    const sumRatings = artistRatings.reduce((a, b) => a + b, 0);
+    const bayesianRating = (C * m + sumRatings) / (m + N);
+
+    // Round to 1 decimal place (e.g., 4.4, 4.7, 5.0)
+    const finalRating = Math.round(bayesianRating * 10) / 10;
+
+    await withRetry(() =>
+      db.user.update({
+        where: { id: booking.artistId },
+        data: { rating: finalRating },
+      })
+    );
 
     return NextResponse.json({
       success: true,
       rating,
-      avgRating: Math.round(avgRating * 10) / 10,
-      totalRatings: ratings.length,
+      avgRating: finalRating,
+      rawAvg: N > 0 ? Math.round((sumRatings / N) * 10) / 10 : 0,
+      bayesianRating: finalRating,
+      totalRatings: N,
+      globalAverage: Math.round(C * 100) / 100,
+      priorStrength: m,
     });
   } catch (err: any) {
     console.error('POST /api/bookings/[id]/rate error:', err);
