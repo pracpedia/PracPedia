@@ -1275,7 +1275,7 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <div className="min-w-0">
                       <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight wrap-break-word"><h2 className="text-xl sm:text-2xl font-black text-white tracking-tight break-words">Practical Notebook Gallery</h2></h2>
-                      <p className="text-xs text-slate-400 mt-1">Select from five premium subject areas to access specific experiment galleries.</p>
+                      <p className="text-xs text-slate-400 mt-1">Select from five subject areas to access specific experiment galleries.</p>
                     </div>
 
                     {/* Quick Search */}
