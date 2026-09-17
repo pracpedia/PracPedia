@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Logo } from '@/components/features/Logo';
 import {
@@ -24,6 +24,8 @@ import {
   Atom,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { safeLocalStorage } from '@/lib/storage';
+
 
 interface AuthPageProps {
   onSuccess: () => void;
@@ -54,8 +56,59 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
   };
 
   // Custom 2-way Auth Segment Choice: 'student' | 'artist'
-  const [authType, setAuthType] = useState<'student' | 'artist'>('student');
+    const [authType, setAuthType] = useState<'student' | 'artist'>('student');
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
+
+     // ── Assistant invite handling ──
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteData, setInviteData] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const code = safeLocalStorage.getItem('pp_invite_code');
+    if (!code) return;
+
+    setInviteCode(code);
+    setAuthType('artist');
+    setIsLogin(false); // invite = always signup
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/assistants/invite/${encodeURIComponent(code)}`);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.valid && data.invite) {
+          setInviteData(data.invite);
+
+          if (data.invite.inviteeName) {
+            setName(data.invite.inviteeName);
+          }
+
+          // Smart routing based on inviteeEmail:
+          if (data.invite.inviteeEmail && data.invite.inviteeEmail.includes('@')) {
+            const email = data.invite.inviteeEmail;
+
+            if (isGmailAddress(email)) {
+              // Gmail → pre-fill Google modal + auto-open after 800ms
+              setGoogleEmailInput(email);
+              if (data.invite.inviteeName) {
+                setGoogleNameInput(data.invite.inviteeName);
+              }
+              setTimeout(() => setIsGoogleModalOpen(true), 800);
+            } else {
+              // Non-Gmail → pre-fill the standard form
+              setEmail(email);
+            }
+          }
+        } else {
+          safeLocalStorage.removeItem('pp_invite_code');
+          setInviteCode(null);
+          if (data.error) setErrorMsg(data.error);
+        }
+      } catch {
+        // network error — silently ignore
+      }
+    })();
+  }, []);
 
   // Standard Fields
   const [name, setName] = useState('');
@@ -130,7 +183,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
 
   const passScore = getPasswordStrength(password);
 
-  const handleSelectGoogleAccount = async (accEmail: string, accName?: string, accAvatar?: string, accPassword?: string) => {
+    const handleSelectGoogleAccount = async (accEmail: string, accName?: string, accAvatar?: string, accPassword?: string) => {
     if (!accEmail) return;
     const cleanEmail = accEmail.trim();
 
@@ -141,12 +194,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
       return;
     }
 
-        setGoogleModalLoading(true);
+    setGoogleModalLoading(true);
     setGoogleModalError(null);
 
     try {
-      // Build artist-specific payload (mirrors the standard /api/artists/register body)
-      const artistPayload = authType === 'artist' ? {
+      // Build artist-specific payload, BUT skip rate/bio/specialties if
+      // this is an assistant invite signup.
+      const isAssistantInvite = !!inviteCode;
+      const artistPayload = (authType === 'artist' && !isAssistantInvite) ? {
         phoneNumber: phoneNumber.trim() || undefined,
         bio: artistBio || undefined,
         rateDrawingOnly: Number(artistRate) || 150,
@@ -167,6 +222,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
           password: accPassword || googlePasswordInput || 'google-pass-123',
           isSignup: !isLogin,  // true when in sign-up mode, false when in login mode
           ...artistPayload,
+          // Pass invite code if present — backend will set parentArtistId
+          inviteCode: inviteCode || undefined,
         }),
       });
 
@@ -176,7 +233,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
         throw new Error(data.error || 'Google authentication failed.');
       }
 
-      if (data.token && data.user) {
+            if (data.token && data.user) {
+        // Clear the invite code from localStorage — it's been used
+        if (inviteCode) {
+          safeLocalStorage.removeItem('pp_invite_code');
+        }
         setIsGoogleModalOpen(false);
         login(data.token, data.user);
         onSuccess();
@@ -239,7 +300,40 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
       } finally {
         setLoading(false);
       }
-    } else {
+        } else {
+      // ── Assistant registration via invite code ──
+      if (inviteCode && inviteData) {
+        try {
+          const regRes = await apiFetch('/api/assistants/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: inviteCode,
+              name: name.trim(),
+              email: email.trim().toLowerCase(),
+              password,
+              phone: phoneNumber.trim() || undefined,
+            }),
+          });
+          const regData = await safeJson(regRes);
+          if (!regRes.ok) {
+            throw new Error(regData.error || 'Assistant registration failed.');
+          }
+          if (regData.token && regData.user) {
+            safeLocalStorage.removeItem('pp_invite_code');
+            login(regData.token, regData.user);
+            onSuccess();
+          } else {
+            throw new Error('Invalid assistant registration response.');
+          }
+        } catch (err: any) {
+          setErrorMsg(err.message || 'Error creating assistant account.');
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
       // Direct Signup pathway — non-Gmail emails (or platform owner bypass)
       try {
         const endpoint = authType === 'artist' ? '/api/artists/register' : '/api/auth/register';
@@ -315,15 +409,50 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
             <div className="absolute top-0 left-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="space-y-6 relative z-10">
+                        <div className="space-y-6 relative z-10">
+              {/* Assistant invite banner */}
+              {inviteCode && inviteData && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 rounded-2xl bg-cyan-500/[0.06] border border-cyan-500/25 space-y-2"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-cyan-200">You're invited as an assistant</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                        <strong className="text-amber-300">{inviteData.parentArtist?.name}</strong> has invited you to join their team.
+                        Default split: <strong className="text-cyan-300">{inviteData.defaultSplitPercent}%</strong> per task.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm('Cancel the assistant invitation?')) {
+                        safeLocalStorage.removeItem('pp_invite_code');
+                        setInviteCode(null);
+                        setInviteData(null);
+                        setEmail('');
+                        setName('');
+                      }
+                    }}
+                    className="text-[10px] text-slate-500 hover:text-rose-300 underline cursor-pointer"
+                  >
+                    Not now — sign up as a regular account
+                  </button>
+                </motion.div>
+              )}
+
               {/* Rabbi Zidni Ilma Spiritual Blessing */}
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className="p-5 rounded-2xl bg-gradient-to-b from-indigo-950/40 via-slate-950/70 to-slate-950/40 border border-indigo-500/20 shadow-lg text-center space-y-2 relative overflow-hidden group"
+                className="p-5 rounded-2xl bg-linear-to-b from-indigo-950/40 via-slate-950/70 to-slate-950/40 border border-indigo-500/20 shadow-lg text-center space-y-2 relative overflow-hidden group"
               >
-                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-400/40 to-transparent" />
+                <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-indigo-400/40 to-transparent" />
                 <div className="text-2xl font-serif text-amber-200/95 font-semibold tracking-wider leading-relaxed filter drop-shadow-[0_0_10px_rgba(251,191,36,0.25)]">
                   رَبِّ زِدْنِي عِلْمًا
                 </div>
@@ -428,8 +557,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                     }}
                     className={`relative flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 cursor-pointer text-xs font-bold min-h-[44px] ${
                       authType === 'student'
-                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/20 border border-indigo-400/30'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
+                        ? 'bg-linear-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/20 border border-indigo-400/30'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/2'
                     }`}
                   >
                     <GraduationCap className={`w-4 h-4 shrink-0 ${authType === 'student' ? 'text-amber-300' : 'text-slate-400'}`} />
@@ -446,7 +575,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                     className={`relative flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all duration-200 cursor-pointer text-xs font-bold min-h-[44px] ${
                       authType === 'artist'
                         ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20 border border-amber-300/40'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/2'
                     }`}
                   >
                     <Paintbrush className="w-4 h-4 shrink-0" />
@@ -711,9 +840,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                   </div>
                 )}
 
-                {/* 5. Artist Custom Registration Fields */}
-                {!isLogin && authType === 'artist' && (
-                  <div className="space-y-3 p-4 bg-amber-500/[0.03] rounded-2xl border border-amber-500/15 animate-in fade-in slide-in-from-top-2 duration-300">
+                                {/* 5. Artist Custom Registration Fields
+                    Hidden for assistant invite signups */}
+                {!isLogin && authType === 'artist' && !inviteCode && (
+                  <div className="space-y-3 p-4 bg-amber-500/3 rounded-2xl border border-amber-500/15 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="text-[10px] uppercase font-mono font-bold tracking-widest text-amber-400 pb-1.5 border-b border-white/[0.06] flex items-center justify-between gap-2 flex-wrap">
                       <span className="flex items-center gap-1.5">
                         <Paintbrush className="w-3.5 h-3.5 shrink-0" /> Illustrator Parameters
@@ -1068,10 +1198,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onGoBack, initial
                   </div>
                 )}
 
-                {/* Illustrator Parameters — shown only in signup mode AND artist role */}
-                {!isLogin && authType === 'artist' && (
-                  <div className="space-y-3 p-4 bg-amber-500/[0.03] rounded-2xl border border-amber-500/15">
-                    <div className="text-[10px] uppercase font-mono font-bold tracking-widest text-amber-400 pb-1.5 border-b border-white/[0.06] flex items-center justify-between gap-2 flex-wrap">
+                                {/* Illustrator Parameters — hidden for assistant invite signups */}
+                {!isLogin && authType === 'artist' && !inviteCode && (
+                  <div className="space-y-3 p-4 bg-amber-500/3 rounded-2xl border border-amber-500/15">
+                    <div className="text-[10px] uppercase font-mono font-bold tracking-widest text-amber-400 pb-1.5 border-b border-white/6 flex items-center justify-between gap-2 flex-wrap">
                       <span className="flex items-center gap-1.5">
                         <Paintbrush className="w-3.5 h-3.5 shrink-0" /> Illustrator Parameters
                       </span>

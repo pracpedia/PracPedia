@@ -22,6 +22,9 @@ export interface UserType {
   isAvailable?: boolean;
   rating?: number;
   completedOrders?: number;
+  parentArtistId?: string | null;
+  assistantEarnings?: number;
+  assistantCompletedOrders?: number;
 }
 
 export interface AuthContextProps {

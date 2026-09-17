@@ -47,6 +47,48 @@ export async function PUT(request: NextRequest) {
       if (isAvailable !== undefined) updateData.isAvailable = Boolean(isAvailable);
     }
 
+        // ── Assistant graduation: assistant → independent artist ──
+    if (body.graduateToIndependent === true && u.parentArtistId) {
+      if (!body.rateDrawingOnly || !body.rateDrawingWriting) {
+        return NextResponse.json({
+          error: 'Please set your drawing rates before becoming an independent artist.'
+        }, { status: 400 });
+      }
+      updateData.parentArtistId = null;
+      updateData.rateDrawingOnly = Math.max(50, Math.min(2000, Number(body.rateDrawingOnly) || 150));
+      updateData.rateDrawingWriting = Math.max(100, Math.min(4000, Number(body.rateDrawingWriting) || 300));
+      updateData.notebookCost = Number(body.notebookCost) || 100;
+      if (body.specialties) {
+        const arr = Array.isArray(body.specialties)
+          ? body.specialties
+          : String(body.specialties).split(',').map((s: string) => s.trim()).filter(Boolean);
+        updateData.specialtiesJson = JSON.stringify(arr);
+      }
+      if (body.bio) updateData.bio = String(body.bio);
+      updateData.isAvailable = true;
+    }
+
+    // ── Student → Artist conversion ──
+    if (body.becomeArtist === true && u.role === 'user') {
+      if (!body.rateDrawingOnly || !body.rateDrawingWriting) {
+        return NextResponse.json({
+          error: 'Please set your drawing rates to become an artist.'
+        }, { status: 400 });
+      }
+      updateData.role = 'artist';
+      updateData.rateDrawingOnly = Math.max(50, Math.min(2000, Number(body.rateDrawingOnly) || 150));
+      updateData.rateDrawingWriting = Math.max(100, Math.min(4000, Number(body.rateDrawingWriting) || 300));
+      updateData.notebookCost = Number(body.notebookCost) || 100;
+      if (body.specialties) {
+        const arr = Array.isArray(body.specialties)
+          ? body.specialties
+          : String(body.specialties).split(',').map((s: string) => s.trim()).filter(Boolean);
+        updateData.specialtiesJson = JSON.stringify(arr);
+      }
+      if (body.bio) updateData.bio = String(body.bio);
+      updateData.isAvailable = true;
+    }
+
     const updated = await db.user.update({ where: { id: u.id }, data: updateData });
     const newToken = await signToken({ userId: updated.id, email: updated.email, role: updated.role });
     return NextResponse.json({ token: newToken, user: serializeUser(updated) });

@@ -24,6 +24,9 @@ export interface SerializedUser {
   isAvailable: boolean;
   rating: number;
   completedOrders: number;
+  parentArtistId: string | null;
+  assistantEarnings: number;
+  assistantCompletedOrders: number;
 }
 
 export function serializeUser(u: User): SerializedUser {
@@ -65,5 +68,8 @@ export function serializeUser(u: User): SerializedUser {
     isAvailable: u.isAvailable,
     rating: u.rating,
     completedOrders: u.completedOrders,
+    parentArtistId: u.parentArtistId || null,
+    assistantEarnings: u.assistantEarnings || 0,
+    assistantCompletedOrders: u.assistantCompletedOrders || 0,
   };
 }

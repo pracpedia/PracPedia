@@ -17,7 +17,8 @@ import {
   GraduationCap,
   Palette,
   Key,
-  Calendar
+  Calendar,
+  Briefcase,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -349,8 +350,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="truncate">{t('editProfile')}</span>
             </button>
 
-            {/* Marketplace — Drawing practicals marketplace (visible to non-artists) */}
-            {user?.role !== 'artist' && (
+                       {/* Marketplace — visible to regular users AND assistants (they can browse) */}
+            {(user?.role !== 'artist' || user?.parentArtistId) && (
               <button
                 onClick={() => handleNav('artists')}
                 className={`
@@ -368,21 +369,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
 
-            {/* Artist Dashboard — dedicated order & portfolio management (visible to artists) */}
-            {user?.role === 'artist' && (
+               {/* Artist Dashboard — visible to artists who have set their rates (rateDrawingOnly > 0).
+    This includes independent artists AND assistants who graduated. */}
+{user?.role === 'artist' && (user?.rateDrawingOnly || 0) > 0 && (
+  <button
+    onClick={() => handleNav('artist_dashboard')}
+    className={`
+      w-full flex items-center gap-3 px-3.5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold tracking-wide
+      transition-all duration-200 group border text-left cursor-pointer
+      ${currentView === 'artist_dashboard'
+        ? 'bg-amber-500/10 border-amber-500/20 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
+        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02] border-transparent'}
+    `}
+  >
+    <Palette className={`w-4 h-4 transition-transform group-hover:scale-110 shrink-0 ${currentView === 'artist_dashboard' ? 'text-amber-400' : 'text-slate-500'}`} />
+    <span className="truncate">
+      {language === 'en' ? 'Artist Dashboard' : 'আর্টিস্ট ড্যাশবোর্ড'}
+    </span>
+  </button>
+)}
+
+            {/* Assistant Studio — visible only to assistants (parentArtistId is set) */}
+            {user?.role === 'artist' && user?.parentArtistId && (
               <button
-                onClick={() => handleNav('artist_dashboard')}
+                onClick={() => handleNav('assistant_dashboard')}
                 className={`
                   w-full flex items-center gap-3 px-3.5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold tracking-wide
                   transition-all duration-200 group border text-left cursor-pointer
-                  ${currentView === 'artist_dashboard'
-                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
+                  ${currentView === 'assistant_dashboard'
+                    ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-300 font-bold shadow-lg shadow-cyan-500/5'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02] border-transparent'}
                 `}
               >
-                <Palette className={`w-4 h-4 transition-transform group-hover:scale-110 shrink-0 ${currentView === 'artist_dashboard' ? 'text-amber-400' : 'text-slate-500'}`} />
+                <Briefcase className={`w-4 h-4 transition-transform group-hover:scale-110 shrink-0 ${currentView === 'assistant_dashboard' ? 'text-cyan-400' : 'text-slate-500'}`} />
                 <span className="truncate">
-                  {language === 'en' ? 'Artist Dashboard' : 'আর্টিস্ট ড্যাশবোর্ড'}
+                  {language === 'en' ? 'Assistant Studio' : 'অ্যাসিস্ট্যান্ট স্টুডিও'}
                 </span>
               </button>
             )}

@@ -1,13 +1,11 @@
 /**
- * Resend email integration — transactional emails for booking lifecycle.
- *
- * Free tier: 100 emails/day, 3000/month — plenty for PracPedia's volume.
- * Signup: https://resend.com
+ * Brevo email integration — transactional emails for booking lifecycle.
+ * Free tier: 300 emails/day, no card required. Signup: https://www.brevo.com
  */
 
-const RESEND_API_URL = 'https://api.resend.com/emails';
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
-interface ResendEmailPayload {
+interface BrevoEmailPayload {
   to: string | string[];
   subject: string;
   html: string;
@@ -15,82 +13,57 @@ interface ResendEmailPayload {
   reply_to?: string;
 }
 
-export async function sendEmail(payload: ResendEmailPayload): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = payload.from || process.env.EMAIL_FROM || 'PracPedia <onboarding@resend.dev>';
+function parseFrom(fromStr: string): { name: string; email: string } {
+  const match = fromStr.match(/^(.*?)\s*<([^>]+)>$/);
+  if (match) return { name: match[1].trim() || 'PracPedia', email: match[2].trim() };
+  return { name: 'PracPedia', email: fromStr.trim() };
+}
+
+export async function sendEmail(payload: BrevoEmailPayload): Promise<boolean> {
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromStr = payload.from || process.env.EMAIL_FROM || 'PracPedia <pracpedia@gmail.com>';
 
   if (!apiKey) {
-    console.log('[email] RESEND_API_KEY not set — skipping email send to:', payload.to);
+    console.log('[email] BREVO_API_KEY not set — skipping email send to:', payload.to);
     return false;
   }
 
+  const from = parseFrom(fromStr);
+  const toArray = Array.isArray(payload.to)
+    ? payload.to.map((email) => ({ email }))
+    : [{ email: payload.to }];
+
   try {
-    const res = await fetch(RESEND_API_URL, {
+    const res = await fetch(BREVO_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'api-key': apiKey,
         'Content-Type': 'application/json',
+        'accept': 'application/json',
       },
       body: JSON.stringify({
-        from,
-        to: payload.to,
+        sender: { name: from.name, email: from.email },
+        to: toArray,
         subject: payload.subject,
-        html: payload.html,
-        reply_to: payload.reply_to || 'pracpedia@gmail.com',
+        htmlContent: payload.html,
+        replyTo: { email: payload.reply_to || 'pracpedia@gmail.com', name: 'PracPedia' },
       }),
     });
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      console.error(`[email] Resend API error ${res.status}:`, errText.slice(0, 300));
+      console.error(`[email] Brevo API error ${res.status}:`, errText.slice(0, 300));
       return false;
     }
 
     const data = await res.json().catch(() => ({}));
-    console.log('[email] Sent to:', payload.to, '| id:', data.id || '(unknown)');
+    console.log('[email] Sent to:', payload.to, '| id:', data.messageId || '(unknown)');
     return true;
   } catch (err: any) {
     console.error('[email] Send failed (non-fatal):', err?.message || err);
     return false;
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface BookingEmailContext {
-  bookingId: string;
-  serviceType: string;
-  notebookProvider: string;
-  subject: string;
-  description: string;
-  price: number;
-  clientName: string;
-  clientEmail: string;
-  artistName: string;
-  artistEmail: string;
-  artistRating?: number;
-  appUrl: string;
-}
-
-function formatBDT(amount: number): string {
-  return `৳${Number(amount || 0).toLocaleString('en-US')}`;
-}
-
-function serviceLabel(s: string): string {
-  if (s === 'drawing_only') return 'Drawing Only';
-  if (s === 'drawing_writing') return 'Drawing + Writing';
-  return s;
-}
-
-function escapeHtml(s: string): string {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
 function emailShell(innerContent: string, appUrl: string): string {
   return `
 <!DOCTYPE html>
@@ -265,4 +238,128 @@ export async function sendOrderDeliveredEmail(ctx: BookingEmailContext): Promise
   `, ctx.appUrl);
 
   await sendEmail({ to: ctx.clientEmail, subject: `📦 Order Delivered — Please rate your experience with ${ctx.artistName}`, html });
+}
+
+
+// ── Assistant system emails ─────────────────────────────────────────────────
+
+interface AssistantInviteEmailContext {
+  inviteeEmail: string;
+  inviteeName?: string;
+  parentArtistName: string;
+  parentArtistEmail: string;
+  defaultRole: string;
+  defaultSplitPercent: number;
+  inviteUrl: string;
+  appUrl: string;
+}
+
+export async function sendAssistantInviteEmail(ctx: AssistantInviteEmailContext): Promise<boolean> {
+  const roleLabel = ctx.defaultRole === 'drawing' ? 'Drawing' : ctx.defaultRole === 'writing' ? 'Writing' : 'Drawing + Writing';
+  const html = emailShell(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#fff;">You're Invited 🎨</h1>
+    <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;line-height:1.6;">
+      Hi ${escapeHtml(ctx.inviteeName || 'there')},<br>
+      <strong style="color:#fbbf24;">${escapeHtml(ctx.parentArtistName)}</strong> has invited you to join PracPedia as their assistant.
+    </p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:20px 0;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
+      <tr><td style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <span style="font-size:10px;font-family:monospace;color:#64748b;text-transform:uppercase;">Invited By</span><br>
+        <span style="font-size:14px;color:#e2e8f0;font-weight:600;">${escapeHtml(ctx.parentArtistName)}</span>
+      </td></tr>
+      <tr><td style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <span style="font-size:10px;font-family:monospace;color:#64748b;text-transform:uppercase;">Role</span><br>
+        <span style="font-size:14px;color:#e2e8f0;">${escapeHtml(roleLabel)}</span>
+      </td></tr>
+      <tr><td style="padding:14px 18px;background:rgba(34,211,238,0.04);">
+        <span style="font-size:10px;font-family:monospace;color:#64748b;text-transform:uppercase;">Default Split</span><br>
+        <span style="font-size:18px;color:#22d3ee;font-weight:800;">${ctx.defaultSplitPercent}%</span>
+      </td></tr>
+    </table>
+    <p style="margin:16px 0 0;font-size:12px;color:#64748b;">Expires in 7 days.</p>
+    ${ctaButton('Accept Invitation', ctx.inviteUrl)}
+  `, ctx.appUrl);
+  return sendEmail({ to: ctx.inviteeEmail, subject: `🎨 You're invited to join PracPedia as ${ctx.parentArtistName}'s Assistant`, html });
+}
+
+interface AssistantRegisteredEmailContext {
+  assistantName: string;
+  assistantEmail: string;
+  parentArtistName: string;
+  parentArtistEmail: string;
+  appUrl: string;
+}
+
+export async function sendAssistantRegisteredEmail(ctx: AssistantRegisteredEmailContext): Promise<void> {
+  const assistantHtml = emailShell(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#fff;">Welcome ✨</h1>
+    <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;line-height:1.6;">
+      Hi ${escapeHtml(ctx.assistantName)},<br>Your assistant account is ready. You're working with <strong style="color:#fbbf24;">${escapeHtml(ctx.parentArtistName)}</strong>.
+    </p>
+    ${ctaButton('Go to Dashboard', `${ctx.appUrl}/?view=assistant_dashboard`)}
+  `, ctx.appUrl);
+  const parentHtml = emailShell(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#fff;">Assistant Joined ✅</h1>
+    <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;line-height:1.6;">
+      <strong style="color:#22d3ee;">${escapeHtml(ctx.assistantName)}</strong> (${escapeHtml(ctx.assistantEmail)}) has accepted your invitation.
+    </p>
+    ${ctaButton('View Assistants', `${ctx.appUrl}/?view=artist_dashboard`)}
+  `, ctx.appUrl);
+  await Promise.allSettled([
+    sendEmail({ to: ctx.assistantEmail, subject: `✅ Welcome to PracPedia`, html: assistantHtml }),
+    sendEmail({ to: ctx.parentArtistEmail, subject: `✅ ${ctx.assistantName} accepted your invitation`, html: parentHtml }),
+  ]);
+}
+
+interface TaskAssignedEmailContext {
+  bookingId: string;
+  assistantName: string;
+  assistantEmail: string;
+  parentArtistName: string;
+  subject: string;
+  description: string;
+  taskType: string;
+  splitPercent: number;
+  earnings: number;
+  appUrl: string;
+}
+
+export async function sendTaskAssignedEmail(ctx: TaskAssignedEmailContext): Promise<void> {
+  const taskLabel = ctx.taskType === 'drawing' ? 'Drawing' : 'Writing';
+  const html = emailShell(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#fff;">New Task 🎨</h1>
+    <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;line-height:1.6;">
+      <strong style="color:#fbbf24;">${escapeHtml(ctx.parentArtistName)}</strong> assigned you the <strong style="color:#22d3ee;">${taskLabel}</strong> part of "${escapeHtml(ctx.subject)}".
+    </p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:20px 0;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
+      <tr><td style="padding:14px 18px;background:rgba(34,211,238,0.04);">
+        <span style="font-size:10px;font-family:monospace;color:#64748b;text-transform:uppercase;">Your Earnings (${ctx.splitPercent}%)</span><br>
+        <span style="font-size:18px;color:#22d3ee;font-weight:800;">৳${ctx.earnings.toLocaleString('en-US')}</span>
+      </td></tr>
+    </table>
+    ${ctaButton('View Task', `${ctx.appUrl}/?view=assistant_dashboard`)}
+  `, ctx.appUrl);
+  await sendEmail({ to: ctx.assistantEmail, subject: `🎨 New task: ${taskLabel} for ${ctx.subject}`, html });
+}
+
+interface TaskCompletedEmailContext {
+  parentArtistName: string;
+  parentArtistEmail: string;
+  assistantName: string;
+  subject: string;
+  taskType: string;
+  earnings: number;
+  appUrl: string;
+}
+
+export async function sendTaskCompletedEmail(ctx: TaskCompletedEmailContext): Promise<void> {
+  const taskLabel = ctx.taskType === 'drawing' ? 'Drawing' : 'Writing';
+  const html = emailShell(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#fff;">Task Completed ✅</h1>
+    <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;line-height:1.6;">
+      <strong style="color:#22d3ee;">${escapeHtml(ctx.assistantName)}</strong> completed the ${taskLabel} part of "${escapeHtml(ctx.subject)}".
+    </p>
+    ${ctaButton('View Order', `${ctx.appUrl}/?view=artist_dashboard`)}
+  `, ctx.appUrl);
+  await sendEmail({ to: ctx.parentArtistEmail, subject: `✅ ${ctx.assistantName} completed the ${taskLabel} task`, html });
 }

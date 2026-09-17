@@ -52,9 +52,12 @@ import {
   ChevronRight,
   Mail,
   Wallet,
-  BarChart3,
+   BarChart3,
   Award,
   CheckCircle,
+  Users,
+  UserPlus,
+  Copy,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -74,6 +77,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 import { ConfirmModal } from '@/components/features/ConfirmModal';
+import { InviteAssistantModal } from '@/components/features/InviteAssistantModal';
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -1333,7 +1337,8 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
   const [uploadSubmitting, setUploadSubmitting] = useState<boolean>(false);
   const [lightboxItem, setLightboxItem] = useState<PortfolioItem | null>(null);
   const [availabilityToggling, setAvailabilityToggling] = useState<boolean>(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+    const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [inviteModalOpen, setInviteModalOpen] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const notesInitRef = useRef<Record<string, boolean>>({});
@@ -1948,12 +1953,19 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
                 {portfolio.length}
               </span>
             </TabsTrigger>
-            <TabsTrigger
+                      <TabsTrigger
               value="earnings"
               className="min-h-[44px] flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5"
             >
               <BarChart3 className="w-4 h-4" />
               Earnings
+            </TabsTrigger>
+            <TabsTrigger
+              value="assistants"
+              className="min-h-11 flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5"
+            >
+              <Users className="w-4 h-4" />
+              Assistants
             </TabsTrigger>
           </TabsList>
 
@@ -1978,15 +1990,15 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
                     className={`inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full text-[11px] sm:text-xs font-bold border transition min-h-[36px] cursor-pointer ${
                       isActive
                         ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                        : 'bg-slate-900/40 border-white/[0.06] text-slate-400 hover:text-white hover:border-white/15'
+                        : 'bg-slate-900/40 border-white/6 text-slate-400 hover:text-white hover:border-white/15'
                     }`}
                   >
                     {f.label}
                     <span
-                      className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                      className={`inline-flex items-center justify-center min-w-4.5 h-4.5 px-1 rounded-full text-[10px] font-bold ${
                         isActive
                           ? 'bg-amber-500/30 text-amber-200'
-                          : 'bg-white/[0.06] text-slate-400'
+                          : 'bg-white/6 text-slate-400'
                       }`}
                     >
                       {count}
@@ -2321,6 +2333,14 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
                 )}
               </>
             )}
+                  </TabsContent>
+
+          {/* ── Tab 4: Assistants ── */}
+          <TabsContent value="assistants" className="space-y-4 sm:space-y-5 outline-none">
+            <ArtistAssistantsTab
+              isOpen={inviteModalOpen}
+              onOpenChange={setInviteModalOpen}
+            />
           </TabsContent>
         </Tabs>
       </div>
@@ -2368,14 +2388,292 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
         isDestructive
       />
 
-      {/* Hidden preview of the delete target image — purely for the confirm modal context */}
+           {/* Hidden preview of the delete target image */}
       {deleteTarget && (
         <div className="sr-only">
           <img src={deleteTarget.imageUrl} alt={deleteTarget.title} />
         </div>
       )}
+
+      {/* Invite Assistant Modal */}
+      <InviteAssistantModal
+        open={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+      />
     </div>
   );
 };
 
 export default ArtistDashboard;
+
+/* ── ArtistAssistantsTab component ──────────────────────────────────────────
+   This is a separate component rendered inside the "Assistants" tab.
+   It manages the list of assistants + pending invites + the invite button. */
+
+interface Assistant {
+  id: string;
+  name: string;
+  email: string;
+  profilePic: string | null;
+  isAvailable: boolean;
+  rating: number;
+  completedOrders: number;
+  assistantCompletedOrders: number;
+  assistantEarnings: number;
+  lastSeenAt: string | null;
+  createdAt: string;
+}
+
+interface Invite {
+  id: string;
+  code: string;
+  inviteeEmail: string;
+  inviteeName: string | null;
+  defaultRole: string;
+  defaultSplitPercent: number;
+  expiresAt: string;
+  createdAt: string;
+}
+
+const ArtistAssistantsTab: React.FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}> = ({ isOpen, onOpenChange }) => {
+  const { apiFetch } = useAuth();
+  const [assistants, setAssistants] = useState<Assistant[]>([]);
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch('/api/assistants');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setAssistants(Array.isArray(data.assistants) ? data.assistants : []);
+      setInvites(Array.isArray(data.invites) ? data.invites : []);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load assistants');
+    } finally {
+      setLoading(false);
+    }
+  }, [apiFetch]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData, isOpen]);
+
+  const handleRemove = async (assistantId: string, name: string) => {
+    if (!confirm(`Remove ${name} from your team? They will become an independent artist.`)) return;
+    setRemovingId(assistantId);
+    try {
+      const res = await apiFetch(`/api/assistants/${assistantId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setSuccess(`${name} has been removed from your team.`);
+      await fetchData();
+    } catch (e: any) {
+      setError(e?.message || 'Could not remove assistant');
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const handleCopyInvite = async (code: string) => {
+    const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pracpedia.vercel.app';
+    const url = `${appUrl}/?invite=${code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    }
+  };
+
+  const fmtDate = (iso: string | null): string => {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch { return '—'; }
+  };
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle
+        icon={Users}
+        title="Your Assistants"
+        sub="Invite collaborators to split your workload + share income"
+        action={
+          <Button
+            type="button"
+            onClick={() => onOpenChange(true)}
+            className="min-h-[44px] h-11 px-4 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold gap-1.5"
+          >
+            <UserPlus className="w-4 h-4" />
+            Invite Assistant
+          </Button>
+        }
+      />
+
+      {error && (
+        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+          <button onClick={() => setError(null)} className="ml-auto text-rose-400 hover:text-rose-300">✕</button>
+        </div>
+      )}
+      {success && (
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {success}
+          <button onClick={() => setSuccess(null)} className="ml-auto text-emerald-400 hover:text-emerald-300">✕</button>
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+          <span className="ml-2 text-sm text-slate-400">Loading team…</span>
+        </div>
+      )}
+
+      {!loading && assistants.length === 0 && invites.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-white/[0.08] bg-slate-900/30 px-6 py-12 flex flex-col items-center text-center">
+          <div className="p-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] text-slate-500">
+            <Users className="w-7 h-7" />
+          </div>
+          <h3 className="mt-4 text-sm font-bold text-slate-300">No assistants yet</h3>
+          <p className="mt-1 text-xs text-slate-500 max-w-md leading-relaxed">
+            Invite a collaborator to split your work. When you get a Drawing + Writing order, you can assign each part to a different assistant and share the income.
+          </p>
+          <Button
+            type="button"
+            onClick={() => onOpenChange(true)}
+            className="mt-4 min-h-[44px] h-11 px-4 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold gap-1.5"
+          >
+            <UserPlus className="w-4 h-4" />
+            Invite Your First Assistant
+          </Button>
+        </div>
+      )}
+
+      {!loading && invites.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-mono uppercase tracking-widest text-slate-500 font-bold">Pending Invites ({invites.length})</h3>
+          {invites.map((inv) => {
+            const expired = new Date(inv.expiresAt) < new Date();
+            return (
+              <div key={inv.id} className={`rounded-2xl border p-4 flex items-center justify-between gap-3 ${
+                expired ? 'bg-rose-500/[0.04] border-rose-500/15' : 'bg-amber-500/[0.04] border-amber-500/15'
+              }`}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`p-2 rounded-xl border shrink-0 ${
+                    expired ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                  }`}>
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white truncate">
+                      {inv.inviteeName || inv.inviteeEmail}
+                    </p>
+                    <p className="text-[10px] text-slate-400 truncate">{inv.inviteeEmail}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {expired ? 'Expired' : `Expires ${fmtDate(inv.expiresAt)}`} · {inv.defaultRole} · {inv.defaultSplitPercent}%
+                    </p>
+                  </div>
+                </div>
+                {!expired && (
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyInvite(inv.code)}
+                    className={`shrink-0 px-3 py-2 rounded-lg border text-[11px] font-bold transition cursor-pointer inline-flex items-center gap-1.5 min-h-[36px] ${
+                      copiedCode === inv.code
+                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                        : 'bg-slate-900 border-white/10 text-slate-300 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    {copiedCode === inv.code ? <CheckCircle2 className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    {copiedCode === inv.code ? 'Copied!' : 'Copy Link'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!loading && assistants.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-mono uppercase tracking-widest text-slate-500 font-bold">Active Assistants ({assistants.length})</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {assistants.map((a) => (
+              <div key={a.id} className="rounded-2xl border border-white/[0.06] bg-slate-900/40 p-4 flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Avatar className="w-10 h-10 rounded-xl ring-1 ring-white/10 shrink-0">
+                      <AvatarImage src={a.profilePic || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(a.name)}`} alt={a.name} />
+                      <AvatarFallback className="bg-slate-800 text-amber-300 font-bold rounded-xl">
+                        {a.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{a.name}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{a.email}</p>
+                    </div>
+                  </div>
+                  {a.isAvailable ? (
+                    <Badge className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shrink-0">Active</Badge>
+                  ) : (
+                    <Badge className="bg-slate-500/15 border border-slate-500/30 text-slate-400 shrink-0">Inactive</Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                    <p className="text-[9px] font-mono uppercase text-slate-500 font-bold">Tasks Done</p>
+                    <p className="text-sm font-black text-white mt-0.5">{a.assistantCompletedOrders || 0}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                    <p className="text-[9px] font-mono uppercase text-slate-500 font-bold">Earned</p>
+                    <p className="text-sm font-black text-amber-300 mt-0.5">৳{(a.assistantEarnings || 0).toLocaleString('en-US')}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                    <p className="text-[9px] font-mono uppercase text-slate-500 font-bold">Rating</p>
+                    <p className="text-sm font-black text-indigo-300 mt-0.5">{(a.rating || 5).toFixed(1)} ★</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
+                  <span className="text-[10px] text-slate-500">Joined {fmtDate(a.createdAt)}</span>
+                  <button
+                    type="button"
+                    onClick={() => void handleRemove(a.id, a.name)}
+                    disabled={removingId === a.id}
+                    className="text-[11px] text-rose-400 hover:text-rose-300 font-bold disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    {removingId === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

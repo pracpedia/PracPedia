@@ -2,7 +2,6 @@
 //
 // PostgreSQL-only. The project no longer supports SQLite — Neon serverless
 // Postgres is the recommended production provider. Set DATABASE_URL in .env
-// (see .env.example for the format — do NOT include channel_binding=require).
 
 generator client {
   provider = "prisma-client-js"
@@ -27,9 +26,7 @@ model User {
   isPremium     Boolean  @default(false)
   aiCredits     Int      @default(0)
 
-  // Granular permissions for admins — JSON array of permission keys.
-  // Super admins have all permissions implicitly. Regular admins only have
-  // the permissions assigned to them by a super admin.
+  // Granular permissions for admins
   permissionsJson String   @default("[]")
 
   // Artist marketplace fields
@@ -44,14 +41,22 @@ model User {
   // IP address tracking
   lastIpAddress String?
 
-    // Trial-credit recharge cooldown — set to the current time when the user
-  // self-recharges via /api/users/recharge-trial. Regular users are limited
-  // to one recharge per 24h. Platform owners bypass.
+  // Trial-credit recharge cooldown
   lastRechargeAt DateTime?
 
-  // Presence tracking — updated every 30s by /api/presence/heartbeat.
-  // Used by ClassroomDiscussion to show "Active Scholars Online" indicator.
+  // Presence tracking
   lastSeenAt DateTime?
+
+  // ── Assistant system (Additive Model) ──────────────────────────────────────
+  // If set, this user is an assistant to the artist with this ID.
+  // Users can be BOTH independent artists (rates > 0) AND assistants (parentArtistId set).
+  parentArtistId String?
+  parentArtist   User?   @relation("AssistantParent", fields: [parentArtistId], references: [id], onDelete: SetNull)
+  assistants     User[]  @relation("AssistantParent")
+
+  // Total earnings from completed assistant subtasks (in BDT).
+  assistantEarnings Int @default(0)
+  assistantCompletedOrders Int @default(0)
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -60,9 +65,15 @@ model User {
   bookingsAsArtist  Booking[]    @relation("BookingArtist")
   portfolio         PortfolioItem[]
 
+  // Assistant system relations
+  subtasksAssigned  SubTask[]     @relation("SubTaskAssistant")
+  subtasksCreated   SubTask[]     @relation("SubTaskParentArtist")
+  invitesSent       AssistantInvite[] @relation("InviteParentArtist")
+
   @@index([role])
   @@index([isAvailable, rating])
   @@index([lastSeenAt])
+  @@index([parentArtistId])
   @@map("users")
 }
 
@@ -168,6 +179,7 @@ model Booking {
 
   client        User     @relation("BookingClient", fields: [clientId], references: [id], onDelete: Cascade)
   artist        User     @relation("BookingArtist", fields: [artistId], references: [id], onDelete: Cascade)
+  subtasks      SubTask[]
 
   @@index([clientId, status])
   @@index([artistId, status])
@@ -208,4 +220,49 @@ model ActivityLog {
   @@index([category])
   @@index([action])
   @@map("activity_logs")
+}
+
+// ── Assistant System ─────────────────────────────────────────────────────
+
+model AssistantInvite {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  parentArtistId  String
+  parentArtist    User     @relation("InviteParentArtist", fields: [parentArtistId], references: [id], onDelete: Cascade)
+  inviteeEmail    String   @default("") // Optional, used for pre-fill + email
+  inviteeName     String?
+  defaultRole     String   @default("both")
+  defaultSplitPercent Int  @default(40)
+  status          String   @default("pending")
+  expiresAt       DateTime
+  acceptedById    String?
+  acceptedAt      DateTime?
+  createdAt       DateTime @default(now())
+  @@index([parentArtistId])
+  @@index([status])
+  @@map("assistant_invites")
+}
+
+model SubTask {
+  id              String   @id @default(cuid())
+  bookingId       String
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  assistantId     String
+  assistant       User     @relation("SubTaskAssistant", fields: [assistantId], references: [id], onDelete: Cascade)
+  parentArtistId  String
+  parentArtist    User     @relation("SubTaskParentArtist", fields: [parentArtistId], references: [id], onDelete: Cascade)
+  taskType        String   // "drawing" | "writing"
+  splitPercent    Int
+  earnings        Int
+  status          String   @default("assigned") // assigned | in_progress | completed | declined
+  assignedAt      DateTime @default(now())
+  completedAt     DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@unique([bookingId, taskType])
+  @@index([assistantId, status])
+  @@index([parentArtistId])
+  @@index([bookingId])
+  @@map("subtasks")
 }

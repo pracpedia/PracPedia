@@ -62,21 +62,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 4 characters long.' }, { status: 400 });
     }
 
-       const isArtist = role === 'artist';
+          const isArtist = role === 'artist';
     const displayName = String(name || normalizedEmail.split('@')[0]).slice(0, 100);
 
-    // ── Artist-specific fields (passed from frontend, mirrors /api/artists/register) ──
-    // For artist signups, these come from the Google modal form. For students,
-    // only phoneNumber is collected (for order SMS notifications).
-    const phoneNumber = body.phoneNumber ? String(body.phoneNumber).slice(0, 30) : null;
-    const artistBio = isArtist && body.bio ? String(body.bio).slice(0, 1000) : null;
-    const rateDrawingOnly = isArtist && body.rateDrawingOnly
+    // ── Invite code handling ──
+    const inviteCode = body.inviteCode
+      ? String(body.inviteCode).toUpperCase().trim()
+      : null;
+    let parentArtistId: string | null = null;
+    let validInvite: any = null;
+
+    if (inviteCode && body.isSignup === true) {
+      const invite = await withRetry(() =>
+        db.assistantInvite.findUnique({
+          where: { code: inviteCode },
+          include: { parentArtist: { select: { id: true } } },
+        })
+      );
+      if (invite && invite.status === 'pending' && invite.expiresAt > new Date()) {
+        parentArtistId = invite.parentArtist.id;
+        validInvite = invite;
+      }
+    }
+
+    // ── If assistant signup, skip artist-specific fields ──
+    const isAssistantSignup = !!parentArtistId;
+
+        const phoneNumber = body.phoneNumber ? String(body.phoneNumber).slice(0, 30) : null;
+    const artistBio = isArtist && !isAssistantSignup && body.bio ? String(body.bio).slice(0, 1000) : null;
+    const rateDrawingOnly = isArtist && !isAssistantSignup && body.rateDrawingOnly
       ? Math.max(50, Math.min(2000, Number(body.rateDrawingOnly) || 150))
-      : (isArtist ? 150 : 0);
-    const rateDrawingWriting = isArtist && body.rateDrawingWriting
+      : (isArtist && !isAssistantSignup ? 150 : 0);
+    const rateDrawingWriting = isArtist && !isAssistantSignup && body.rateDrawingWriting
       ? Math.max(100, Math.min(4000, Number(body.rateDrawingWriting) || 300))
-      : (isArtist ? 300 : 0);
-    const specialtiesArray = isArtist && Array.isArray(body.specialties)
+      : (isArtist && !isAssistantSignup ? 300 : 0);
+    const specialtiesArray = isArtist && !isAssistantSignup && Array.isArray(body.specialties)
       ? body.specialties.map((s: any) => String(s).slice(0, 100)).filter(Boolean).slice(0, 20)
       : [];
 
@@ -108,7 +128,7 @@ export async function POST(request: NextRequest) {
       }
 
             // Create new user
-      user = await withRetry(() =>
+            user = await withRetry(() =>
         db.user.create({
           data: {
             email: normalizedEmail,
@@ -122,11 +142,26 @@ export async function POST(request: NextRequest) {
             rateDrawingWriting,
             specialtiesJson: JSON.stringify(specialtiesArray),
             isAvailable: true,
+            parentArtistId,  // ← ADD THIS LINE
           },
         })
       );
       action = 'register';
       registerLimiter.reset(ip);
+
+      // ← ADD THIS BLOCK (marks invite as accepted):
+      if (validInvite) {
+        await withRetry(() =>
+          db.assistantInvite.update({
+            where: { id: validInvite.id },
+            data: {
+              status: 'accepted',
+              acceptedById: user.id,
+              acceptedAt: new Date(),
+            },
+          })
+        ).catch(() => {});
+      }
     }
 
     // Successful auth — reset login bucket

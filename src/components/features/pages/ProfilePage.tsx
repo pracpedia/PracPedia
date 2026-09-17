@@ -76,6 +76,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
 import { ConfirmModal } from '@/components/features/ConfirmModal';
+import { GraduationModal } from '@/components/features/GraduationModal';
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -1718,6 +1719,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
   /* ---- delete account modal ---- */
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+    /* ---- graduation modal ---- */
+  const [graduationOpen, setGraduationOpen] = useState(false);
+
   // Track whether the initial sync from `user` has happened so we don't
   // clobber local form state whenever `user` updates (e.g. after a save).
   const syncRef = useRef<string | null>(null);
@@ -1947,6 +1951,41 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
     showError('Password change is not yet supported in this version.');
   };
 
+    /* ---- graduate to independent artist ---- */
+  const handleGraduation = async (data: {
+    rateDrawingOnly: number;
+    rateDrawingWriting: number;
+    notebookCost: number;
+    specialties: string;
+    bio: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await apiFetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          graduateToIndependent: true,
+          rateDrawingOnly: data.rateDrawingOnly,
+          rateDrawingWriting: data.rateDrawingWriting,
+          notebookCost: data.notebookCost,
+          specialties: data.specialties,
+          bio: data.bio,
+        }),
+      });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { success: false, error: resData?.error || 'Server rejected graduation.' };
+      }
+      if (resData.token) {
+        updateSession(resData.token, resData.user);
+      }
+      showSuccess('🎉 You are now an Independent Artist!');
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Network error during graduation.' };
+    }
+  };
+
   /* ---- manage portfolio (switch view if callback provided) ---- */
   const handleManagePortfolio = () => {
     if (onSwitchView) {
@@ -1955,6 +1994,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
       showError('Open the Artist Dashboard from the sidebar to manage your portfolio.');
     }
   };
+
+
 
   /* ---- derived: optional member-since (not exposed by serializer) ---- */
   const memberSince = formatDate(
@@ -2072,8 +2113,37 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
                     tone={user.isAvailable !== false ? 'emerald' : 'rose'}
                   />
                 </>
-              )}
+                            )}
             </div>
+
+            {/* ── Graduation Banner ── */}
+            {isArtist && !!user.parentArtistId && (Number(user.rateDrawingOnly) || 0) === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 border-t border-white/[0.04]"
+              >
+                <div className="p-3.5 rounded-xl bg-gradient-to-br from-amber-500/[0.06] to-transparent border border-amber-500/20 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-amber-500/15 border border-amber-500/25 text-amber-400 shrink-0">
+                      <GraduationCap className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-amber-200">You're an Assistant</p>
+                      <p className="text-[9px] text-slate-400">Ready to sell on the marketplace?</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setGraduationOpen(true)}
+                    className="w-full py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 text-white text-[11px] font-black tracking-wide uppercase shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 min-h-[36px]"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    Become Independent Artist
+                  </button>
+                </div>
+              </motion.div>
+            )}
 
             {/* Actions */}
             <div className="p-5 flex flex-col gap-2 border-t border-white/[0.04]">
@@ -2221,6 +2291,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onSwitchView }) => {
         confirmText="Delete Account"
         cancelText="Cancel"
         isDestructive
+      />
+            {/* Graduation modal */}
+      <GraduationModal
+        open={graduationOpen}
+        onClose={() => setGraduationOpen(false)}
+        onSuccess={() => {
+          setGraduationOpen(false);
+          if (onSwitchView) {
+            onSwitchView('artistDashboard');
+          }
+        }}
+        onSubmit={handleGraduation}
       />
     </div>
   );

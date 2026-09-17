@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { safeLocalStorage } from '@/lib/storage';
@@ -22,6 +23,7 @@ import { ArtistsPage } from '@/components/features/pages/ArtistsPage';
 import { PublicMarketplace } from '@/components/features/pages/PublicMarketplace';
 import { AdminCmsPage } from '@/components/features/pages/AdminCmsPage';
 import { ArtistDashboard } from '@/components/features/pages/ArtistDashboard';
+import { AssistantDashboard } from '@/components/features/pages/AssistantDashboard';
 import { BookingsPage } from '@/components/features/pages/BookingsPage';
 import { CredentialsView } from '@/components/features/pages/CredentialsView';
 import { GeminiKeyModal } from '@/components/features/GeminiKeyModal';
@@ -92,7 +94,7 @@ export interface AnnouncementType {
   targetUserId?: string | null;
 }
 
-type ViewState = 'landing' | 'auth' | 'dashboard' | 'subject' | 'folder' | 'admins' | 'chat' | 'academy' | 'profile' | 'artists' | 'artist_dashboard' | 'creds' | 'bookings';
+type ViewState = 'landing' | 'auth' | 'dashboard' | 'subject' | 'folder' | 'admins' | 'chat' | 'academy' | 'profile' | 'artists' | 'artist_dashboard' | 'assistant_dashboard' | 'creds' | 'bookings';
 
 // Unused-import guards: preserve original API surface so tree-shaking does not strip
 // icons/components referenced by the original Vite file (kept for behavioral parity).
@@ -123,7 +125,7 @@ function PortalConsole() {
   const [currentView, setCurrentView] = useState<ViewState>(() => {
     if (typeof window === 'undefined') return 'dashboard';
     const saved = safeLocalStorage.getItem('app_current_view');
-    if (saved && ['landing', 'auth', 'dashboard', 'subject', 'folder', 'admins', 'chat', 'academy', 'profile', 'artists', 'artist_dashboard', 'creds', 'bookings'].includes(saved)) {
+           if (saved && ['landing', 'auth', 'dashboard', 'subject', 'folder', 'admins', 'chat', 'academy', 'profile', 'artists', 'artist_dashboard', 'assistant_dashboard', 'creds', 'bookings'].includes(saved)) {
       return saved as ViewState;
     }
     return 'dashboard';
@@ -145,10 +147,24 @@ function PortalConsole() {
     return null;
   });
 
-  // Sync state parameters to localStorage for reload integrity
+   // Sync state parameters to localStorage for reload integrity
   useEffect(() => {
     safeLocalStorage.setItem('app_current_view', currentView);
   }, [currentView]);
+
+    // ── Assistant routing (Additive Model) ─────────────────────────────────────
+  // Users can be BOTH independent artists AND assistants.
+  // If an assistant (with rates=0) tries to access the Artist Dashboard,
+  // redirect them to the Assistant Dashboard instead.
+  // If they have rates set (>0), they can access BOTH dashboards.
+  useEffect(() => {
+    if (!user) return;
+    if (user.parentArtistId && (user.rateDrawingOnly || 0) === 0 && currentView === 'artist_dashboard') {
+      setCurrentView('assistant_dashboard');
+    }
+  }, [user?.id, user?.parentArtistId, user?.rateDrawingOnly, currentView]);
+
+  
 
   useEffect(() => {
     if (selectedSubjectId) {
@@ -1274,7 +1290,7 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
 
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <div className="min-w-0">
-                      <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight wrap-break-word"><h2 className="text-xl sm:text-2xl font-black text-white tracking-tight break-words">Practical Notebook Gallery</h2></h2>
+                      <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight wrap-break-wordbun">Practical Notebook Gallery</h2>
                       <p className="text-xs text-slate-400 mt-1">Select from five subject areas to access specific experiment galleries.</p>
                     </div>
 
@@ -2048,9 +2064,16 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
               {/* ==============================================
                   📊 VIEW: ARTIST DASHBOARD (ORDERS & PORTFOLIO)
                   ============================================== */}
-              {currentView === 'artist_dashboard' && user?.role === 'artist' && (
+                               {currentView === 'artist_dashboard' && user?.role === 'artist' && (user?.rateDrawingOnly || 0) > 0 && (
                 <div className="space-y-6 animate-in fade-in duration-300">
                   <ArtistDashboard activeTheme={activeTheme} />
+                </div>
+              )}
+
+              {/* ── ASSISTANT DASHBOARD ── */}
+                           {currentView === 'assistant_dashboard' && user?.role === 'artist' && !!user?.parentArtistId && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <AssistantDashboard />
                 </div>
               )}
 
@@ -2314,7 +2337,8 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
  *    subjects={[]} folders={[]} announcements={[]} />.
  */
 export default function Home() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, logout } = useAuth();
+  const router = useRouter();
   const [viewAuth, setViewAuth] = useState(false);
   // Initial mode for the AuthPage when it's shown — 'login' (default) or
   // 'register' (when triggered from a "Sign up to do X" prompt on the landing).
@@ -2328,8 +2352,41 @@ export default function Home() {
   // Local fallback so the loading screen NEVER gets stuck even if AuthContext
   // hangs (e.g., dev server HMR restart mid-fetch, or an unreadable stale
   // localStorage entry).
-  const [forceLoaded, setForceLoaded] = useState(false);
+    const [forceLoaded, setForceLoaded] = useState(false);
+  // Pauses dashboard rendering when an invite link is detected
+  const [invitePending, setInvitePending] = useState(false);
 
+
+        // ── Invite link & Auth handler ─────────────────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+
+    // 1. Handle Invite Link (?invite=CODE)
+    const inviteCode = url.searchParams.get('invite');
+    if (inviteCode) {
+      // Save to localStorage for the AuthPage fallback
+      safeLocalStorage.setItem('pp_invite_code', inviteCode.toUpperCase().trim());
+      
+      // Clean the URL
+      url.searchParams.delete('invite');
+      window.history.replaceState({}, '', url.toString());
+
+          // Redirect to the standalone Accept Page (Client-side navigation, no reload!)
+    router.push(`/assistant-accept?invite=${inviteCode}`);
+      return; // Stop execution here so it doesn't trigger auth modal
+    }
+
+    // 2. Handle Auth Trigger (?auth=register or ?auth=login)
+    const authParam = url.searchParams.get('auth');
+    if (authParam === 'register' || authParam === 'login') {
+      setAuthMode(authParam);
+      setViewAuth(true);
+      // Clean the URL
+      url.searchParams.delete('auth');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
   // Fetch banner config for landing page (public, no auth needed)
   useEffect(() => {
     fetch('/api/settings/banner')
@@ -2382,18 +2439,24 @@ export default function Home() {
     );
   }
 
-  if (isAuthenticated) {
+    // Don't render the dashboard if we are processing an invite link
+  if (isAuthenticated && !invitePending) {
     return <PortalConsole />;
   }
 
-  if (viewAuth && !isAuthenticated) {
+  // If invite is pending OR user clicked Sign In, show the AuthPage
+  if ((viewAuth && !isAuthenticated) || invitePending) {
     return (
       <AuthPage
         initialMode={authMode}
         onSuccess={() => {
           setViewAuth(false);
+          setInvitePending(false);
         }}
-        onGoBack={() => setViewAuth(false)}
+        onGoBack={() => {
+          setViewAuth(false);
+          setInvitePending(false);
+        }}
       />
     );
   }
