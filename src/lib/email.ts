@@ -1,6 +1,8 @@
 /**
  * Brevo email integration — transactional emails for booking lifecycle.
- * Free tier: 300 emails/day, no card required. Signup: https://www.brevo.com
+ *
+ * Free tier: 300 emails/day — very generous, no card required.
+ * Signup: https://www.brevo.com
  */
 
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
@@ -64,6 +66,45 @@ export async function sendEmail(payload: BrevoEmailPayload): Promise<boolean> {
     return false;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Email Templates & Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface BookingEmailContext {
+  bookingId: string;
+  serviceType: string;
+  notebookProvider: string;
+  subject: string;
+  description: string;
+  price: number;
+  clientName: string;
+  clientEmail: string;
+  artistName: string;
+  artistEmail: string;
+  artistRating?: number;
+  appUrl: string;
+}
+
+function formatBDT(amount: number): string {
+  return `৳${Number(amount || 0).toLocaleString('en-US')}`;
+}
+
+function serviceLabel(s: string): string {
+  if (s === 'drawing_only') return 'Drawing Only';
+  if (s === 'drawing_writing') return 'Drawing + Writing';
+  return s;
+}
+
+function escapeHtml(s: string): string {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function emailShell(innerContent: string, appUrl: string): string {
   return `
 <!DOCTYPE html>
@@ -170,13 +211,8 @@ export async function sendOrderPlacedEmails(ctx: BookingEmailContext): Promise<v
     <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;line-height:1.6;">
       Hi ${escapeHtml(ctx.clientName)},<br>
       Your order with <strong style="color:#fbbf24;">${escapeHtml(ctx.artistName)}</strong> has been placed successfully.
-      The artist will review your request and accept it shortly.
     </p>
     ${orderDetailsTable(ctx)}
-    <p style="margin:16px 0 0;font-size:12px;color:#64748b;">
-      Artist: ${escapeHtml(ctx.artistName)}${ctx.artistRating ? ` (★ ${ctx.artistRating.toFixed(1)})` : ''}<br>
-      Order ID: <code style="font-family:monospace;color:#475569;">${escapeHtml(ctx.bookingId)}</code>
-    </p>
     ${ctaButton('View Your Order', `${ctx.appUrl}/?view=bookings`)}
   `, ctx.appUrl);
 
@@ -185,13 +221,8 @@ export async function sendOrderPlacedEmails(ctx: BookingEmailContext): Promise<v
     <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;line-height:1.6;">
       Hi ${escapeHtml(ctx.artistName)},<br>
       <strong style="color:#22d3ee;">${escapeHtml(ctx.clientName)}</strong> just placed an order for your sketch services.
-      Review the details below and accept it when you're ready to start.
     </p>
     ${orderDetailsTable(ctx)}
-    <p style="margin:16px 0 0;font-size:12px;color:#64748b;">
-      Client: ${escapeHtml(ctx.clientName)} (${escapeHtml(ctx.clientEmail)})<br>
-      Order ID: <code style="font-family:monospace;color:#475569;">${escapeHtml(ctx.bookingId)}</code>
-    </p>
     ${ctaButton('Review Order', `${ctx.appUrl}/?view=artist_dashboard`)}
   `, ctx.appUrl);
 
@@ -207,12 +238,8 @@ export async function sendOrderAcceptedEmail(ctx: BookingEmailContext): Promise<
     <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;line-height:1.6;">
       Hi ${escapeHtml(ctx.clientName)},<br>
       Good news! <strong style="color:#fbbf24;">${escapeHtml(ctx.artistName)}</strong> accepted your order and has started working on it.
-      You'll receive another email when the work is delivered.
     </p>
     ${orderDetailsTable(ctx)}
-    <p style="margin:16px 0 0;font-size:12px;color:#64748b;">
-      Estimated delivery depends on the artist's workload. You can check the status anytime from your dashboard.
-    </p>
     ${ctaButton('Track Your Order', `${ctx.appUrl}/?view=bookings`)}
   `, ctx.appUrl);
 
@@ -225,21 +252,13 @@ export async function sendOrderDeliveredEmail(ctx: BookingEmailContext): Promise
     <p style="margin:0 0 16px;font-size:14px;color:#94a3b8;line-height:1.6;">
       Hi ${escapeHtml(ctx.clientName)},<br>
       Your order from <strong style="color:#fbbf24;">${escapeHtml(ctx.artistName)}</strong> has been marked as delivered.
-      Please review the work and rate your experience with the artist.
     </p>
     ${orderDetailsTable(ctx)}
-    <div style="margin:20px 0;padding:16px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:10px;">
-      <p style="margin:0;font-size:13px;color:#fbbf24;font-weight:700;">⭐ How was your experience?</p>
-      <p style="margin:6px 0 0;font-size:12px;color:#94a3b8;line-height:1.5;">
-        Your rating helps other students find trustworthy artists. It takes 10 seconds.
-      </p>
-    </div>
     ${ctaButton('Rate Your Artist', `${ctx.appUrl}/?view=bookings`)}
   `, ctx.appUrl);
 
   await sendEmail({ to: ctx.clientEmail, subject: `📦 Order Delivered — Please rate your experience with ${ctx.artistName}`, html });
 }
-
 
 // ── Assistant system emails ─────────────────────────────────────────────────
 
