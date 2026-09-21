@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const body = await request.json();
-    const { artistId, serviceType, notebookProvider, subject, description, referenceImages, clientNotes } = body;
+    const { artistId, serviceType, notebookProvider, subject, description, referenceImages, clientNotes, deadline } = body;
 
     if (!artistId || !subject || !description) {
       return NextResponse.json({ error: 'artistId, subject, and description required.' }, { status: 400 });
@@ -68,6 +68,21 @@ export async function POST(request: NextRequest) {
     const svc = validServiceTypes.includes(serviceType) ? serviceType : 'drawing_only';
     // notebookProvider: "client" (I will provide) or "artist" (artist provides)
     const np = notebookProvider === 'artist' ? 'artist' : 'client';
+
+    // ── Parse deadline (optional) ──
+    // Accepts ISO datetime string from the frontend (e.g. "2026-09-25T14:30")
+    // Must be at least 1 hour in the future if provided.
+    let deadlineDate: Date | null = null;
+    if (deadline && typeof deadline === 'string') {
+      const parsed = new Date(deadline);
+      if (!isNaN(parsed.getTime())) {
+        const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+        if (parsed < oneHourFromNow) {
+          return NextResponse.json({ error: 'Deadline must be at least 1 hour from now.' }, { status: 400 });
+        }
+        deadlineDate = parsed;
+      }
+    }
 
     const artist = await db.user.findUnique({ where: { id: String(artistId) } });
     if (!artist || artist.role !== 'artist') {
@@ -95,6 +110,8 @@ export async function POST(request: NextRequest) {
         clientNotes: clientNotes ? String(clientNotes) : null,
         status: 'pending',
         paymentStatus: 'unpaid',
+        // ── NEW: Save deadline if provided ──
+        ...(deadlineDate ? { deadline: deadlineDate } : {}),
       },
     });
 
@@ -105,7 +122,7 @@ export async function POST(request: NextRequest) {
       userRole: payload.role,
       action: 'booking_created',
       category: 'marketplace',
-      detail: `${payload.email} hired ${artist.name} for ${svc === 'drawing_only' ? 'Drawing Only' : 'Drawing + Writing'} — ${subject} — ৳${price} (${np === 'artist' ? 'artist provides notebook' : 'client provides notebook'})`,
+      detail: `${payload.email} hired ${artist.name} for ${svc === 'drawing_only' ? 'Drawing Only' : 'Drawing + Writing'} — ${subject} — ৳${price} (${np === 'artist' ? 'artist provides notebook' : 'client provides notebook'})${deadlineDate ? ` — deadline: ${deadlineDate.toISOString()}` : ''}`,
       metadata: {
         bookingId: booking.id,
         clientId: payload.userId,
@@ -116,6 +133,7 @@ export async function POST(request: NextRequest) {
         notebookProvider: np,
         subject,
         price,
+        deadline: deadlineDate ? deadlineDate.toISOString() : null,
       },
             request,
     });
@@ -152,3 +170,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Could not create booking.' }, { status: 500 });
   }
 }
+
+
+
+

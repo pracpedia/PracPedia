@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { OrderChatModal } from '@/components/features/OrderChatModal';
+import { MessageSquare } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Calendar,
@@ -37,8 +39,9 @@ interface Booking {
   artistEarnings: number;
   status: string;
   paymentStatus: string;
-  clientNotes: string | null;
+    clientNotes: string | null;
   artistNotes: string | null;
+  deadline?: string | null;
   createdAt: string;
   updatedAt: string;
   client: { id: string; name: string; email: string; profilePic?: string | null };
@@ -103,6 +106,7 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
   // Rating state: per-booking draft + submission tracking
   const [ratingDrafts, setRatingDrafts] = useState<Record<string, { stars: number; review: string }>>({});
   const [submittingRatingId, setSubmittingRatingId] = useState<string | null>(null);
+  const [chatBooking, setChatBooking] = useState<any | null>(null);
 
   const isSuperAdmin = user?.role === 'super_admin';
   const isAdmin = user?.role === 'admin' || isSuperAdmin;
@@ -386,11 +390,40 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
           <span className="text-lg font-black text-white font-mono">৳{b.price}</span>
         </div>
 
-        {/* Subject + description */}
+                {/* Subject + description */}
         <div className="mb-3">
           <h3 className="text-sm font-bold text-white">{b.subject}</h3>
           <p className="text-xs text-slate-400 mt-1 line-clamp-2">{b.description}</p>
         </div>
+
+        {/* Deadline countdown badge (NEW) */}
+        {b.deadline && b.status !== 'completed' && b.status !== 'cancelled' && (() => {
+          const deadlineDate = new Date(b.deadline);
+          const diffMs = deadlineDate.getTime() - Date.now();
+          const isOverdue = diffMs < 0;
+          const absDiff = Math.abs(diffMs);
+          const days = Math.floor(absDiff / (24 * 60 * 60 * 1000));
+          const hours = Math.floor((absDiff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+          const minutes = Math.floor((absDiff % (60 * 60 * 1000)) / (60 * 1000));
+          const countdownText = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+          const deadlineLabel = deadlineDate.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          return (
+            <div className="mb-3">
+              <div
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-bold ${
+                  isOverdue ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                    : days <= 1 ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                }`}
+                title={`Deadline: ${deadlineLabel}`}
+              >
+                <Clock className={`w-3 h-3 ${isOverdue ? 'animate-pulse' : ''}`} />
+                {isOverdue ? `Overdue by ${countdownText}` : `${countdownText} left`}
+                <span className="text-[9px] opacity-60 font-mono">· {deadlineLabel}</span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 1-2-3 Progress bar — shows the order tracking for the client */}
         <div className="mb-3">
@@ -455,64 +488,85 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
           </div>
         )}
 
-        {/* Artist actions — update progress system-wide */}
-        {canUpdate && b.status !== 'cancelled' && b.status !== 'completed' && (
-          <div className="flex gap-2 pt-2 border-t border-white/[0.04] flex-wrap">
-            {/* Step 1 → 2: Accept (move to in_progress) */}
-            {b.status === 'pending' && (
-              <>
-                <button
-                  onClick={() => updateBookingStatus(b.id, 'in_progress')}
-                  disabled={updatingId === b.id}
-                  className="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
-                >
-                  {updatingId === b.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Package className="w-3 h-3" />}
-                  Accept & Start
-                </button>
-                <button
-                  onClick={() => updateBookingStatus(b.id, 'cancelled')}
-                  disabled={updatingId === b.id}
-                  className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
-                >
-                  Decline
-                </button>
-              </>
-            )}
-            {/* Step 2 → 3: Mark Delivered (move to completed) */}
-            {b.status === 'in_progress' && (
-              <>
-                <button
-                  onClick={() => updateBookingStatus(b.id, 'completed')}
-                  disabled={updatingId === b.id}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
-                >
-                  {updatingId === b.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                  Mark Delivered
-                </button>
-                <button
-                  onClick={() => updateBookingStatus(b.id, 'cancelled')}
-                  disabled={updatingId === b.id}
-                  className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
-                >
-                  Cancel Order
-                </button>
-              </>
-            )}
-          </div>
-        )}
+        {/* ---- Unified action row (responsive) ---- */}
+        {(() => {
+          const showArtistActions = canUpdate && b.status !== 'cancelled' && b.status !== 'completed';
+          const showClientCancel = isClient && !canUpdate && b.status === 'pending';
+          const showChat = (isArtist || isClient) && b.status !== 'cancelled';
 
-        {/* Client actions — can cancel pending orders */}
-        {isClient && !canUpdate && b.status === 'pending' && (
-          <div className="flex gap-2 pt-2 border-t border-white/[0.04]">
-            <button
-              onClick={() => updateBookingStatus(b.id, 'cancelled')}
-              disabled={updatingId === b.id}
-              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
-            >
-              Cancel Order
-            </button>
-          </div>
-        )}
+          if (!showArtistActions && !showClientCancel && !showChat) return null;
+
+          return (
+            <div className="pt-2 mt-2 border-t border-white/[0.04]">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2">
+
+                {/* Artist: Accept & Start (primary, full-width on mobile) */}
+                {showArtistActions && b.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => updateBookingStatus(b.id, 'in_progress')}
+                      disabled={updatingId === b.id}
+                      className="col-span-2 sm:col-auto px-3 py-2 sm:py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-1 w-full sm:w-auto min-h-[40px]"
+                    >
+                      {updatingId === b.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Package className="w-3 h-3" />}
+                      Accept &amp; Start
+                    </button>
+                    <button
+                      onClick={() => updateBookingStatus(b.id, 'cancelled')}
+                      disabled={updatingId === b.id}
+                      className="px-3 py-2 sm:py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 w-full sm:w-auto min-h-[40px]"
+                    >
+                      Decline
+                    </button>
+                  </>
+                )}
+
+                {/* Artist: Mark Delivered (primary, full-width on mobile) */}
+                {showArtistActions && b.status === 'in_progress' && (
+                  <>
+                    <button
+                      onClick={() => updateBookingStatus(b.id, 'completed')}
+                      disabled={updatingId === b.id}
+                      className="col-span-2 sm:col-auto px-3 py-2 sm:py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-1 w-full sm:w-auto min-h-[40px]"
+                    >
+                      {updatingId === b.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                      Mark Delivered
+                    </button>
+                    <button
+                      onClick={() => updateBookingStatus(b.id, 'cancelled')}
+                      disabled={updatingId === b.id}
+                      className="px-3 py-2 sm:py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 w-full sm:w-auto min-h-[40px]"
+                    >
+                      Cancel Order
+                    </button>
+                  </>
+                )}
+
+                {/* Client: Cancel pending */}
+                {showClientCancel && (
+                  <button
+                    onClick={() => updateBookingStatus(b.id, 'cancelled')}
+                    disabled={updatingId === b.id}
+                    className="col-span-2 sm:col-auto px-3 py-2 sm:py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50 w-full sm:w-auto min-h-[40px]"
+                  >
+                    Cancel Order
+                  </button>
+                )}
+
+                {/* Chat (everyone, all non-cancelled) */}
+                {showChat && (
+                  <button
+                    onClick={() => setChatBooking(b)}
+                    className="px-3 py-2 sm:py-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-slate-300 hover:text-white text-[11px] font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 w-full sm:w-auto min-h-[40px]"
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    Chat
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
                 {/* Completed/cancelled — show step label */}
         {(b.status === 'completed' || b.status === 'cancelled') && (
@@ -881,8 +935,18 @@ export const BookingsPage: React.FC<{ activeTheme?: string }> = () => {
                 )}
               </div>
             );
-          })}
+                   })}
         </div>
+      )}
+
+      {/* Order Chat Modal — conversation between client and artist about a booking */}
+      {chatBooking && (
+        <OrderChatModal
+          open={!!chatBooking}
+          onClose={() => setChatBooking(null)}
+          bookingId={chatBooking.id}
+          bookingSubject={chatBooking.subject}
+        />
       )}
     </div>
   );

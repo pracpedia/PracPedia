@@ -409,10 +409,50 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
     ? 'Universal classroom bulletin board and loose peer conversation space.'
     : activeChannelObj?.description;
 
+  // Format time only (HH:MM AM/PM)
   const formatDateLabel = (isoStr: string) => {
     try {
       const date = new Date(isoStr);
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Format a date as a separator label: "Today", "Yesterday", or "September 19, 2026"
+  const formatDateSeparator = (isoStr: string) => {
+    try {
+      const date = new Date(isoStr);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+      const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+      if (msgDate.getTime() === today.getTime()) return 'Today';
+      if (msgDate.getTime() === yesterday.getTime()) return 'Yesterday';
+      return date.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Returns a date key (YYYY-M-D) for comparing days
+  const getDateKey = (isoStr: string) => {
+    try {
+      const d = new Date(isoStr);
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Full date+time for tooltip (e.g., "Sep 19, 2026, 02:30 PM")
+  const formatFullDateTime = (isoStr: string) => {
+    try {
+      return new Date(isoStr).toLocaleString([], {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
     } catch (e) {
       return '';
     }
@@ -662,14 +702,32 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
                 const hasImage = !!msg.imageUrl;
                 const hasText = !!(msg.content && msg.content.trim() && msg.content !== '(image)');
 
+                // Date separator — show when day changes from previous message
+                const currentDateKey = getDateKey(msg.createdAt);
+                const prevMsg = messages[index - 1];
+                const prevDateKey = prevMsg ? getDateKey(prevMsg.createdAt) : null;
+                const showDateSeparator = currentDateKey !== prevDateKey;
+
                 return (
-                  <motion.div
-                    key={dbId || `msg-${index}`}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className={`flex gap-2 sm:gap-3 w-full ${isMine ? 'justify-end' : 'justify-start'}`}
-                  >
+                  <div key={`${dbId || `msg-${index}`}-${index}`} className="w-full">
+                    {/* Date separator — Today / Yesterday / full date */}
+                    {showDateSeparator && (
+                      <div className="flex items-center justify-center my-4 first:mt-0">
+                        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-white/[0.06]">
+                          <span className="w-1 h-1 rounded-full bg-cyan-400" />
+                          <span className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                            {formatDateSeparator(msg.createdAt)}
+                          </span>
+                          <span className="w-1 h-1 rounded-full bg-cyan-400" />
+                        </div>
+                      </div>
+                    )}
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className={`flex gap-2 sm:gap-3 w-full ${isMine ? 'justify-end' : 'justify-start'}`}
+                    >
                     {/* Avatar — for others: left side; for me: right side (rendered first, flex-row handles order) */}
                     {!isMine && (
                       msg.userProfilePic ? (
@@ -694,7 +752,7 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
 
                     {/* Bubble column — sizes to content, max 80% width */}
                     <div className="min-w-0 flex flex-col" style={{ maxWidth: '80%' }}>
-                      {/* Name + meta — timestamp hidden by default, click to reveal (like Messenger) */}
+                      {/* Name + role badge */}
                       <div className={`flex items-center gap-1.5 text-[10px] mb-1 flex-wrap ${isMine ? 'justify-end' : 'justify-start'}`}>
                         <span className={`font-bold ${isTeacher ? 'text-amber-300' : 'text-slate-300'}`}>
                           {isMine ? 'You' : msg.userName}
@@ -704,14 +762,6 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
                             {t('teacher')}
                           </span>
                         )}
-                        <button
-                          onClick={() => setRevealedTimeId(revealedTimeId === (msg.id || msg._id) ? null : (msg.id || msg._id || ''))}
-                          className="text-slate-600 hover:text-slate-400 font-mono text-[9px] transition-colors cursor-pointer"
-                        >
-                          {revealedTimeId === (msg.id || msg._id)
-                            ? new Date(msg.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                            : '◦◦◦'}
-                        </button>
                       </div>
 
                       {/* Image (if present) */}
@@ -745,6 +795,16 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
                           </div>
                         </div>
                       )}
+
+                      {/* Always-visible time below bubble */}
+                      <div className={`flex items-center gap-1 mt-1 px-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                        <span
+                          title={formatFullDateTime(msg.createdAt)}
+                          className="text-[9px] sm:text-[10px] font-mono text-slate-500 cursor-help"
+                        >
+                          {formatDateLabel(msg.createdAt)}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Own avatar — right side for my messages */}
@@ -762,7 +822,8 @@ export const ClassroomDiscussion: React.FC<ClassroomDiscussionProps> = ({ subjec
                         </div>
                       )
                     )}
-                  </motion.div>
+                    </motion.div>
+                  </div>
                 );
               })}
             </div>

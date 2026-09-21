@@ -162,8 +162,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         } else {
                           const err = await res.json().catch(() => ({}));
                           setConfirmResign(false);
-                          // Surface the error to the user instead of silently
-                          // logging to console. Platform owners get 403.
                           alert(err.error || 'Resignation declined. You may not have permission to resign.');
                         }
                       } catch (e) {
@@ -183,6 +181,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Notification Bell removed — now floats in top-right corner across all devices */}
 
           {/* Bilingual Switch Segment */}
           <div className="px-1 shrink-0 select-none">
@@ -350,7 +350,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="truncate">{t('editProfile')}</span>
             </button>
 
-                       {/* Marketplace — visible to regular users AND assistants (they can browse) */}
+            {/* Marketplace — visible to regular users AND assistants (they can browse) */}
             {(user?.role !== 'artist' || user?.parentArtistId) && (
               <button
                 onClick={() => handleNav('artists')}
@@ -369,25 +369,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
 
-               {/* Artist Dashboard — visible to artists who have set their rates (rateDrawingOnly > 0).
-    This includes independent artists AND assistants who graduated. */}
-{user?.role === 'artist' && (user?.rateDrawingOnly || 0) > 0 && (
-  <button
-    onClick={() => handleNav('artist_dashboard')}
-    className={`
-      w-full flex items-center gap-3 px-3.5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold tracking-wide
-      transition-all duration-200 group border text-left cursor-pointer
-      ${currentView === 'artist_dashboard'
-        ? 'bg-amber-500/10 border-amber-500/20 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
-        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02] border-transparent'}
-    `}
-  >
-    <Palette className={`w-4 h-4 transition-transform group-hover:scale-110 shrink-0 ${currentView === 'artist_dashboard' ? 'text-amber-400' : 'text-slate-500'}`} />
-    <span className="truncate">
-      {language === 'en' ? 'Artist Dashboard' : 'আর্টিস্ট ড্যাশবোর্ড'}
-    </span>
-  </button>
-)}
+            {/* Artist Dashboard — visible to artists who have set their rates */}
+            {user?.role === 'artist' && (user?.rateDrawingOnly || 0) > 0 && (
+              <button
+                onClick={() => handleNav('artist_dashboard')}
+                className={`
+                  w-full flex items-center gap-3 px-3.5 py-2.5 min-h-[44px] rounded-xl text-xs font-bold tracking-wide
+                  transition-all duration-200 group border text-left cursor-pointer
+                  ${currentView === 'artist_dashboard'
+                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-300 font-bold shadow-lg shadow-amber-500/5'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02] border-transparent'}
+                `}
+              >
+                <Palette className={`w-4 h-4 transition-transform group-hover:scale-110 shrink-0 ${currentView === 'artist_dashboard' ? 'text-amber-400' : 'text-slate-500'}`} />
+                <span className="truncate">
+                  {language === 'en' ? 'Artist Dashboard' : 'আর্টিস্ট ড্যাশবোর্ড'}
+                </span>
+              </button>
+            )}
 
             {/* Assistant Studio — visible only to assistants (parentArtistId is set) */}
             {user?.role === 'artist' && user?.parentArtistId && (
@@ -408,9 +407,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
 
-            {/* Bookings & Hire Requests — visible to all authenticated users.
-                Students see their own bookings, artists see commissions received,
-                admins see all bookings + hire requests across the platform. */}
+            {/* Bookings & Hire Requests */}
             <button
               onClick={() => handleNav('bookings')}
               className={`
@@ -427,7 +424,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </button>
 
-            {/* Marketplace browse link for artists (so they can also view other artists) */}
+            {/* Marketplace browse link for artists */}
             {user?.role === 'artist' && (
               <button
                 onClick={() => handleNav('artists')}
@@ -499,7 +496,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             {/* Admin actions shortcut within the dashboard structure */}
-            {(user.role === 'admin' || user.role === 'super_admin') &&(
+            {(user.role === 'admin' || user.role === 'super_admin') && (
               <button
                 onClick={onOpenFolderCreate}
                 className="w-full mt-2 flex items-center justify-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl text-xs font-bold tracking-wide shadow-md shadow-indigo-950/50 transition-all active:scale-[0.98] cursor-pointer"

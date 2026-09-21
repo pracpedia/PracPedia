@@ -55,9 +55,10 @@ import {
    BarChart3,
   Award,
   CheckCircle,
-  Users,
+     Users,
   UserPlus,
   Copy,
+  MessageSquare,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -78,6 +79,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 import { ConfirmModal } from '@/components/features/ConfirmModal';
 import { InviteAssistantModal } from '@/components/features/InviteAssistantModal';
+import { AssignTaskModal } from '@/components/features/AssignTaskModal';
+import { OrderChatModal } from '@/components/features/OrderChatModal';
+import {
+  ScientificAnalytics, SkillBreakdown, TaskProgressRing,
+  type AnalyticsTask,
+} from '@/components/features/DashboardAnalytics';
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -112,8 +119,10 @@ interface Booking {
   status: BookingStatus;
   paymentStatus: PaymentStatus;
   referenceImages: string[];
-  clientNotes?: string | null;
+    clientNotes?: string | null;
   artistNotes?: string | null;
+  // ── NEW: optional deadline the client set when placing the order ──
+  deadline?: string | null;
   createdAt: string;
   client: Client;
 }
@@ -263,13 +272,14 @@ interface StatTileProps {
   sub?: string;
   tone: 'amber' | 'emerald' | 'cyan' | 'indigo';
   loading?: boolean;
+  pulse?: boolean;
 }
 
-const STAT_TONE: Record<StatTileProps['tone'], string> = {
-  amber: 'text-amber-300',
-  emerald: 'text-emerald-300',
-  cyan: 'text-cyan-300',
-  indigo: 'text-indigo-300',
+const STAT_TONE: Record<StatTileProps['tone'], { text: string; orb: string; accent: string; glow: string }> = {
+  amber: { text: 'text-amber-300', orb: 'rgba(245, 158, 11, 0.12)', accent: '#f59e0b', glow: 'rgba(245, 158, 11, 0.4)' },
+  emerald: { text: 'text-emerald-300', orb: 'rgba(16, 185, 129, 0.12)', accent: '#10b981', glow: 'rgba(16, 185, 129, 0.4)' },
+  cyan: { text: 'text-cyan-300', orb: 'rgba(6, 182, 212, 0.12)', accent: '#06b6d4', glow: 'rgba(6, 182, 212, 0.4)' },
+  indigo: { text: 'text-indigo-300', orb: 'rgba(99, 102, 241, 0.12)', accent: '#6366f1', glow: 'rgba(99, 102, 241, 0.4)' },
 };
 
 const StatTile: React.FC<StatTileProps> = ({
@@ -279,27 +289,60 @@ const StatTile: React.FC<StatTileProps> = ({
   sub,
   tone,
   loading,
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 8 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.25 }}
-    className="relative overflow-hidden rounded-2xl border border-white/6 bg-slate-900/40 p-4 sm:p-5 backdrop-blur-sm"
-  >
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest text-slate-400 font-bold">
-        {label}
-      </span>
-      <Icon className={`w-4 h-4 ${STAT_TONE[tone]}`} />
-    </div>
-    <div className={`mt-2 text-2xl sm:text-3xl font-black ${STAT_TONE[tone]}`}>
-      {loading ? <Skeleton className="h-7 w-16 bg-white/5" /> : value}
-    </div>
-    {sub && (
-      <div className="mt-0.5 text-[11px] text-slate-500 font-medium">{sub}</div>
-    )}
-  </motion.div>
-);
+  pulse,
+}) => {
+  const t = STAT_TONE[tone];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      whileHover={{ y: -2, transition: { duration: 0.15 } }}
+      className="relative overflow-hidden rounded-2xl border border-white/6 bg-slate-900/40 p-4 sm:p-5 backdrop-blur-sm group"
+    >
+      {/* Animated background orb */}
+      <motion.div
+        className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none"
+        style={{ background: t.orb }}
+        animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.8, 0.5] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      {/* Top accent line */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] origin-left"
+        style={{ background: `linear-gradient(90deg, transparent, ${t.accent}, transparent)` }}
+      >
+        <motion.div
+          className="h-full w-full"
+          style={{ background: t.accent }}
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3 relative z-10">
+        <span className="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest text-slate-400 font-bold flex items-center gap-1.5">
+          {pulse && (
+            <motion.span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: t.accent }}
+              animate={{ opacity: [1, 0.3, 1], scale: [1, 1.3, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          )}
+          {label}
+        </span>
+        <Icon className={`w-4 h-4 ${t.text}`} />
+      </div>
+      <div className={`mt-2 text-2xl sm:text-3xl font-black ${t.text} relative z-10`}>
+        {loading ? <Skeleton className="h-7 w-16 bg-white/5" /> : value}
+      </div>
+      {sub && (
+        <div className="mt-0.5 text-[11px] text-slate-500 font-medium relative z-10">{sub}</div>
+      )}
+    </motion.div>
+  );
+};
 
 const SectionTitle: React.FC<{
   icon: React.ComponentType<{ className?: string }>;
@@ -432,6 +475,8 @@ interface OrderCardProps {
   onCancel: (booking: Booking) => void;
   onReopen: (id: string) => void;
   onToggleExpand: (id: string) => void;
+  onAssignTask: (booking: Booking) => void;
+  onOpenChat: (booking: Booking) => void;
   expanded: boolean;
   notesDraft: string;
   onNotesChange: (id: string, value: string) => void;
@@ -446,6 +491,8 @@ const OrderCard: React.FC<OrderCardProps> = ({
   onCancel,
   onReopen,
   onToggleExpand,
+  onAssignTask,
+  onOpenChat,
   expanded,
   notesDraft,
   onNotesChange,
@@ -476,7 +523,11 @@ const OrderCard: React.FC<OrderCardProps> = ({
       className="rounded-2xl border border-white/[0.06] bg-slate-900/40 backdrop-blur-sm overflow-hidden"
     >
       {/* ---- top row: client + badges ---- */}
-      <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+            <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+        {/* Progress ring — shows task completion state */}
+        <div className="shrink-0 hidden sm:flex items-center justify-center">
+          <TaskProgressRing status={booking.status} size={36} />
+        </div>
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <Avatar className="w-10 h-10 sm:w-12 sm:h-12 rounded-full ring-1 ring-white/10">
             <AvatarImage
@@ -565,7 +616,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
         >
           {booking.description || 'No description provided.'}
         </p>
-        {booking.description && booking.description.length > 140 && (
+                {booking.description && booking.description.length > 140 && (
           <button
             type="button"
             onClick={() => onToggleExpand(booking.id)}
@@ -578,6 +629,51 @@ const OrderCard: React.FC<OrderCardProps> = ({
           </button>
         )}
       </div>
+
+      {/* ---- deadline countdown (NEW) ---- */}
+      {booking.deadline && booking.status !== 'completed' && booking.status !== 'cancelled' && (() => {
+        const deadlineDate = new Date(booking.deadline);
+        const now = new Date();
+        const diffMs = deadlineDate.getTime() - now.getTime();
+        const isOverdue = diffMs < 0;
+        const absDiff = Math.abs(diffMs);
+        const days = Math.floor(absDiff / (24 * 60 * 60 * 1000));
+        const hours = Math.floor((absDiff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+        const minutes = Math.floor((absDiff % (60 * 60 * 1000)) / (60 * 1000));
+
+        let countdownText: string;
+        if (days > 0) countdownText = `${days}d ${hours}h`;
+        else if (hours > 0) countdownText = `${hours}h ${minutes}m`;
+        else countdownText = `${minutes}m`;
+
+        const deadlineLabel = deadlineDate.toLocaleString('en-US', {
+          weekday: 'short', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        });
+
+        return (
+          <div className="px-4 sm:px-5 pb-3">
+            <div
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-bold ${
+                isOverdue
+                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                  : days <= 1
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              }`}
+              title={`Deadline: ${deadlineLabel}`}
+            >
+              <Clock className={`w-3 h-3 ${isOverdue ? 'animate-pulse' : ''}`} />
+              {isOverdue ? (
+                <span>Overdue by {countdownText}</span>
+              ) : (
+                <span>{countdownText} left</span>
+              )}
+              <span className="text-[9px] opacity-60 font-mono">· {deadlineLabel}</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ---- reference images ---- */}
       {booking.referenceImages && booking.referenceImages.length > 0 && (
@@ -650,116 +746,149 @@ const OrderCard: React.FC<OrderCardProps> = ({
         </div>
       </div>
 
-      {/* ---- action row ---- */}
-      <div className="px-4 sm:px-5 py-3 border-t border-white/[0.04] bg-white/[0.01] flex flex-wrap items-center gap-2">
-        {booking.status === 'pending' && (
-          <>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => onAdvance(booking.id, 'in_progress')}
-              disabled={isActioning}
-              className="min-h-[44px] h-10 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5 disabled:opacity-50"
-            >
-              {isActioning ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <CheckCircle className="w-4 h-4" />
-              )}
-              Accept &amp; Start
-            </Button>
+      {/* ---- action row (responsive) ---- */}
+      <div className="px-3 sm:px-5 py-3 border-t border-white/[0.04] bg-white/[0.01]">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2">
+
+          {/* ---- pending: Accept (primary, full-width on mobile) + Cancel ---- */}
+          {booking.status === 'pending' && (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => onAdvance(booking.id, 'in_progress')}
+                disabled={isActioning}
+                className="col-span-2 sm:col-auto min-h-[44px] h-11 sm:h-10 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5 disabled:opacity-50 w-full sm:w-auto justify-center"
+              >
+                {isActioning ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4" />
+                )}
+                Accept &amp; Start
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => onCancel(booking)}
+                disabled={isActioning}
+                className="min-h-[44px] h-11 sm:h-10 px-4 border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 text-xs font-bold gap-1.5 disabled:opacity-50 w-full sm:w-auto justify-center"
+              >
+                <XCircle className="w-4 h-4" />
+                Cancel
+              </Button>
+            </>
+          )}
+
+          {/* ---- in_progress: Mark Complete (primary, full-width on mobile) + Cancel ---- */}
+          {booking.status === 'in_progress' && (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => onAdvance(booking.id, 'completed')}
+                disabled={isActioning}
+                className="col-span-2 sm:col-auto min-h-[44px] h-11 sm:h-10 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5 disabled:opacity-50 w-full sm:w-auto justify-center"
+              >
+                {isActioning ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                Mark Complete
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => onCancel(booking)}
+                disabled={isActioning}
+                className="min-h-[44px] h-11 sm:h-10 px-4 border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 text-xs font-bold gap-1.5 disabled:opacity-50 w-full sm:w-auto justify-center"
+              >
+                <XCircle className="w-4 h-4" />
+                Cancel
+              </Button>
+            </>
+          )}
+
+          {/* ---- Assign to Assistant (pending + in_progress) ---- */}
+          {(booking.status === 'pending' || booking.status === 'in_progress') && (
             <Button
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => onCancel(booking)}
-              disabled={isActioning}
-              className="min-h-[44px] h-10 px-4 border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 text-xs font-bold gap-1.5 disabled:opacity-50"
+              onClick={() => onAssignTask(booking)}
+              className="min-h-[44px] h-11 sm:h-10 px-4 border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200 text-xs font-bold gap-1.5 w-full sm:w-auto justify-center"
             >
-              <XCircle className="w-4 h-4" />
-              Cancel
+              <Users className="w-4 h-4" />
+              Assign to Assistant
             </Button>
-          </>
-        )}
+          )}
 
-        {booking.status === 'in_progress' && (
-          <>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => onAdvance(booking.id, 'completed')}
-              disabled={isActioning}
-              className="min-h-[44px] h-10 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5 disabled:opacity-50"
-            >
-              {isActioning ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4" />
-              )}
-              Mark Complete
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onCancel(booking)}
-              disabled={isActioning}
-              className="min-h-[44px] h-10 px-4 border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 text-xs font-bold gap-1.5 disabled:opacity-50"
-            >
-              <XCircle className="w-4 h-4" />
-              Cancel
-            </Button>
-          </>
-        )}
-
-        {booking.status === 'completed' && (
+          {/* ---- Chat (always visible on active orders) ---- */}
           <Button
             type="button"
             size="sm"
             variant="outline"
-            onClick={() => onToggleExpand(booking.id)}
-            className="min-h-[44px] h-10 px-4 border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06] hover:text-white text-xs font-bold gap-1.5"
+            onClick={() => onOpenChat(booking)}
+            className="min-h-[44px] h-11 sm:h-10 px-4 border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06] hover:text-white text-xs font-bold gap-1.5 w-full sm:w-auto justify-center"
           >
-            <Eye className="w-4 h-4" />
-            {expanded ? 'Hide Details' : 'View Details'}
-            <ChevronRight
-              className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
-            />
+            <MessageSquare className="w-4 h-4" />
+            Chat
           </Button>
-        )}
 
-        {booking.status === 'cancelled' && (
-          <>
+          {/* ---- completed: View Details ---- */}
+          {booking.status === 'completed' && (
             <Button
               type="button"
               size="sm"
               variant="outline"
               onClick={() => onToggleExpand(booking.id)}
-              className="min-h-[44px] h-10 px-4 border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06] hover:text-white text-xs font-bold gap-1.5"
+              className="col-span-2 sm:col-auto min-h-[44px] h-11 sm:h-10 px-4 border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06] hover:text-white text-xs font-bold gap-1.5 w-full sm:w-auto justify-center"
             >
               <Eye className="w-4 h-4" />
-              View Details
+              {expanded ? 'Hide Details' : 'View Details'}
+              <ChevronRight
+                className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
+              />
             </Button>
-            {canReopen && (
+          )}
+
+          {/* ---- cancelled: View Details + Re-open ---- */}
+          {booking.status === 'cancelled' && (
+            <>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => onReopen(booking.id)}
-                disabled={isActioning}
-                className="min-h-[44px] h-10 px-4 border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 text-xs font-bold gap-1.5 disabled:opacity-50"
-                title="Cancelled within the last 24 hours"
+                onClick={() => onToggleExpand(booking.id)}
+                className="min-h-[44px] h-11 sm:h-10 px-4 border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06] hover:text-white text-xs font-bold gap-1.5 w-full sm:w-auto justify-center"
               >
-                {isActioning ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <RotateCcw className="w-3.5 h-3.5" />
-                )}
-                Re-open
+                <Eye className="w-4 h-4" />
+                View Details
               </Button>
-            )}
-          </>
-        )}
+              {canReopen && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onReopen(booking.id)}
+                  disabled={isActioning}
+                  className="min-h-[44px] h-11 sm:h-10 px-4 border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 text-xs font-bold gap-1.5 disabled:opacity-50 w-full sm:w-auto justify-center"
+                  title="Cancelled within the last 24 hours"
+                >
+                  {isActioning ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  )}
+                  Re-open
+                </Button>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -1339,6 +1468,8 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
   const [availabilityToggling, setAvailabilityToggling] = useState<boolean>(false);
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState<boolean>(false);
+    const [assignTaskBooking, setAssignTaskBooking] = useState<Booking | null>(null);
+    const [chatBooking, setChatBooking] = useState<Booking | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const notesInitRef = useRef<Record<string, boolean>>({});
@@ -1453,6 +1584,12 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
   }, [bookings, user]);
 
   /* ---- derived: filtered orders ---- */
+    // Convert bookings to AnalyticsTask format for analytics components
+      const analyticsTasks: AnalyticsTask[] = useMemo(() => bookings.map((b) => ({
+    id: b.id, subject: b.subject, status: b.status, earnings: b.artistEarnings || b.price,
+    price: b.price, createdAt: b.createdAt, completedAt: null,
+  })), [bookings]);
+
   const filteredOrders = useMemo(() => {
     if (orderFilter === 'all') return bookings;
     return bookings.filter((b) => b.status === orderFilter);
@@ -1895,6 +2032,7 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
             sub="Pending + In Progress"
             tone="amber"
             loading={bookingsLoading}
+            pulse={stats.active > 0}
           />
           <StatTile
             icon={CheckCircle2}
@@ -1922,7 +2060,12 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
             tone="indigo"
             loading={false}
           />
-        </section>
+                </section>
+
+                {/* ═══ Scientific Analytics (productivity only — no earnings totals) ═══ */}
+        <ScientificAnalytics tasks={analyticsTasks} loading={bookingsLoading} />
+
+        {/* SkillBreakdown removed from here — per-subject earnings live in the Earnings tab to avoid repetition */}
 
         {/* ---------- Tabs ---------- */}
         <Tabs
@@ -1930,42 +2073,42 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
           onValueChange={setActiveTab}
           className="space-y-4 sm:space-y-6"
         >
-          <TabsList className="bg-slate-900/60 border border-white/[0.06] h-auto p-1.5 flex w-full sm:w-fit gap-1 rounded-2xl">
+          <TabsList className="bg-slate-900/60 border border-white/[0.06] h-auto p-1.5 grid grid-cols-2 sm:flex sm:w-fit gap-1 rounded-2xl">
             <TabsTrigger
               value="orders"
-              className="min-h-[44px] flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5"
+              className="min-h-[44px] w-full sm:w-auto sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5 justify-center sm:justify-start"
             >
-              <Package className="w-4 h-4" />
-              Orders
+              <Package className="w-4 h-4 shrink-0" />
+              <span className="truncate">Orders</span>
               {stats.active > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500/30 text-amber-300 text-[10px] font-bold">
+                <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500/30 text-amber-300 text-[10px] font-bold shrink-0">
                   {stats.active}
                 </span>
               )}
             </TabsTrigger>
             <TabsTrigger
               value="portfolio"
-              className="min-h-[44px] flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5"
+              className="min-h-[44px] w-full sm:w-auto sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5 justify-center sm:justify-start"
             >
-              <ImageIcon className="w-4 h-4" />
-              Portfolio
-              <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white/[0.08] text-slate-300 text-[10px] font-bold">
+              <ImageIcon className="w-4 h-4 shrink-0" />
+              <span className="truncate">Portfolio</span>
+              <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white/[0.08] text-slate-300 text-[10px] font-bold shrink-0">
                 {portfolio.length}
               </span>
             </TabsTrigger>
-                      <TabsTrigger
+            <TabsTrigger
               value="earnings"
-              className="min-h-[44px] flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5"
+              className="min-h-[44px] w-full sm:w-auto sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5 justify-center sm:justify-start"
             >
-              <BarChart3 className="w-4 h-4" />
-              Earnings
+              <BarChart3 className="w-4 h-4 shrink-0" />
+              <span className="truncate">Earnings</span>
             </TabsTrigger>
             <TabsTrigger
               value="assistants"
-              className="min-h-11 flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5"
+              className="min-h-[44px] w-full sm:w-auto sm:flex-none px-3 sm:px-4 text-xs sm:text-sm font-bold data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-300 data-[state=active]:border-amber-500/30 rounded-xl gap-1.5 justify-center sm:justify-start"
             >
-              <Users className="w-4 h-4" />
-              Assistants
+              <Users className="w-4 h-4 shrink-0" />
+              <span className="truncate">Assistants</span>
             </TabsTrigger>
           </TabsList>
 
@@ -2033,8 +2176,10 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
                       booking={b}
                       onAdvance={handleAdvance}
                       onCancel={(booking) => setCancelTarget(booking)}
-                      onReopen={handleReopen}
+                                           onReopen={handleReopen}
                       onToggleExpand={handleToggleExpand}
+                      onAssignTask={(booking) => setAssignTaskBooking(booking)}
+                      onOpenChat={(booking) => setChatBooking(booking)}
                       expanded={!!expandedOrders[b.id]}
                       notesDraft={notesDrafts[b.id] ?? ''}
                       onNotesChange={handleNotesChange}
@@ -2138,8 +2283,11 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
             <SectionTitle
               icon={BarChart3}
               title="Earnings & Analytics"
-              sub="A snapshot of your completed-commission revenue"
+              sub="Breakdown by service type and subject"
             />
+
+            {/* EarningsForecast removed — Total/Pending already in Stats Strip above */}
+            {/* Rating banner removed — Rating already in Stats Strip above */}
 
             {bookingsLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -2152,51 +2300,6 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
               </div>
             ) : (
               <>
-                {/* Top earnings cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.08] to-slate-900/40 p-5"
-                  >
-                    <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-emerald-500/20 blur-3xl pointer-events-none" />
-                    <div className="flex items-center justify-between relative z-10">
-                      <span className="text-[11px] uppercase tracking-widest font-mono font-bold text-emerald-300/80">
-                        Total Earnings
-                      </span>
-                      <Wallet className="w-5 h-5 text-emerald-300" />
-                    </div>
-                    <div className="mt-2 text-3xl sm:text-4xl font-black text-emerald-300">
-                      {fmtBDT(stats.totalEarnings)}
-                    </div>
-                    <div className="mt-1 text-[11px] text-slate-400">
-                      From {stats.completedBookingsCount} completed commission
-                      {stats.completedBookingsCount === 1 ? '' : 's'}
-                    </div>
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 }}
-                    className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.08] to-slate-900/40 p-5"
-                  >
-                    <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-amber-500/20 blur-3xl pointer-events-none" />
-                    <div className="flex items-center justify-between relative z-10">
-                      <span className="text-[11px] uppercase tracking-widest font-mono font-bold text-amber-300/80">
-                        Pending Earnings
-                      </span>
-                      <Clock className="w-5 h-5 text-amber-300" />
-                    </div>
-                    <div className="mt-2 text-3xl sm:text-4xl font-black text-amber-300">
-                      {fmtBDT(stats.pendingEarnings)}
-                    </div>
-                    <div className="mt-1 text-[11px] text-slate-400">
-                      Currently in-progress — paid on completion
-                    </div>
-                  </motion.div>
-                </div>
-
                 {/* Service-type breakdown */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <motion.div
@@ -2256,72 +2359,10 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
                   </motion.div>
                 </div>
 
-                {/* Subject breakdown */}
-                <div className="rounded-2xl border border-white/[0.06] bg-slate-900/40 p-4 sm:p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Receipt className="w-4 h-4 text-slate-300" />
-                    <h3 className="text-sm font-bold text-white">
-                      Earnings by Subject
-                    </h3>
-                  </div>
-                  {earningsBreakdown.bySubject.length === 0 ? (
-                    <p className="text-xs text-slate-500 py-6 text-center">
-                      No completed commissions yet — earnings by subject will
-                      appear here once you deliver your first order.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                      {earningsBreakdown.bySubject.map((row) => (
-                        <SubjectBar
-                          key={row.subject}
-                          subject={row.subject}
-                          total={row.total}
-                          count={row.count}
-                          maxTotal={earningsBreakdown.maxSubject}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Subject breakdown — using animated SkillBreakdown component (merged here from above tabs) */}
+                <SkillBreakdown tasks={analyticsTasks} loading={bookingsLoading} />
 
-                {/* Rating banner */}
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-indigo-500/[0.06] to-slate-900/40 p-5 flex items-center gap-4 sm:gap-5"
-                >
-                  <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-amber-500/15 blur-3xl pointer-events-none" />
-                  <div className="p-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-300 shrink-0">
-                    <Star className="w-7 h-7" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[11px] uppercase tracking-widest font-mono font-bold text-slate-400">
-                      Client Rating
-                    </div>
-                    <div className="mt-1 flex items-baseline gap-2">
-                      <span className="text-4xl sm:text-5xl font-black text-amber-300">
-                        {stats.rating > 0 ? stats.rating.toFixed(1) : '—'}
-                      </span>
-                      {stats.rating > 0 && (
-                        <span className="text-sm font-bold text-amber-300/70">
-                          / 5.0
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      {stats.rating > 0
-                        ? 'Based on client reviews after delivery.'
-                        : 'No ratings yet — they will appear once clients review your completed work.'}
-                    </div>
-                  </div>
-                  <div className="hidden sm:flex flex-col items-center gap-1 shrink-0">
-                    <Award className="w-5 h-5 text-amber-300" />
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                      Reputation
-                    </span>
-                  </div>
-                </motion.div>
+                {/* Rating banner removed — Rating already shown in Stats Strip above */}
 
                 {/* Foot note */}
                 {stats.completedBookingsCount === 0 && (
@@ -2396,10 +2437,32 @@ export const ArtistDashboard: React.FC<ArtistDashboardProps> = ({
       )}
 
       {/* Invite Assistant Modal */}
-      <InviteAssistantModal
+           <InviteAssistantModal
         open={inviteModalOpen}
         onClose={() => setInviteModalOpen(false)}
       />
+
+            {/* Assign Task to Assistant Modal */}
+      {assignTaskBooking && (
+        <AssignTaskModal
+          open={!!assignTaskBooking}
+          onClose={() => setAssignTaskBooking(null)}
+          bookingId={assignTaskBooking.id}
+          bookingSubject={assignTaskBooking.subject}
+          bookingPrice={assignTaskBooking.price}
+          bookingServiceType={assignTaskBooking.serviceType}
+        />
+      )}
+
+      {/* Order Chat Modal — conversation with the client about this booking */}
+      {chatBooking && (
+  <OrderChatModal
+    bookingId={chatBooking.id}
+    bookingSubject={chatBooking.subject}
+    open={!!chatBooking}
+    onClose={() => setChatBooking(null)}
+  />
+)}
     </div>
   );
 };
@@ -2571,13 +2634,14 @@ const ArtistAssistantsTab: React.FC<{
         </div>
       )}
 
+           {/* Pending invites */}
       {!loading && invites.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-xs font-mono uppercase tracking-widest text-slate-500 font-bold">Pending Invites ({invites.length})</h3>
           {invites.map((inv) => {
             const expired = new Date(inv.expiresAt) < new Date();
             return (
-              <div key={inv.id} className={`rounded-2xl border p-4 flex items-center justify-between gap-3 ${
+              <div key={inv.id} className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                 expired ? 'bg-rose-500/[0.04] border-rose-500/15' : 'bg-amber-500/[0.04] border-amber-500/15'
               }`}>
                 <div className="flex items-center gap-3 min-w-0">
@@ -2588,14 +2652,27 @@ const ArtistAssistantsTab: React.FC<{
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-white truncate">
-                      {inv.inviteeName || inv.inviteeEmail}
+                      {inv.inviteeName || inv.inviteeEmail || 'Generic Invite Link'}
                     </p>
-                    <p className="text-[10px] text-slate-400 truncate">{inv.inviteeEmail}</p>
+                    {inv.inviteeEmail && inv.inviteeName && (
+                      <p className="text-[10px] text-slate-400 truncate">{inv.inviteeEmail}</p>
+                    )}
                     <p className="text-[10px] text-slate-500 mt-0.5">
-                      {expired ? 'Expired' : `Expires ${fmtDate(inv.expiresAt)}`} · {inv.defaultRole} · {inv.defaultSplitPercent}%
+                      {expired ? 'Expired' : `Expires ${fmtDate(inv.expiresAt)}`}
                     </p>
                   </div>
                 </div>
+
+                {/* Role & Split Badges */}
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
+                    {inv.defaultRole || 'Both'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-300 uppercase tracking-wider">
+                    {inv.defaultSplitPercent || 40}% Split
+                  </span>
+                </div>
+
                 {!expired && (
                   <button
                     type="button"
@@ -2605,6 +2682,7 @@ const ArtistAssistantsTab: React.FC<{
                         ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
                         : 'bg-slate-900 border-white/10 text-slate-300 hover:text-white hover:border-white/20'
                     }`}
+                    title="Copy invite link"
                   >
                     {copiedCode === inv.code ? <CheckCircle2 className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                     {copiedCode === inv.code ? 'Copied!' : 'Copy Link'}

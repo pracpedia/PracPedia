@@ -44,8 +44,13 @@ model User {
   // Trial-credit recharge cooldown
   lastRechargeAt DateTime?
 
+
   // Presence tracking
   lastSeenAt DateTime?
+
+  // ── NEW: Notification system — when the user last saw their notifications ──
+  // Used by /api/notifications to determine which messages are "unread"
+  lastNotificationSeen DateTime?
 
   // ── Assistant system (Additive Model) ──────────────────────────────────────
   // If set, this user is an assistant to the artist with this ID.
@@ -69,6 +74,9 @@ model User {
   subtasksAssigned  SubTask[]     @relation("SubTaskAssistant")
   subtasksCreated   SubTask[]     @relation("SubTaskParentArtist")
   invitesSent       AssistantInvite[] @relation("InviteParentArtist")
+
+    // Order chat messages sent by this user
+  orderChatsSent OrderChat[] @relation("OrderChatSender")
 
   @@index([role])
   @@index([isAvailable, rating])
@@ -172,18 +180,23 @@ model Booking {
   artistEarnings    Int      @default(0)
   status        String   @default("pending")
   paymentStatus String   @default("unpaid")
-  clientNotes   String?
+    clientNotes   String?
   artistNotes   String?
+  // ── NEW: Deadline when the client needs delivery (optional) ──
+  deadline      DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   client        User     @relation("BookingClient", fields: [clientId], references: [id], onDelete: Cascade)
   artist        User     @relation("BookingArtist", fields: [artistId], references: [id], onDelete: Cascade)
   subtasks      SubTask[]
+    // Chat messages for this order
+  orderChats OrderChat[]
 
-  @@index([clientId, status])
+    @@index([clientId, status])
   @@index([artistId, status])
   @@index([status])
+  @@index([deadline])
   @@map("bookings")
 }
 
@@ -266,3 +279,20 @@ model SubTask {
   @@index([bookingId])
   @@map("subtasks")
 }
+
+
+// ── Order Chat System ─────────────────────────────────────────────────────
+
+model OrderChat {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation("OrderChatSender", fields: [senderId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([bookingId, createdAt])
+  @@map("order_chats")
+}
+

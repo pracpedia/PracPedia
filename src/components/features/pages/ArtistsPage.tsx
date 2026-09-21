@@ -43,9 +43,10 @@ import {
   Mail,
   ChevronLeft,
   ChevronRight,
-  Wand2,
+    Wand2,
   Phone,
   Upload,
+  Calendar,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -974,7 +975,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const [subject, setSubject] = useState<string>('Physics');
   const [description, setDescription] = useState<string>('');
   const [referenceImages, setReferenceImages] = useState<string[]>(['']);
-  const [clientNotes, setClientNotes] = useState<string>('');
+    const [clientNotes, setClientNotes] = useState<string>('');
+  const [deadline, setDeadline] = useState<string>(''); // ISO datetime string (e.g. 2026-09-25T14:30)
   const [submitting, setSubmitting] = useState<boolean>(false);
   const refImageFileRef = useRef<HTMLInputElement>(null);
 
@@ -1081,7 +1083,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
           referenceImages: referenceImages
             .map((u) => u.trim())
             .filter(Boolean),
-          clientNotes: clientNotes.trim() || undefined,
+                   clientNotes: clientNotes.trim() || undefined,
+          deadline: deadline || undefined, // ISO datetime string
         }),
       });
       const data = await res.json();
@@ -1404,12 +1407,82 @@ const BookingModal: React.FC<BookingModalProps> = ({
             </div>
           </section>
 
-          {/* Step 5 — Client notes */}
+                    {/* Step 6 — Deadline (NEW) */}
           <section>
             <StepHeader
               index={6}
+              title="Delivery deadline"
+              subtitle="When do you need this delivered? The artist will see a countdown."
+            />
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Date + time picker */}
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400 pointer-events-none" />
+                <Input
+                  type="datetime-local"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)}
+                  className="h-11 pl-10 bg-slate-950/40 border-white/[0.06] text-slate-200 text-sm"
+                  aria-label="Delivery deadline"
+                />
+              </div>
+              {/* Quick presets */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                    setDeadline(d.toISOString().slice(0, 16));
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-bold hover:bg-amber-500/20 transition cursor-pointer"
+                >
+                  +1 day
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                    setDeadline(d.toISOString().slice(0, 16));
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-bold hover:bg-amber-500/20 transition cursor-pointer"
+                >
+                  +3 days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+                    setDeadline(d.toISOString().slice(0, 16));
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-bold hover:bg-amber-500/20 transition cursor-pointer"
+                >
+                  +1 week
+                </button>
+                {deadline && (
+                  <button
+                    type="button"
+                    onClick={() => setDeadline('')}
+                    className="px-2.5 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[10px] font-bold hover:bg-rose-500/20 transition cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+            {deadline && (
+              <p className="mt-2 text-[10px] text-amber-300/80 font-mono">
+                ⏰ Artist must deliver by: {new Date(deadline).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+          </section>
+
+          {/* Step 7 — Client notes (was Step 6) */}
+          <section>
+            <StepHeader
+              index={7}
               title="Client notes"
-              subtitle="Optional — deadline, format, anything else the artist should know."
+              subtitle="Optional — format preferences, anything else the artist should know."
             />
             <Textarea
               value={clientNotes}

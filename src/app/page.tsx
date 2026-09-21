@@ -18,6 +18,7 @@ import { ClassroomDiscussion } from '@/components/features/ClassroomDiscussion';
 import { AiAcademyRoom } from '@/components/features/AiAcademyRoom';
 import { ConfirmModal } from '@/components/features/ConfirmModal';
 import { GsapStudentCounter } from '@/components/features/GsapStudentCounter';
+import { NotificationBell } from '@/components/features/NotificationBell';
 import { ProfilePage } from '@/components/features/pages/ProfilePage';
 import { ArtistsPage } from '@/components/features/pages/ArtistsPage';
 import { PublicMarketplace } from '@/components/features/pages/PublicMarketplace';
@@ -1065,6 +1066,7 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
               <option value="plasma-storm">⚡ Plasma Storm</option>
             </select>
           </div>
+          <NotificationBell />
         </div>
       </header>
 
@@ -1151,7 +1153,6 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Theme Selection Panel */}
             <div className="flex items-center gap-1 bg-slate-950/80 border border-white/4 rounded-xl p-1 shrink-0 max-w-32.5 sm:max-w-none">
-              <span className="text-[9px] font-mono font-bold text-slate-500 uppercase px-1 hidden sm:inline">Theme:</span>
               <select
                 value={activeTheme}
                 onChange={(e) => setActiveTheme(e.target.value)}
@@ -1180,6 +1181,8 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
             <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-slate-950/60 border border-white/4 rounded-xl text-slate-400 text-[10px] font-mono uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-[#22d3ee] animate-pulse" />
             </div>
+
+            <NotificationBell />
           </div>
         </header>
 
