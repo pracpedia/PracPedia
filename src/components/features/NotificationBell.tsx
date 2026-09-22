@@ -1,27 +1,22 @@
 'use client';
 
 /**
- * NotificationBell — premium notification bell with WAV-based sound.
+ * NotificationBell — premium notification bell with custom sound.
  *
- * FIXES:
- *   - Sound uses <audio> element with generated WAV (NOT AudioContext)
- *     → reliable playback on every notification, not just first time
- *   - Pleasant two-note chime (E6 → G6, perfect fifth = harmonious)
- *   - Custom bell icon (modern, clean)
- *   - Bell at the MOST RIGHT corner of header
- *   - Toast popup slides in on new notification
- *   - 5-second polling (near real-time)
- *   - Red badge shows total count (like cart superscript)
- *   - Refetch on window focus (instant check when returning to tab)
+ * SOUND:
+ *   - Uses your custom notification sound from /public/notification.mp3
+ *   - Audio element is preloaded on mount
+ *   - Unlocked on first user interaction (browser requirement)
+ *   - Plays reliably on every notification
+ *   - Debounced to prevent double-play (mobile + desktop bell instances)
  *
- * WHY NOT WEBSOCKET:
- *   Vercel serverless doesn't support persistent WebSocket connections.
- *   True real-time requires a dedicated WS server (Pusher, Ably, or
- *   a separate Node.js process on Railway/Render). 5-second polling
- *   is the best alternative on Vercel — near-instant for chat.
+ * REAL-TIME:
+ *   - 5-second polling + refetch on window focus
+ *   - Detects new notifications by ID comparison
+ *   - Triggers: shake animation + ripple + toast + chime
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, MessageSquare, Users, Palette, CheckCircle2,
@@ -29,74 +24,57 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SOUND — Generate a pleasant WAV chime at runtime
+// SOUND — Custom notification sound (served from /public/notification.mp3)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function createChimeWavDataUri(): string {
-  if (typeof window === 'undefined') return '';
-  try {
-    const sampleRate = 22050;
-    const duration = 0.45;
-    const numSamples = Math.floor(sampleRate * duration);
-    const bufferSize = 44 + numSamples * 2;
-    const buffer = new ArrayBuffer(bufferSize);
-    const view = new DataView(buffer);
+const NOTIFICATION_SOUND_URL = '/notification.mp3';
 
-    const writeStr = (offset: number, str: string) => {
-      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-    };
+let sharedAudio: HTMLAudioElement | null = null;
+let audioUnlocked = false;
+let lastSoundTime = 0; // Module-level debounce — shared across all bell instances
 
-    // WAV header
-    writeStr(0, 'RIFF');
-    view.setUint32(4, 36 + numSamples * 2, true);
-    writeStr(8, 'WAVE');
-    writeStr(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeStr(36, 'data');
-    view.setUint32(40, numSamples * 2, true);
-
-    // Generate samples — pleasant two-note chime (E6 → G6, perfect fifth)
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const env = Math.exp(-t * 3.5);
-
-      let sample = 0;
-
-      // Note 1: E6 (1318.51 Hz) — main note, plays throughout
-      sample += Math.sin(2 * Math.PI * 1318.51 * t) * 0.45;
-
-      // Note 2: G6 (1567.98 Hz) — perfect fifth, starts at 0.12s
-      if (t > 0.12) {
-        const t2 = t - 0.12;
-        const env2 = Math.exp(-t2 * 4.5);
-        sample += Math.sin(2 * Math.PI * 1567.98 * t2) * 0.35 * env2;
-      }
-
-      // Subtle warmth: low harmonic at 2x
-      sample += Math.sin(2 * Math.PI * 2637 * t) * 0.04 * env;
-
-      // Apply envelope + volume
-      sample = sample * env * 0.5;
-
-      // Convert to 16-bit PCM
-      const int16 = Math.max(-32768, Math.min(32767, sample * 32767));
-      view.setInt16(44 + i * 2, int16, true);
-    }
-
-    // Convert to base64 data URI
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return 'data:audio/wav;base64,' + btoa(binary);
-  } catch (e) {
-    return '';
+function getAudioElement(): HTMLAudioElement | null {
+  if (typeof window === 'undefined') return null;
+  if (!sharedAudio) {
+    try {
+      sharedAudio = new Audio(NOTIFICATION_SOUND_URL);
+      sharedAudio.volume = 1;
+      sharedAudio.preload = 'auto';
+    } catch { return null; }
   }
+  return sharedAudio;
+}
+
+function playNotificationSound() {
+  // Debounce: only play once every 3 seconds (prevents double-play from
+  // multiple bell instances in mobile + desktop headers)
+  const now = Date.now();
+  if (now - lastSoundTime < 3000) return;
+  lastSoundTime = now;
+
+  const audio = getAudioElement();
+  if (!audio) return;
+  try {
+    audio.currentTime = 0;
+    const promise = audio.play();
+    if (promise) {
+      promise.catch(() => {
+        // Audio play rejected — likely needs user interaction first.
+        // The unlock handler will re-arm it on next click.
+      });
+    }
+  } catch (e) { /* silent */ }
+}
+
+// Unlock audio on first user interaction (required by all browsers)
+function unlockAudio() {
+  const audio = getAudioElement();
+  if (!audio || audioUnlocked) return;
+  audio.volume = 0;
+  audio.play().then(() => {
+    audio.volume = 1;
+    audioUnlocked = true;
+  }).catch(() => {});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -134,7 +112,7 @@ const formatTimeAgo = (iso: string): string => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Custom Bell Icon (modern, clean — different from standard lucide bell)
+// Custom Bell Icon
 // ═══════════════════════════════════════════════════════════════════════════
 
 const BellIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -149,9 +127,7 @@ const BellIcon: React.FC<{ className?: string }> = ({ className }) => (
     strokeLinejoin="round"
     className={className}
   >
-    {/* Rounded bell body — different shape from standard bell */}
     <path d="M12 2.5a6.5 6.5 0 0 0-6.5 6.5c0 3.5-1.2 5.5-2.3 6.8-.5.6-.1 1.5.7 1.5h16.2c.8 0 1.2-.9.7-1.5-1.1-1.3-2.3-3.3-2.3-6.8A6.5 6.5 0 0 0 12 2.5z" />
-    {/* Clapper */}
     <path d="M10.2 18.8c.3 1 1 1.7 1.8 1.7s1.5-.7 1.8-1.7" />
   </svg>
 );
@@ -175,54 +151,21 @@ export const NotificationBell: React.FC = () => {
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Audio element — MORE RELIABLE than AudioContext
-  const chimeUri = useMemo(() => createChimeWavDataUri(), []);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUnlockedRef = useRef(false);
-
-  // Create audio element on mount
+  // ── Preload audio element on mount ──
   useEffect(() => {
-    if (typeof window !== 'undefined' && chimeUri) {
-      audioRef.current = new Audio(chimeUri);
-      audioRef.current.volume = 0.4;
-      audioRef.current.preload = 'auto';
-    }
-  }, [chimeUri]);
-
-  // Play sound — works reliably after first user interaction
-  const playSound = useCallback(() => {
-    if (!audioRef.current) return;
-    try {
-      audioRef.current.currentTime = 0;
-      const promise = audioRef.current.play();
-      if (promise) {
-        promise.then(() => {
-          audioUnlockedRef.current = true;
-        }).catch(() => {
-          audioUnlockedRef.current = false;
-        });
-      }
-    } catch (e) { /* silent */ }
+    getAudioElement();
   }, []);
 
-  // Unlock audio on first user interaction
+  // ── Unlock audio on first user interaction ──
   useEffect(() => {
-    const unlock = () => {
-      if (audioRef.current && !audioUnlockedRef.current) {
-        audioRef.current.volume = 0;
-        audioRef.current.play().then(() => {
-          audioRef.current!.volume = 0.4;
-          audioUnlockedRef.current = true;
-        }).catch(() => {});
-      }
-    };
-    document.addEventListener('click', unlock, true);
-    document.addEventListener('touchstart', unlock, true);
-    document.addEventListener('keydown', unlock, true);
+    const handler = () => { unlockAudio(); };
+    document.addEventListener('click', handler, true);
+    document.addEventListener('touchstart', handler, true);
+    document.addEventListener('keydown', handler, true);
     return () => {
-      document.removeEventListener('click', unlock, true);
-      document.removeEventListener('touchstart', unlock, true);
-      document.removeEventListener('keydown', unlock, true);
+      document.removeEventListener('click', handler, true);
+      document.removeEventListener('touchstart', handler, true);
+      document.removeEventListener('keydown', handler, true);
     };
   }, []);
 
@@ -244,7 +187,7 @@ export const NotificationBell: React.FC = () => {
           // ── TRIGGER: animation + sound + toast ──
           setIsShaking(true);
           setShowRipple(true);
-          playSound();
+          playNotificationSound();
           setTimeout(() => setIsShaking(false), 1000);
           setTimeout(() => setShowRipple(false), 1200);
 
@@ -262,7 +205,7 @@ export const NotificationBell: React.FC = () => {
       setNotifications(newNotifs);
       setUnreadCount(newCount);
     } catch (e) { /* silent */ }
-  }, [apiFetch, user, playSound]);
+  }, [apiFetch, user]);
 
   // ── Polling every 5 seconds (near real-time) ──
   useEffect(() => {
@@ -270,14 +213,14 @@ export const NotificationBell: React.FC = () => {
     void fetchNotifications();
     pollTimerRef.current = setInterval(() => {
       void fetchNotifications();
-    }, 5000); // 5 seconds — near real-time
+    }, 5000); // 5 seconds
     return () => {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, [user, fetchNotifications]);
 
-  // ── Refetch on window focus (instant check when returning to tab) ──
+  // ── Refetch on window focus ──
   useEffect(() => {
     const handleFocus = () => { void fetchNotifications(); };
     window.addEventListener('focus', handleFocus);
@@ -289,8 +232,7 @@ export const NotificationBell: React.FC = () => {
 
   // ── Bell click handler ──
   const handleBellClick = () => {
-    // Play test chime (also unlocks audio if not already)
-    playSound();
+    playNotificationSound(); // Test sound + unlocks audio
     setToast(null);
     if (unreadCount > 0) {
       void handleMarkAllRead();
@@ -333,7 +275,7 @@ export const NotificationBell: React.FC = () => {
 
   return (
     <>
-      {/* ══ Popup Toast — slides in from right ══ */}
+      {/* ══ Popup Toast ══ */}
       <AnimatePresence>
         {toast && ToastIcon && (
           <motion.div
@@ -395,7 +337,7 @@ export const NotificationBell: React.FC = () => {
             <BellIcon className={unreadCount > 0 ? 'text-cyan-400' : 'text-slate-400'} />
           </motion.div>
 
-          {/* Red badge — like cart count superscript */}
+          {/* Red badge */}
           <AnimatePresence>
             {unreadCount > 0 && (
               <motion.span
