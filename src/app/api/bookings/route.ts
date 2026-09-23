@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const scope = searchParams.get('scope'); // 'client' | 'artist' | null (all for super_admin)
+    const scope = searchParams.get('scope');
 
     let where: any = {};
     if (scope === 'client') {
@@ -21,9 +21,7 @@ export async function GET(request: NextRequest) {
     } else if (scope === 'artist') {
       where.artistId = payload.userId;
     } else {
-      // Only super_admin / admin can list ALL bookings
       if (payload.role !== 'super_admin' && payload.role !== 'admin') {
-        // Default: show bookings where the user is either client or artist
         where = {
           OR: [{ clientId: payload.userId }, { artistId: payload.userId }],
         };
@@ -58,30 +56,22 @@ export async function POST(request: NextRequest) {
     if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
     const body = await request.json();
-    const { artistId, serviceType, notebookProvider, subject, description, referenceImages, clientNotes, deadline } = body;
+    
+    // Support both single object and { items: [...] } for bulk orders
+    const itemsToCreate = Array.isArray(body.items) ? body.items : [body];
 
-    if (!artistId || !subject || !description) {
-      return NextResponse.json({ error: 'artistId, subject, and description required.' }, { status: 400 });
+    if (itemsToCreate.length === 0) {
+      return NextResponse.json({ error: 'No items to order.' }, { status: 400 });
     }
-    const validServiceTypes = ['drawing_only', 'drawing_writing'];
-    const svc = validServiceTypes.includes(serviceType) ? serviceType : 'drawing_only';
-    // notebookProvider: "client" (I will provide) or "artist" (artist provides)
-    const np = notebookProvider === 'artist' ? 'artist' : 'client';
 
-    // ── Parse deadline (optional) ──
-    // Accepts ISO datetime string from the frontend (e.g. "2026-09-25T14:30")
-    // Must be at least 1 hour in the future if provided.
-    let deadlineDate: Date | null = null;
-    if (deadline && typeof deadline === 'string') {
-      const parsed = new Date(deadline);
-      if (!isNaN(parsed.getTime())) {
-        const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
-        if (parsed < oneHourFromNow) {
-          return NextResponse.json({ error: 'Deadline must be at least 1 hour from now.' }, { status: 400 });
-        }
-        deadlineDate = parsed;
-      }
+    // Validate first item to get artistId (assuming all items are for the same artist)
+    const firstItem = itemsToCreate[0];
+    const artistId = firstItem.artistId;
+    
+    if (!artistId) {
+      return NextResponse.json({ error: 'Artist ID is required.' }, { status: 400 });
     }
 
     const artist = await db.user.findUnique({ where: { id: String(artistId) } });
@@ -92,85 +82,113 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This artist is currently unavailable for new commissions.' }, { status: 400 });
     }
 
-    // 4-tier pricing: base price (drawing_only | drawing_writing) + notebookCost if artist provides
-    const basePrice = svc === 'drawing_only' ? artist.rateDrawingOnly : artist.rateDrawingWriting;
-    const notebookExtra = np === 'artist' ? (artist.notebookCost || 0) : 0;
-    const price = basePrice + notebookExtra;
+        const createdBookings: any[] = [];
 
-    const booking = await db.booking.create({
-      data: {
-        clientId: payload.userId,
-        artistId: artist.id,
-        serviceType: svc,
-        notebookProvider: np,
-        subject: String(subject),
-        description: String(description),
-        referenceImagesJson: JSON.stringify(Array.isArray(referenceImages) ? referenceImages : []),
-        price,
-        clientNotes: clientNotes ? String(clientNotes) : null,
-        status: 'pending',
-        paymentStatus: 'unpaid',
-        // ── NEW: Save deadline if provided ──
-        ...(deadlineDate ? { deadline: deadlineDate } : {}),
-      },
-    });
+    for (const item of itemsToCreate) {
+      const { serviceType, notebookProvider, subject, description, referenceImages, clientNotes, deadline } = item;
 
-    // Log to activity feed — who hired who for what and total price
-    await logActivity({
-      userId: payload.userId,
-      userName: payload.email,
-      userRole: payload.role,
-      action: 'booking_created',
-      category: 'marketplace',
-      detail: `${payload.email} hired ${artist.name} for ${svc === 'drawing_only' ? 'Drawing Only' : 'Drawing + Writing'} — ${subject} — ৳${price} (${np === 'artist' ? 'artist provides notebook' : 'client provides notebook'})${deadlineDate ? ` — deadline: ${deadlineDate.toISOString()}` : ''}`,
-      metadata: {
-        bookingId: booking.id,
-        clientId: payload.userId,
-        clientEmail: payload.email,
-        artistId: artist.id,
-        artistName: artist.name,
-        serviceType: svc,
-        notebookProvider: np,
-        subject,
-        price,
-        deadline: deadlineDate ? deadlineDate.toISOString() : null,
-      },
-            request,
-    });
+      if (!subject || !description) {
+        return NextResponse.json({ error: `Item missing subject or description.` }, { status: 400 });
+      }
 
-    // ── Send transactional emails (fire-and-forget, non-blocking) ──
+      const validServiceTypes = ['drawing_only', 'drawing_writing'];
+      const svc = validServiceTypes.includes(serviceType) ? serviceType : 'drawing_only';
+      const np = notebookProvider === 'artist' ? 'artist' : 'client';
+
+      let deadlineDate: Date | null = null;
+      if (deadline && typeof deadline === 'string') {
+        const parsed = new Date(deadline);
+        if (!isNaN(parsed.getTime())) {
+          const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+          if (parsed < oneHourFromNow) {
+            return NextResponse.json({ error: 'Deadline must be at least 1 hour from now.' }, { status: 400 });
+          }
+          deadlineDate = parsed;
+        }
+      }
+
+      const basePrice = svc === 'drawing_only' ? artist.rateDrawingOnly : artist.rateDrawingWriting;
+      const notebookExtra = np === 'artist' ? (artist.notebookCost || 0) : 0;
+      const price = basePrice + notebookExtra;
+
+      const booking = await db.booking.create({
+        data: {
+          clientId: payload.userId,
+          artistId: artist.id,
+          serviceType: svc,
+          notebookProvider: np,
+          subject: String(subject),
+          description: String(description),
+          referenceImagesJson: JSON.stringify(Array.isArray(referenceImages) ? referenceImages : []),
+          price,
+          clientNotes: clientNotes ? String(clientNotes) : null,
+          status: 'pending',
+          paymentStatus: 'unpaid',
+          ...(deadlineDate ? { deadline: deadlineDate } : {}),
+        },
+      });
+
+      createdBookings.push(booking);
+
+      await logActivity({
+        userId: payload.userId,
+        userName: payload.email,
+        userRole: payload.role,
+        action: 'booking_created',
+        category: 'marketplace',
+        detail: `${payload.email} hired ${artist.name} for ${svc === 'drawing_only' ? 'Drawing Only' : 'Drawing + Writing'} — ${subject} — ৳${price}`,
+        metadata: {
+          bookingId: booking.id,
+          clientId: payload.userId,
+          clientEmail: payload.email,
+          artistId: artist.id,
+          artistName: artist.name,
+          serviceType: svc,
+          notebookProvider: np,
+          subject,
+          price,
+          deadline: deadlineDate ? deadlineDate.toISOString() : null,
+        },
+        request,
+      });
+    }
+
+    // Send transactional emails (fire-and-forget)
     const client = await db.user.findUnique({
       where: { id: payload.userId },
       select: { name: true, email: true },
     });
+    
     if (client?.email && artist.email) {
-      void sendOrderPlacedEmails({
-        bookingId: booking.id,
-        serviceType: svc,
-        notebookProvider: np,
-        subject: String(subject),
-        description: String(description),
-        price,
-        clientName: client.name,
-        clientEmail: client.email,
-        artistName: artist.name,
-        artistEmail: artist.email,
-        artistRating: artist.rating,
-        appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://pracpedia.vercel.app',
-      }).catch((e) => console.error('[email] order_placed send failed:', e));
+      for (const booking of createdBookings) {
+        void sendOrderPlacedEmails({
+          bookingId: booking.id,
+          serviceType: booking.serviceType,
+          notebookProvider: booking.notebookProvider,
+          subject: booking.subject,
+          description: booking.description,
+          price: booking.price,
+          clientName: client.name,
+          clientEmail: client.email,
+          artistName: artist.name,
+          artistEmail: artist.email,
+          artistRating: artist.rating,
+          appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://pracpedia.vercel.app',
+        }).catch((e) => console.error('[email] order_placed send failed:', e));
+      }
     }
 
     return NextResponse.json({
-      ...booking,
-      id: booking.id,
-      referenceImages: safeJsonParseArray(booking.referenceImagesJson),
+      success: true,
+      count: createdBookings.length,
+      bookings: createdBookings.map(b => ({
+        ...b,
+        id: b.id,
+        referenceImages: safeJsonParseArray(b.referenceImagesJson),
+      })),
     });
   } catch (err: any) {
     console.error('POST /api/bookings error:', err);
     return NextResponse.json({ error: 'Could not create booking.' }, { status: 500 });
   }
 }
-
-
-
-

@@ -247,7 +247,7 @@ export const OrderChatModal: React.FC<OrderChatModalProps> = ({
             transition={{ type: 'spring', damping: 26, stiffness: 320 }}
             className="
               w-full sm:max-w-lg
-              h-[100dvh] sm:h-[600px] sm:max-h-[92vh]
+              h-[100dvh] sm:h-[600px] sm:max-h-[92vh] max-h-[100dvh]
               bg-[#0d121f] border border-slate-700/70
               rounded-t-3xl sm:rounded-3xl
               shadow-[0_25px_70px_rgba(0,0,0,0.9)]
@@ -294,7 +294,7 @@ export const OrderChatModal: React.FC<OrderChatModalProps> = ({
                 className="
                   p-2 text-slate-400 hover:text-white hover:bg-slate-800
                   rounded-full transition-colors cursor-pointer shrink-0
-                  min-h-[40px] min-w-[40px] sm:min-h-[36px] sm:min-w-[36px]
+                  min-h-10 min-w-10 sm:min-h-9 sm:min-w-9
                   flex items-center justify-center
                 "
               >
@@ -302,11 +302,11 @@ export const OrderChatModal: React.FC<OrderChatModalProps> = ({
               </button>
             </div>
 
-            {/* Messages Area */}
+                        {/* Messages Area */}
             <div
               ref={scrollContainerRef}
               className="
-                flex-1 overflow-y-auto overflow-x-hidden
+                flex-1 min-h-0 overflow-y-auto overflow-x-hidden
                 p-3 sm:p-4 space-y-3
                 overscroll-contain
                 scrollbar-thin scrollbar-thumb-white/5
