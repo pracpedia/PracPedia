@@ -2024,7 +2024,7 @@ const fetchWithTimeout = async (url: string, opts: RequestInit = {}): Promise<Re
                   — kept mounted (display:none when inactive) for state persistency
                   ============================================== */}
               <div className={currentView === 'chat' ? "space-y-6" : "hidden"}>
-                <ClassroomDiscussion subjects={subjects} />
+                <ClassroomDiscussion />
               </div>
 
               {/* ==============================================
