@@ -65,6 +65,15 @@ interface ReportPayload {
 export function reportError(payload: ReportPayload): void {
   try {
     if (typeof window === 'undefined') return;
+    
+    // GLOBAL FILTER: Ignore AbortErrors everywhere.
+    // These happen when a component unmounts while a fetch is loading.
+    if (payload.type === 'fetch_error') {
+      const msg = (payload.message || '').toLowerCase();
+      if (msg.includes('aborted') || msg.includes('aborterror')) {
+        return; // Don't report
+      }
+    }
     // Enrich with browser context
     const enriched: ReportPayload = {
       ...payload,
@@ -244,6 +253,11 @@ export function installErrorCapture(): void {
  */
 export function reportFetchErrors<T extends Promise<Response>>(p: T, url: string): T {
   p.catch((err) => {
+    // Ignore AbortErrors — these happen normally when a component unmounts
+    // while a fetch is still loading (e.g., navigating away during a poll).
+    const isAbortError = err?.name === 'AbortError' || (err?.message || '').includes('aborted');
+    if (isAbortError) return;
+
     reportError({
       type: 'fetch_error',
       message: err instanceof Error ? err.message : String(err),

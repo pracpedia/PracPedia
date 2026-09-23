@@ -160,16 +160,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
         return res;
-      } catch (err: any) {
-        // Network-level failure (DNS, connection refused, etc.) — report it
-        import('@/lib/client-error-capture').then(({ reportError }) => {
-          reportError({
-            type: 'fetch_error',
-            message: err instanceof Error ? err.message : String(err),
-            stack: err instanceof Error ? err.stack || '' : '',
-            extra: { requestUrl: url.slice(0, 500), method: options.method || 'GET' },
+          } catch (err: any) {
+        // Ignore AbortErrors (happen when navigating away during a fetch)
+        const isAbortError = err?.name === 'AbortError' || (err?.message || '').includes('aborted');
+        if (!isAbortError) {
+          // Network-level failure (DNS, connection refused, etc.) — report it
+          import('@/lib/client-error-capture').then(({ reportError }) => {
+            reportError({
+              type: 'fetch_error',
+              message: err instanceof Error ? err.message : String(err),
+              stack: err instanceof Error ? err.stack || '' : '',
+              extra: { requestUrl: url.slice(0, 500), method: options.method || 'GET' },
+            });
           });
-        });
+        }
         throw err;
       }
     },
