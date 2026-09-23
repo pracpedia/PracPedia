@@ -16,6 +16,7 @@
  *   - input text-base on mobile (prevents iOS auto-zoom on focus)
  *   - scrollIntoView with 'auto' fallback for iOS
  *   - browser-safe ref typing (ReturnType<typeof setInterval>)
+ *   - Profile pictures for both sender and user (Messenger style, top-aligned)
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -230,7 +231,7 @@ export const OrderChatModal: React.FC<OrderChatModalProps> = ({
     <AnimatePresence>
       {open && (
         <div
-          className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md"
+          className="fixed inset-0 z-2000 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md"
           style={{
             // 100dvh adapts to mobile browser chrome (URL bar hide/show)
             height: '100dvh',
@@ -302,7 +303,7 @@ export const OrderChatModal: React.FC<OrderChatModalProps> = ({
               </button>
             </div>
 
-                        {/* Messages Area */}
+            {/* Messages Area */}
             <div
               ref={scrollContainerRef}
               className="
@@ -344,11 +345,11 @@ export const OrderChatModal: React.FC<OrderChatModalProps> = ({
                   const currentDateKey = getDateKey(msg.createdAt);
                   const prevMsg = messages[index - 1];
                   const prevDateKey = prevMsg ? getDateKey(prevMsg.createdAt) : null;
-                  // Show date separator if this is the first message OR the date changed from previous message
                   const showDateSeparator = currentDateKey !== prevDateKey;
+                  
                   return (
-                    <div key={msg.id}>
-                      {/* Date separator — shown when day changes */}
+                    <div key={`${msg.id}-${index}`} className="space-y-2">
+                      {/* Date separator — full width, centered above message */}
                       {showDateSeparator && (
                         <div className="flex items-center justify-center my-4 first:mt-0">
                           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-white/[0.06]">
@@ -360,15 +361,22 @@ export const OrderChatModal: React.FC<OrderChatModalProps> = ({
                           </div>
                         </div>
                       )}
-                      <div
-                        className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
-                      >
+
+                      {/* Message row — aligned to top like Messenger */}
+                      <div className={`flex items-start gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                        {/* Sender Avatar (Left) */}
                         {!isMe && (
-                          <div className="w-7 h-7 sm:w-6 sm:h-6 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center text-[10px] font-bold text-slate-200 shrink-0">
-                            {msg.sender.name?.charAt(0).toUpperCase() || '?'}
+                          <div className="w-7 h-7 sm:w-6 sm:h-6 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center text-[10px] font-bold text-slate-200 shrink-0 overflow-hidden mt-4">
+                            {msg.sender.profilePic ? (
+                              <img src={msg.sender.profilePic} alt={msg.sender.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              <span>{msg.sender.name?.charAt(0).toUpperCase() || '?'}</span>
+                            )}
                           </div>
                         )}
-                        <div className="max-w-[80%] sm:max-w-[75%] space-y-1 min-w-0">
+
+                        {/* Message Content */}
+                        <div className={`max-w-[80%] sm:max-w-[75%] space-y-1 min-w-0 flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                           {!isMe && (
                             <p className="text-[10px] sm:text-[9px] font-bold text-slate-400 px-2 truncate">
                               {msg.sender.name}
@@ -398,6 +406,17 @@ export const OrderChatModal: React.FC<OrderChatModalProps> = ({
                             {formatTime(msg.createdAt)}
                           </p>
                         </div>
+
+                        {/* My Avatar (Right) */}
+                        {isMe && (
+                          <div className="w-7 h-7 sm:w-6 sm:h-6 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-[10px] font-bold text-cyan-200 shrink-0 overflow-hidden mt-4">
+                            {user?.profilePic ? (
+                              <img src={user.profilePic} alt="You" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              <span>{user?.name?.charAt(0).toUpperCase() || 'M'}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
